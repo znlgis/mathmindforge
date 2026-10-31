@@ -1,0 +1,528 @@
+{
+  "id": "g79-modeling-dispatch",
+  "title": "城市调度员",
+  "band": "g79",
+  "thread": "modeling",
+  "template": "simulate",
+  "thinkingTarget": "在预算内让覆盖率和等待时间同时达标，换一天也稳",
+  "intro": "城里有六个站，每天的需求写在调度单上。你要排车、排班，让两天的线路都跑得动。",
+  "prompt": "调参数，让两个种子日的覆盖率、等待时间和预算同时达标，再锁定参数提交方案。",
+  "done": "你在预算里排好了车和班次，两个种子日都稳，换一种需求分布还站得住。",
+  "retry": "先看是等待超了还是覆盖率不够，再决定加车、加队，还是换一条路线。",
+  "tools": [
+    {
+      "kind": "knob",
+      "titleKey": "tool.knob.title",
+      "descriptionKey": "tool.knob.desc",
+      "requiredArtifacts": [
+        "params"
+      ],
+      "config": {
+        "keys": [
+          {
+            "key": "vehicles",
+            "min": 1,
+            "max": 4,
+            "step": 1,
+            "unit": "辆"
+          },
+          {
+            "key": "teams",
+            "min": 1,
+            "max": 2,
+            "step": 1,
+            "unit": "队"
+          },
+          {
+            "key": "shift",
+            "min": 60,
+            "max": 120,
+            "step": 30,
+            "unit": "分"
+          },
+          {
+            "key": "route",
+            "min": 0,
+            "max": 2,
+            "step": 1
+          }
+        ],
+        "options": {
+          "shift": [
+            {
+              "value": 60,
+              "label": "60 分钟"
+            },
+            {
+              "value": 90,
+              "label": "90 分钟"
+            },
+            {
+              "value": 120,
+              "label": "120 分钟"
+            }
+          ],
+          "route": [
+            {
+              "value": 0,
+              "label": "单区环线"
+            },
+            {
+              "value": 1,
+              "label": "两区分送"
+            },
+            {
+              "value": 2,
+              "label": "快线直送"
+            }
+          ]
+        },
+        "labels": {
+          "vehicles": "车辆",
+          "teams": "服务队",
+          "shift": "班次",
+          "route": "路线"
+        },
+        "budget": 120,
+        "runLabelKey": "knob.run",
+        "commitLabel": "锁定参数",
+        "resetLabel": "重置参数"
+      }
+    },
+    {
+      "kind": "probe",
+      "titleKey": "tool.probe.title",
+      "descriptionKey": "tool.probe.desc",
+      "requiredArtifacts": [
+        "runs"
+      ],
+      "config": {
+        "mode": "metrics",
+        "sampleSizes": [
+          2
+        ],
+        "chart": "metrics",
+        "budget": 120,
+        "targets": {
+          "A": {
+            "coverageMin": 0.9,
+            "waitMax": 18
+          },
+          "B": {
+            "coverageMin": 0.85,
+            "waitMax": 20
+          }
+        },
+        "routeLabels": [
+          "单区环线",
+          "两区分送",
+          "快线直送"
+        ],
+        "seedLabels": [
+          "A",
+          "B"
+        ],
+        "focusLabel": "查看指标"
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "params",
+    "runs"
+  ],
+  "levelScript": {
+    "mode": "dispatch",
+    "stations": [
+      "东门",
+      "南门",
+      "西门",
+      "北门",
+      "中环",
+      "公园"
+    ],
+    "seeds": [
+      {
+        "id": "A",
+        "demand": [
+          3,
+          2,
+          4,
+          3,
+          2,
+          4
+        ]
+      },
+      {
+        "id": "B",
+        "demand": [
+          2,
+          4,
+          3,
+          2,
+          4,
+          3
+        ]
+      }
+    ],
+    "capacityPerVehicle": 10,
+    "budget": 120,
+    "targets": {
+      "A": {
+        "coverageMin": 0.9,
+        "waitMax": 18
+      },
+      "B": {
+        "coverageMin": 0.85,
+        "waitMax": 20
+      }
+    },
+    "routes": [
+      {
+        "id": "single",
+        "label": "单区环线",
+        "factor": 1,
+        "waitPenalty": 0
+      },
+      {
+        "id": "two-zone",
+        "label": "两区分送",
+        "factor": 0.98,
+        "waitPenalty": 1
+      },
+      {
+        "id": "fast",
+        "label": "快线直送",
+        "factor": 0.94,
+        "waitPenalty": 2
+      }
+    ],
+    "formula": {
+      "baseWait": 30,
+      "vehicleWait": 4,
+      "teamWait": 2,
+      "shiftWait": {
+        "60": 6,
+        "90": 0,
+        "120": 0
+      },
+      "minWait": 4,
+      "seedWaitOffset": {
+        "A": 0,
+        "B": 1
+      },
+      "vehicleCost": 25,
+      "teamCost": 10,
+      "shiftCostPerMinute": 0.2
+    },
+    "params": {
+      "vehicles": {
+        "min": 1,
+        "max": 4,
+        "step": 1,
+        "default": 2
+      },
+      "teams": {
+        "min": 1,
+        "max": 2,
+        "step": 1,
+        "default": 1
+      },
+      "shifts": [
+        60,
+        90,
+        120
+      ],
+      "shiftDefault": 90,
+      "routeDefault": "single"
+    }
+  },
+  "evidencePlan": [
+    {
+      "id": "params",
+      "phase": "construct",
+      "require": "knob/commit >= 1",
+      "descriptionKey": "level.g79.sim.params"
+    },
+    {
+      "id": "run",
+      "phase": "run",
+      "require": "knob/run >= 1",
+      "descriptionKey": "level.g79.sim.run"
+    },
+    {
+      "id": "compare",
+      "phase": "result",
+      "require": "probe/focus >= 1",
+      "descriptionKey": "level.g79.sim.compare"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-3v-1t-90",
+      "artifact": {
+        "params": {
+          "vehicles": 3,
+          "teams": 1,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": [
+          {
+            "seed": "A",
+            "demand": 18,
+            "capacity": 30,
+            "coverage": 1,
+            "wait": 16,
+            "cost": 103
+          },
+          {
+            "seed": "B",
+            "demand": 18,
+            "capacity": 30,
+            "coverage": 1,
+            "wait": 17,
+            "cost": 103
+          }
+        ]
+      }
+    },
+    {
+      "id": "s-2v-2t-90",
+      "artifact": {
+        "params": {
+          "vehicles": 2,
+          "teams": 2,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": [
+          {
+            "seed": "A",
+            "demand": 18,
+            "capacity": 20,
+            "coverage": 1,
+            "wait": 18,
+            "cost": 88
+          },
+          {
+            "seed": "B",
+            "demand": 18,
+            "capacity": 20,
+            "coverage": 1,
+            "wait": 19,
+            "cost": 88
+          }
+        ]
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-budget-4v",
+      "expectFailure": "sim-budget",
+      "artifact": {
+        "params": {
+          "vehicles": 4,
+          "teams": 1,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": [
+          {
+            "seed": "A",
+            "demand": 18,
+            "capacity": 40,
+            "coverage": 1,
+            "wait": 12,
+            "cost": 128
+          },
+          {
+            "seed": "B",
+            "demand": 18,
+            "capacity": 40,
+            "coverage": 1,
+            "wait": 13,
+            "cost": 128
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-coverage-1v",
+      "expectFailure": "sim-coverage",
+      "artifact": {
+        "params": {
+          "vehicles": 1,
+          "teams": 1,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": [
+          {
+            "seed": "A",
+            "demand": 18,
+            "capacity": 10,
+            "coverage": 0.5556,
+            "wait": 24,
+            "cost": 53
+          },
+          {
+            "seed": "B",
+            "demand": 18,
+            "capacity": 10,
+            "coverage": 0.5556,
+            "wait": 25,
+            "cost": 53
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-wait-2v-1t",
+      "expectFailure": "sim-wait",
+      "artifact": {
+        "params": {
+          "vehicles": 2,
+          "teams": 1,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": [
+          {
+            "seed": "A",
+            "demand": 18,
+            "capacity": 20,
+            "coverage": 1,
+            "wait": 20,
+            "cost": 78
+          },
+          {
+            "seed": "B",
+            "demand": 18,
+            "capacity": 20,
+            "coverage": 1,
+            "wait": 21,
+            "cost": 78
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-single-seed",
+      "expectFailure": "sim-overfit-seed",
+      "artifact": {
+        "params": {
+          "vehicles": 3,
+          "teams": 1,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": [
+          {
+            "seed": "A",
+            "demand": 18,
+            "capacity": 30,
+            "coverage": 1,
+            "wait": 16,
+            "cost": 103
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-handwritten-no-run",
+      "expectFailure": "sim-not-run",
+      "artifact": {
+        "params": {
+          "vehicles": 3,
+          "teams": 1,
+          "shift": 90,
+          "route": "single"
+        },
+        "runs": []
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-layout",
+      "axis": "representation",
+      "patch": {
+        "stations": [
+          "公园",
+          "北门",
+          "西门",
+          "南门",
+          "东门",
+          "中环"
+        ]
+      }
+    },
+    {
+      "id": "v-demand",
+      "axis": "constraint",
+      "patch": {
+        "seeds": [
+          {
+            "id": "A",
+            "demand": [
+              2,
+              4,
+              3,
+              2,
+              4,
+              3
+            ]
+          },
+          {
+            "id": "B",
+            "demand": [
+              3,
+              2,
+              4,
+              3,
+              2,
+              4
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "feedback": {
+    "sim-not-run": {
+      "messageKey": "level.g79.sim.notRun.message",
+      "hintKey": "level.g79.sim.notRun.hint",
+      "focus": "knob-run"
+    },
+    "sim-budget": {
+      "messageKey": "level.g79.sim.budget.message",
+      "hintKey": "level.g79.sim.budget.hint",
+      "focus": "knob-cost"
+    },
+    "sim-coverage": {
+      "messageKey": "level.g79.sim.coverage.message",
+      "hintKey": "level.g79.sim.coverage.hint",
+      "focus": "knob-vehicles"
+    },
+    "sim-wait": {
+      "messageKey": "level.g79.sim.wait.message",
+      "hintKey": "level.g79.sim.wait.hint",
+      "focus": "knob-teams"
+    },
+    "sim-overfit-seed": {
+      "messageKey": "level.g79.sim.overfit.message",
+      "hintKey": "level.g79.sim.overfit.hint",
+      "focus": "metrics-table"
+    }
+  },
+  "badges": [
+    "modeler"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M1 simulate builder",
+    "reviewedAt": "2026-11-01",
+    "notesKey": "level.g79.sim.manualAudit"
+  }
+}

@@ -4,7 +4,14 @@ import { createTranslator } from '@mmf/i18n';
 import type { Translator } from '@mmf/i18n';
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import ConstructTool from './ConstructTool.vue';
+import CounterTool from './CounterTool.vue';
+import KnobTool from './KnobTool.vue';
+import MetricsTool from './MetricsTool.vue';
 import PatternTool from './PatternTool.vue';
+import PaymentTool from './PaymentTool.vue';
+import RuleTool from './RuleTool.vue';
+import SampleTool from './SampleTool.vue';
+import TallyTool from './TallyTool.vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
@@ -86,7 +93,56 @@ onBeforeUnmount(() => {
         :t="translator"
       />
       <ConstructTool
+        v-else-if="spec.kind === 'construct' && spec.config.mode !== 'payment'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <PaymentTool
         v-else-if="spec.kind === 'construct'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <RuleTool
+        v-else-if="spec.kind === 'rule'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <CounterTool
+        v-else-if="spec.kind === 'counter'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <KnobTool
+        v-else-if="spec.kind === 'knob'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <MetricsTool
+        v-else-if="spec.kind === 'probe' && spec.config.mode === 'metrics'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <TallyTool
+        v-else-if="spec.kind === 'probe' && spec.config.mode === 'tally'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <SampleTool
+        v-else-if="spec.kind === 'probe'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"

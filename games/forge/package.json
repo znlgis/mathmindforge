@@ -5,7 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./k-structure-pattern-path": "./src/levels/k-structure-pattern-path.ts"
+    "./k-structure-pattern-path": "./src/levels/k-structure-pattern-path.ts",
+    "./k-data-tally": "./src/levels/k-data-tally.ts",
+    "./g13-algorithm-route": "./src/levels/g13-algorithm-route.ts",
+    "./g46-algorithm-payment": "./src/levels/g46-algorithm-payment.ts",
+    "./g79-modeling-dispatch": "./src/levels/g79-modeling-dispatch.ts",
+    "./g1012-modeling-winrate": "./src/levels/g1012-modeling-winrate.ts"
   },
   "scripts": {
     "test": "vitest run",

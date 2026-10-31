@@ -1,4 +1,12 @@
 export { default as ToolDock } from './ToolDock.vue';
 export { default as PatternTool } from './PatternTool.vue';
 export { default as ConstructTool } from './ConstructTool.vue';
-export { default } from './ToolDock.vue';
+export { default as RuleTool } from './RuleTool.vue';
+export { default as PaymentTool } from './PaymentTool.vue';
+export { default as CounterTool } from './CounterTool.vue';
+export { default as KnobTool } from './KnobTool.vue';
+export { default as MetricsTool } from './MetricsTool.vue';
+export { default as TallyTool } from './TallyTool.vue';
+export { default as SampleTool } from './SampleTool.vue';
+import ToolDock from './ToolDock.vue';
+export default ToolDock;

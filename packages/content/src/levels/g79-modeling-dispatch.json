@@ -1,0 +1,24 @@
+{
+  "id": "g79-modeling-dispatch",
+  "title": "城市调度员",
+  "emoji": "🚚",
+  "color": "#2f7d78",
+  "band": "g79",
+  "thread": "modeling",
+  "template": "simulate",
+  "tools": [
+    "knob",
+    "probe"
+  ],
+  "estimatedMinutes": 10,
+  "thinkingTarget": "在预算内让覆盖率和等待时间同时达标，换一天也稳",
+  "difficulty": {
+    "structure": 3,
+    "representation": 3,
+    "constraint": 4,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  }
+}

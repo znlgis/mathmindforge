@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { LevelModule, LevelRuntime, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
+import type { LevelModule, LevelRuntime, RunSnapshot, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
 import { loadLevel } from '@mmf/content';
 import type { LevelDetail } from '@mmf/content';
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import ToolDock from '@mmf/toolkit-ui';
 import { navigate } from '../router';
 import { registry } from '../registry';
@@ -26,7 +26,19 @@ const runtime = shallowRef<LevelRuntime | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const completed = ref(false);
+const finalSnapshot = ref<RunSnapshot | null>(null);
 const exitTimer = ref<number | null>(null);
+
+const usedTools = computed(() => {
+  const usage = finalSnapshot.value?.toolUsage;
+  if (!usage) return 0;
+  return Object.values(usage).filter((item) => item.used > 0).length;
+});
+const passedCheckpoints = computed(() => {
+  const checkpoints = finalSnapshot.value?.checkpoints;
+  if (!checkpoints) return 0;
+  return Object.values(checkpoints).filter(Boolean).length;
+});
 
 const progress = useProgress();
 const settings = useSettings();
@@ -75,6 +87,7 @@ async function submit(): Promise<void> {
   const rt = runtime.value;
   if (!rt) return;
   const result = await rt.dispatch({ type: 'submit', payload: {} });
+  finalSnapshot.value = result.snapshot;
   setDebugSnapshot(result.snapshot);
   const verdict = result.verdict;
   if (verdict?.passed) {
@@ -146,6 +159,7 @@ async function start(): Promise<void> {
     registerSubmit(submit);
     if (debug?.autoplay) {
       const result = await runtimeRef.autoplay();
+      finalSnapshot.value = result.snapshot;
       setDebugSnapshot(result.snapshot);
       if (result.verdict?.passed) await completeNow(result.verdict.stamps, result.snapshot.variantId);
     }
@@ -229,11 +243,17 @@ onBeforeUnmount(async () => {
     </header>
 
     <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
-      <section class="relative min-h-[42vh] flex-1 border-b border-grid bg-paper lg:border-b-0 lg:border-r">
+      <section
+        v-if="module?.manifest.hasCanvas"
+        class="relative min-h-[42vh] flex-1 border-b border-grid bg-paper lg:border-b-0 lg:border-r"
+      >
         <div ref="canvasHost" data-testid="level-canvas" class="game-host h-full w-full" />
       </section>
 
-      <aside class="flex min-h-0 w-full flex-col lg:w-[420px]">
+      <aside
+        class="flex min-h-0 w-full flex-col"
+        :class="module?.manifest.hasCanvas ? 'lg:w-[420px]' : 'mx-auto max-w-3xl'"
+      >
         <div ref="host" data-testid="level-dock" class="min-h-0 flex-1 overflow-y-auto p-3">
           <ToolDock
             v-if="runtime && detail"
@@ -246,6 +266,7 @@ onBeforeUnmount(async () => {
         <div class="border-t border-grid bg-paper p-3">
           <div class="flex gap-2">
             <button
+              v-if="module?.manifest.runEnabled !== false"
               type="button"
               data-testid="level-run"
               class="min-h-12 flex-1 rounded-2xl bg-brass px-4 text-sm font-bold text-white active:scale-95"
@@ -296,6 +317,11 @@ onBeforeUnmount(async () => {
         <p class="text-3xl" aria-hidden="true">🧩</p>
         <h2 class="mt-2 text-2xl font-black text-blueprint">{{ t('complete.title') }}</h2>
         <p class="mt-3 text-sm leading-6 text-ink-soft">{{ t('level.completed') }}</p>
+        <div class="mt-4 flex justify-center gap-2 text-xs font-semibold text-ink-soft">
+          <span class="rounded-full bg-paper px-3 py-1">用了 {{ usedTools }} 件工具</span>
+          <span class="rounded-full bg-paper px-3 py-1">通过 {{ passedCheckpoints }} 个检查点</span>
+          <span class="rounded-full bg-paper px-3 py-1">印章 {{ finalSnapshot?.stamps.length ?? 0 }} 枚</span>
+        </div>
         <div class="mt-6 flex justify-center gap-3">
           <button type="button" class="min-h-12 rounded-2xl bg-card px-5 text-sm font-bold" @click="replay">
             {{ t('complete.replay') }}

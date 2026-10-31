@@ -1,0 +1,23 @@
+{
+  "id": "k-data-tally",
+  "title": "分类小站",
+  "emoji": "🔢",
+  "color": "#2f7d78",
+  "band": "k",
+  "thread": "data",
+  "template": "experiment",
+  "tools": [
+    "probe"
+  ],
+  "estimatedMinutes": 5,
+  "thinkingTarget": "把一筐图形数清楚，再用统计条说明最多和最少",
+  "difficulty": {
+    "structure": 1,
+    "representation": 2,
+    "constraint": 1,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}

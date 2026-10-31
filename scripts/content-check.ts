@@ -1,13 +1,6 @@
-import {
-  LEVEL_IDS, SHIPPED_LEVEL_IDS,
-} from '@mmf/content/full';
-import {
-  LEVEL_DETAILS, LEVEL_SUMMARIES, LevelDetailSchema, LevelSummarySchema,
-} from '@mmf/content/full';
-import {
-  applyVariant, parseScript, reachableFailureClasses, validateArtifact,
-} from '@mmf/templates/pattern.logic';
-import type { PatternVariant } from '@mmf/templates/pattern.logic';
+import { LEVEL_IDS, SHIPPED_LEVEL_IDS } from '@mmf/content/full';
+import { LEVEL_DETAILS, LEVEL_SUMMARIES, LevelDetailSchema, LevelSummarySchema } from '@mmf/content/full';
+import { verifiers } from '@mmf/templates/verifiers';
 
 let errors = 0;
 function fail(message: string): void {
@@ -20,26 +13,21 @@ function ok(message: string): void {
 
 const BANNED = ['失败', '惩罚', '笨蛋', '输了', '淘汰', '粗心', '扣分', '排名', '倒数'];
 const summaryById = new Map(LEVEL_SUMMARIES.map((s) => [s.id, s]));
+const baseVariant = { id: 'base', axis: 'structure', patch: {} };
 
 console.log('校验已发布关卡：' + SHIPPED_LEVEL_IDS.join('、') + '\n');
 
 for (const id of SHIPPED_LEVEL_IDS) {
   console.log('· ' + id);
   const rawSummary = summaryById.get(id);
-  if (!rawSummary) {
-    fail(id + ' 缺少摘要');
-    continue;
-  }
+  if (!rawSummary) { fail(id + ' 缺少摘要'); continue; }
   const summary = LevelSummarySchema.safeParse(rawSummary);
   if (!summary.success) {
     fail(id + ' 摘要 schema：' + summary.error.issues.map((i) => i.path.join('.') + ' ' + i.message).join('；'));
     continue;
   }
   const rawDetail = LEVEL_DETAILS[id];
-  if (!rawDetail) {
-    fail(id + ' 缺少详情');
-    continue;
-  }
+  if (!rawDetail) { fail(id + ' 缺少详情'); continue; }
   const detail = LevelDetailSchema.safeParse(rawDetail);
   if (!detail.success) {
     fail(id + ' 详情 schema：' + detail.error.issues.map((i) => i.path.join('.') + ' ' + i.message).join('；'));
@@ -53,8 +41,15 @@ for (const id of SHIPPED_LEVEL_IDS) {
   const detailTools = data.tools.map((tool) => tool.kind).sort().join(',');
   if (summaryTools !== detailTools) fail(id + ' 摘要/详情工具不一致：' + summaryTools + ' vs ' + detailTools);
 
-  const script = parseScript(data.levelScript);
-  if (script.scenario.length !== script.scenario.visible.length) fail(id + ' 路径长度与可见序列长度不一致');
+  const verifier = verifiers[data.template];
+  if (!verifier) { fail(id + ' 模板没有 verifier：' + data.template); continue; }
+
+  try {
+    verifier.parseScript(data.levelScript);
+  } catch (cause) {
+    fail(id + ' levelScript 解析失败：' + (cause instanceof Error ? cause.message : String(cause)));
+    continue;
+  }
 
   const required = new Set(data.tools.flatMap((tool) => tool.requiredArtifacts));
   for (const artifact of data.requiredToolArtifacts) {
@@ -62,14 +57,21 @@ for (const id of SHIPPED_LEVEL_IDS) {
   }
 
   if (data.solutions.length < 2) fail(id + ' 至少需要 2 条黄金解');
-  const baseVariant: PatternVariant = { id: 'base', axis: 'structure', patch: {} };
   for (const solution of data.solutions) {
-    const verdict = validateArtifact(script, baseVariant, solution.artifact);
+    const verdict = verifier.validateArtifact(data, baseVariant, solution.artifact);
     if (!verdict.passed) fail(id + ' 黄金解不通过：' + solution.id + '（' + (verdict.failure?.class ?? '?') + '）');
   }
 
+  const transferVariants = verifier.transferVariants?.(data) ?? [];
+  if (transferVariants.length > 0 && data.solutions[0]) {
+    for (const variant of transferVariants) {
+      const verdict = verifier.validateArtifact(data, variant, data.solutions[0].artifact);
+      if (!verdict.passed) fail(id + ' 迁移变体不可通过：' + variant.id + '（' + (verdict.failure?.class ?? '?') + '）');
+    }
+  }
+
   for (const negative of data.negativeSamples) {
-    const verdict = validateArtifact(script, baseVariant, negative.artifact);
+    const verdict = verifier.validateArtifact(data, baseVariant, negative.artifact);
     if (verdict.passed) fail(id + ' 负例居然通过：' + negative.id);
     else if (verdict.failure?.class !== negative.expectFailure) {
       fail(id + ' 负例失败类不符：' + negative.id + ' 期望 ' + negative.expectFailure + '，实际 ' + verdict.failure?.class);
@@ -78,16 +80,20 @@ for (const id of SHIPPED_LEVEL_IDS) {
 
   if (data.variants.length < 2) fail(id + ' 至少需要 2 个变体');
   for (const variant of data.variants) {
-    applyVariant(script, variant); // 确认补丁本身能被 schema 解析
-    const verdict = validateArtifact(script, variant as PatternVariant, data.solutions[0]?.artifact);
-    if (!verdict.passed) fail(id + ' 变体不可通过黄金解：' + variant.id);
+    try {
+      verifier.applyVariant(data, variant);
+    } catch (cause) {
+      fail(id + ' 变体补丁不可解析：' + variant.id + '（' + (cause instanceof Error ? cause.message : String(cause)) + '）');
+    }
   }
 
-  const reachable = reachableFailureClasses(script);
+  const reachable = verifier.reachableFailureClasses(data);
   const feedbackKeys = new Set(Object.keys(data.feedback));
   for (const failure of reachable) {
     if (!feedbackKeys.has(failure)) fail(id + ' 缺少失败类反馈：' + failure);
   }
+  const covered = new Set(data.negativeSamples.map((n) => n.expectFailure));
+  if (covered.size < 3) fail(id + ' 负例覆盖的失败类少于 3 个');
 
   if (data.evidencePlan.length < 2) fail(id + ' 证据计划少于 2 个阶段');
   if (!data.manualAudit?.reviewed) fail(id + ' 缺少 A5/A10 人工复核记录');

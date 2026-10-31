@@ -14,6 +14,8 @@ export interface LevelManifest {
   designSize: { width: number; height: number };
   estimatedMinutes: number;
   hasCanvas: boolean;
+  /** 默认 true；丘验/模拟/实验关由工具按钮运行，隐藏宿主的大"运行" */
+  runEnabled?: boolean;
 }
 
 export interface LevelContext {
@@ -89,6 +91,30 @@ export interface ActionPayloadMap {
   'pattern/commit': Record<string, never>;
   'construct/place': { piece: PiecePlacementInput };
   'construct/remove': { pieceId: string };
+
+  'rule/place': { block: ProgramBlock; at: number };
+  'rule/remove': { id: string };
+  'rule/move': { id: string; at: number };
+  'rule/run': Record<string, never>;
+  'rule/commit': Record<string, never>;
+
+  'knob/set': { key: string; value: number };
+  'knob/run': Record<string, never>;
+  'knob/compare': { runId: string };
+  'knob/reset': Record<string, never>;
+  'knob/commit': Record<string, never>;
+
+  'probe/sample': { n?: number };
+  'probe/clear': Record<string, never>;
+  'probe/focus': { id: string };
+  'probe/claim': { claim: ClaimInput };
+  'probe/tally': { counts: Record<string, number> };
+
+  'counter/edit': { patch: CounterPatch };
+  'counter/test': Record<string, never>;
+  'counter/annotate': { premiseId: string };
+  'counter/commit': Record<string, never>;
+
   'run': Record<string, never>;
   'submit': Record<string, never>;
   'reset': Record<string, never>;
@@ -167,8 +193,13 @@ export interface ProbeToolState {
     n: number;
     values: number[];
     groups?: Record<string, number[]>;
+    counts?: Record<string, number>;
     digest: string;
   };
+  /** 已采集到的原始项（K 数据关用来显示未计数的图形） */
+  items?: string[];
+  /** 玩家手动记录的统计条 */
+  tally?: Record<string, number>;
   claim?: ClaimInput;
   focusId?: string;
 }

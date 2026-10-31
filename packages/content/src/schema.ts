@@ -25,17 +25,26 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('rule'),
     ...ToolSpecBase,
-    config: z.object({ maxBlocks: z.number().int().min(1).max(64) }).passthrough(),
+    config: z.object({
+      maxBlocks: z.number().int().min(1).max(64),
+      gridWidth: z.number().int().min(3).max(12).optional(),
+      gridHeight: z.number().int().min(3).max(12).optional(),
+    }).passthrough(),
   }),
   z.object({
     kind: z.literal('construct'),
     ...ToolSpecBase,
     config: z.object({
+      mode: z.enum(['placement', 'payment']).default('placement'),
       palette: z.array(z.object({
         id: z.string().min(1), label: z.string().min(1), shape: z.string().min(1),
+        value: z.number().int().positive().optional(),
       })).min(1),
       maxPieces: z.number().int().min(1).max(100),
       slots: z.array(z.number().int().min(0)).optional(),
+      target: z.number().int().positive().optional(),
+      denominations: z.array(z.number().int().positive()).optional(),
+      maxCoins: z.number().int().positive().optional(),
     }),
   }),
   z.object({
@@ -47,25 +56,32 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
         step: z.number().positive(), unit: z.string().max(8).optional(),
       })).min(1),
       sumTo: z.number().optional(),
-    }),
+      presets: z.array(z.record(z.string(), z.number())).optional(),
+    }).passthrough(),
   }),
   z.object({
     kind: z.literal('probe'),
     ...ToolSpecBase,
     config: z.object({
+      mode: z.enum(['sample', 'tally', 'metrics']).default('sample'),
       sampleSizes: z.array(z.number().int().positive()).min(1),
       chart: z.string().max(40).optional(),
-    }),
+      categories: z.array(z.object({
+        id: z.string().min(1), label: z.string().min(1), token: z.string().min(1),
+      })).optional(),
+      batchSize: z.number().int().positive().optional(),
+    }).passthrough(),
   }),
   z.object({
     kind: z.literal('counter'),
     ...ToolSpecBase,
     config: z.object({
+      mode: z.enum(['payment']).default('payment'),
       targetRange: z.tuple([z.number().int(), z.number().int()]).optional(),
       minTargetGap: z.number().int().min(0).optional(),
       denominationPool: z.array(z.number().int().positive()).optional(),
       premises: z.array(z.string().min(1)).optional(),
-    }),
+    }).passthrough(),
   }),
 ]);
 export type ToolSpec = z.infer<typeof ToolSpecSchema>;

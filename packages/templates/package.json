@@ -10,7 +10,22 @@
     "./pattern.logic": "./src/pattern/logic.ts",
     "./schemas": "./src/schemas.ts",
     "./layout": "./src/layout.ts",
-    "./pattern.runtime": "./src/pattern/runtime.ts"
+    "./pattern.runtime": "./src/pattern/runtime.ts",
+    "./shared": "./src/shared/index.ts",
+    "./shared.runtime": "./src/shared/runtime.ts",
+    "./rule": "./src/rule/index.ts",
+    "./rule.logic": "./src/rule/logic.ts",
+    "./rule.runtime": "./src/rule/runtime.ts",
+    "./construct": "./src/construct/index.ts",
+    "./construct.logic": "./src/construct/logic.ts",
+    "./construct.runtime": "./src/construct/runtime.ts",
+    "./simulate": "./src/simulate/index.ts",
+    "./simulate.logic": "./src/simulate/logic.ts",
+    "./simulate.runtime": "./src/simulate/runtime.ts",
+    "./experiment": "./src/experiment/index.ts",
+    "./experiment.logic": "./src/experiment/logic.ts",
+    "./experiment.runtime": "./src/experiment/runtime.ts",
+    "./verifiers": "./src/verifiers.ts"
   },
   "scripts": {
     "test": "vitest run",

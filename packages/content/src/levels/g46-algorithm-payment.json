@@ -1,0 +1,24 @@
+{
+  "id": "g46-algorithm-payment",
+  "title": "最少枚数支付",
+  "emoji": "🪙",
+  "color": "#b07d2b",
+  "band": "g46",
+  "thread": "algorithm",
+  "template": "construct",
+  "tools": [
+    "construct",
+    "counter"
+  ],
+  "estimatedMinutes": 8,
+  "thinkingTarget": "用最少枚数付清，并找到贪心失手的反例",
+  "difficulty": {
+    "structure": 2,
+    "representation": 2,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  }
+}

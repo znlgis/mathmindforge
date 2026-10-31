@@ -8,6 +8,11 @@ import { getLevelSummary } from './summaries';
  */
 const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'k-structure-pattern-path': () => import('./details/k-structure-pattern-path.level.json'),
+  'k-data-tally': () => import('./details/k-data-tally.level.json'),
+  'g13-algorithm-route': () => import('./details/g13-algorithm-route.level.json'),
+  'g46-algorithm-payment': () => import('./details/g46-algorithm-payment.level.json'),
+  'g79-modeling-dispatch': () => import('./details/g79-modeling-dispatch.level.json'),
+  'g1012-modeling-winrate': () => import('./details/g1012-modeling-winrate.level.json'),
 };
 
 export async function loadLevel(

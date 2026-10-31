@@ -1,0 +1,434 @@
+{
+  "id": "g46-algorithm-payment",
+  "title": "最少枚数支付",
+  "band": "g46",
+  "thread": "algorithm",
+  "template": "construct",
+  "intro": "柜台只收恰好 6 元，而且要最少的硬币。先自己付一次，再看看贪心会不会失手。",
+  "prompt": "用最少枚数付清 6 元；再构造一个让贪心不是最优的反例。",
+  "done": "你付到了 2 枚，还找到了贪心依赖的前提在什么情况下不成立。",
+  "retry": "先看看枚数，再看看你选的反例是不是和主任务不一样。",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "payment"
+      ],
+      "config": {
+        "mode": "payment",
+        "palette": [
+          {
+            "id": "coin-1",
+            "label": "1 元",
+            "shape": "1",
+            "value": 1
+          },
+          {
+            "id": "coin-3",
+            "label": "3 元",
+            "shape": "3",
+            "value": 3
+          },
+          {
+            "id": "coin-4",
+            "label": "4 元",
+            "shape": "4",
+            "value": 4
+          }
+        ],
+        "maxPieces": 6,
+        "target": 6,
+        "denominations": [
+          1,
+          3,
+          4
+        ],
+        "maxCoins": 6
+      }
+    },
+    {
+      "kind": "counter",
+      "titleKey": "tool.counter.title",
+      "descriptionKey": "tool.counter.desc",
+      "requiredArtifacts": [
+        "counterexample"
+      ],
+      "config": {
+        "mode": "payment",
+        "targetRange": [
+          1,
+          20
+        ],
+        "minTargetGap": 4,
+        "denominationPool": [
+          1,
+          3,
+          4,
+          5
+        ],
+        "premises": [
+          "greedy-optimal",
+          "no-1-coin",
+          "target-residue"
+        ]
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "payment",
+    "counterexample"
+  ],
+  "levelScript": {
+    "mode": "payment",
+    "denominations": [
+      1,
+      3,
+      4
+    ],
+    "target": 6,
+    "maxCoins": 6,
+    "counter": {
+      "targetRange": [
+        1,
+        20
+      ],
+      "minTargetGap": 4,
+      "denominationPool": [
+        1,
+        3,
+        4,
+        5
+      ],
+      "premises": [
+        "greedy-optimal",
+        "no-1-coin",
+        "target-residue"
+      ]
+    },
+    "representation": {
+      "kind": "coins",
+      "unit": "元"
+    }
+  },
+  "evidencePlan": [
+    {
+      "id": "construct",
+      "phase": "construct",
+      "require": "construct/place >= 2",
+      "descriptionKey": "level.payment.construct"
+    },
+    {
+      "id": "test",
+      "phase": "run",
+      "require": "counter/test >= 1",
+      "descriptionKey": "level.payment.test"
+    },
+    {
+      "id": "annotate",
+      "phase": "revise",
+      "require": "counter/annotate >= 1",
+      "descriptionKey": "level.payment.annotate"
+    },
+    {
+      "id": "commit",
+      "phase": "generalize",
+      "require": "counter/commit >= 1",
+      "descriptionKey": "level.payment.commit"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-main-3plus3",
+      "artifact": {
+        "payment": {
+          "coins": [
+            3,
+            3
+          ],
+          "total": 6,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 10,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 3,
+          "isCounterexample": true,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    },
+    {
+      "id": "s-main-3plus3-alt-counter",
+      "artifact": {
+        "payment": {
+          "coins": [
+            3,
+            3
+          ],
+          "total": 6,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 12,
+          "denominations": [
+            1,
+            3,
+            4,
+            5
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 3,
+          "isCounterexample": true,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-not-optimal",
+      "expectFailure": "construct-not-optimal",
+      "artifact": {
+        "payment": {
+          "coins": [
+            4,
+            1,
+            1
+          ],
+          "total": 6,
+          "count": 3
+        },
+        "counterexample": {
+          "target": 10,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 3,
+          "isCounterexample": true,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    },
+    {
+      "id": "n-overpay",
+      "expectFailure": "construct-overpay",
+      "artifact": {
+        "payment": {
+          "coins": [
+            4,
+            4
+          ],
+          "total": 8,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 10,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 3,
+          "isCounterexample": true,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    },
+    {
+      "id": "n-reuse-main",
+      "expectFailure": "counter-reused-main",
+      "artifact": {
+        "payment": {
+          "coins": [
+            3,
+            3
+          ],
+          "total": 6,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 6,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 3,
+          "optimalCoins": 2,
+          "isCounterexample": true,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    },
+    {
+      "id": "n-wrong-premise",
+      "expectFailure": "counter-wrong-premise",
+      "artifact": {
+        "payment": {
+          "coins": [
+            3,
+            3
+          ],
+          "total": 6,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 10,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 3,
+          "isCounterexample": true,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "no-1-coin"
+        }
+      }
+    },
+    {
+      "id": "n-counter-invalid",
+      "expectFailure": "counter-invalid",
+      "artifact": {
+        "payment": {
+          "coins": [
+            3,
+            3
+          ],
+          "total": 6,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 16,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 4,
+          "isCounterexample": false,
+          "tested": true,
+          "committed": true,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    },
+    {
+      "id": "n-not-tested",
+      "expectFailure": "counter-not-tested",
+      "artifact": {
+        "payment": {
+          "coins": [
+            3,
+            3
+          ],
+          "total": 6,
+          "count": 2
+        },
+        "counterexample": {
+          "target": 10,
+          "denominations": [
+            1,
+            3,
+            4
+          ],
+          "greedyCoins": 4,
+          "optimalCoins": 3,
+          "isCounterexample": true,
+          "tested": false,
+          "committed": false,
+          "failedPremise": "greedy-optimal"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-weights",
+      "axis": "representation",
+      "patch": {
+        "representation": {
+          "kind": "weights",
+          "unit": "克"
+        }
+      }
+    },
+    {
+      "id": "v-cards",
+      "axis": "representation",
+      "patch": {
+        "representation": {
+          "kind": "cards",
+          "unit": "张"
+        }
+      }
+    }
+  ],
+  "feedback": {
+    "construct-not-optimal": {
+      "messageKey": "level.payment.notOptimal.message",
+      "hintKey": "level.payment.notOptimal.hint",
+      "focus": "coin-count"
+    },
+    "construct-overpay": {
+      "messageKey": "level.payment.overpay.message",
+      "hintKey": "level.payment.overpay.hint",
+      "focus": "total"
+    },
+    "counter-not-tested": {
+      "messageKey": "level.payment.notTested.message",
+      "hintKey": "level.payment.notTested.hint",
+      "focus": "counter-test"
+    },
+    "counter-invalid": {
+      "messageKey": "level.payment.invalid.message",
+      "hintKey": "level.payment.invalid.hint",
+      "focus": "counter-compare"
+    },
+    "counter-reused-main": {
+      "messageKey": "level.payment.reused.message",
+      "hintKey": "level.payment.reused.hint",
+      "focus": "counter-panel"
+    },
+    "counter-wrong-premise": {
+      "messageKey": "level.payment.premise.message",
+      "hintKey": "level.payment.premise.hint",
+      "focus": "premise"
+    }
+  },
+  "badges": [
+    "builder",
+    "boundary-explorer"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M1 construct/payment builder",
+    "reviewedAt": "2026-11-01",
+    "notesKey": "level.payment.manualAudit"
+  },
+  "thinkingTarget": "用最少枚数付清，并找到贪心失手的反例"
+}

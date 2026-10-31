@@ -1,0 +1,23 @@
+{
+  "id": "g13-algorithm-route",
+  "title": "规则工程师·路线",
+  "emoji": "🤖",
+  "color": "#1f4e6b",
+  "band": "g13",
+  "thread": "algorithm",
+  "template": "rule",
+  "tools": [
+    "rule"
+  ],
+  "estimatedMinutes": 8,
+  "thinkingTarget": "用顺序与重复拼出程序，让它在转过的地图上也成立",
+  "difficulty": {
+    "structure": 2,
+    "representation": 2,
+    "constraint": 2,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  }
+}

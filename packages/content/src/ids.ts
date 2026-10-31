@@ -56,7 +56,14 @@ export const LEVEL_IDS = [
 export type LevelId = (typeof LEVEL_IDS)[number];
 
 /** M0 只发布这一关；M1 扩到 6 关、M2 扩到 20 关 */
-export const SHIPPED_LEVEL_IDS = ['k-structure-pattern-path'] as const;
+export const SHIPPED_LEVEL_IDS = [
+  'k-structure-pattern-path',
+  'k-data-tally',
+  'g13-algorithm-route',
+  'g46-algorithm-payment',
+  'g79-modeling-dispatch',
+  'g1012-modeling-winrate',
+] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 
 export const BADGE_IDS = [
