@@ -1,0 +1,17 @@
+{
+  "name": "@mmf/platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@mmf/game-kit": "workspace:*",
+    "@mmf/progress": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

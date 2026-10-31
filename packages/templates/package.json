@@ -1,0 +1,28 @@
+{
+  "name": "@mmf/templates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core.ts",
+    "./pattern": "./src/pattern/index.ts",
+    "./pattern.logic": "./src/pattern/logic.ts",
+    "./schemas": "./src/schemas.ts",
+    "./layout": "./src/layout.ts",
+    "./pattern.runtime": "./src/pattern/runtime.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@mmf/content": "workspace:*",
+    "@mmf/game-kit": "workspace:*",
+    "@mmf/toolkit": "workspace:*",
+    "@mmf/canvas-kit": "workspace:*",
+    "@mmf/i18n": "workspace:*",
+    "zod": "4.6.7",
+    "phaser": "4.2.1"
+  }
+}

@@ -1,0 +1,341 @@
+{
+  "id": "k-structure-pattern-path",
+  "title": "模式修补匠",
+  "band": "k",
+  "thread": "structure",
+  "template": "pattern",
+  "intro": "路被踩乱了，先看看它原来是怎么排的。",
+  "prompt": "找出重复的单元，把缺的三块补上，再让小伙伴走过去。",
+  "done": "你找到了 ABB 的规律，还换了一种说法也认出来了。",
+  "retry": "看看断掉的那一格，它和前面哪一格一样？",
+  "tools": [
+    {
+      "kind": "pattern",
+      "titleKey": "tool.pattern.title",
+      "descriptionKey": "tool.pattern.desc",
+      "requiredArtifacts": [
+        "pattern-rule"
+      ],
+      "config": {
+        "tokens": [
+          "A",
+          "B"
+        ],
+        "maxPeriod": 4,
+        "cells": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "repair-set"
+      ],
+      "config": {
+        "palette": [
+          {
+            "id": "A",
+            "label": "A",
+            "shape": "round"
+          },
+          {
+            "id": "B",
+            "label": "B",
+            "shape": "square"
+          }
+        ],
+        "maxPieces": 6,
+        "slots": [
+          6,
+          7,
+          8
+        ]
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "pattern-rule",
+    "repair-set"
+  ],
+  "levelScript": {
+    "scenario": {
+      "kind": "path",
+      "length": 12,
+      "visible": [
+        "A",
+        "B",
+        "B",
+        "A",
+        "B",
+        "B",
+        null,
+        null,
+        null,
+        "A",
+        "B",
+        "B"
+      ],
+      "startIndex": 0
+    },
+    "pattern": {
+      "allowedPeriods": [
+        2,
+        3,
+        4
+      ],
+      "allowedTransforms": [
+        "none",
+        "mirror",
+        "shift"
+      ],
+      "ambiguous": false
+    }
+  },
+  "evidencePlan": [
+    {
+      "id": "observe",
+      "phase": "observe",
+      "require": "pattern/inspect >= 2",
+      "descriptionKey": "level.pattern.observe"
+    },
+    {
+      "id": "hypothesis",
+      "phase": "hypothesize",
+      "require": "pattern/commit >= 1",
+      "descriptionKey": "level.pattern.hypothesis"
+    },
+    {
+      "id": "repair",
+      "phase": "construct",
+      "require": "construct/commit >= 1",
+      "descriptionKey": "level.pattern.repair"
+    },
+    {
+      "id": "run",
+      "phase": "run",
+      "require": "run >= 1",
+      "descriptionKey": "level.pattern.run"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-cycle-abb",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "B"
+          ],
+          "period": 3,
+          "transform": "none"
+        },
+        "repair": [
+          {
+            "index": 6,
+            "token": "A"
+          },
+          {
+            "index": 7,
+            "token": "B"
+          },
+          {
+            "index": 8,
+            "token": "B"
+          }
+        ]
+      }
+    },
+    {
+      "id": "s-cycle-bba-shift",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "B",
+            "B",
+            "A"
+          ],
+          "period": 3,
+          "transform": "shift"
+        },
+        "repair": [
+          {
+            "index": 6,
+            "token": "A"
+          },
+          {
+            "index": 7,
+            "token": "B"
+          },
+          {
+            "index": 8,
+            "token": "B"
+          }
+        ]
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-wrong-cycle",
+      "expectFailure": "pattern-cycle-wrong",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B"
+          ],
+          "period": 2,
+          "transform": "none"
+        },
+        "repair": [
+          {
+            "index": 6,
+            "token": "A"
+          },
+          {
+            "index": 7,
+            "token": "B"
+          },
+          {
+            "index": 8,
+            "token": "A"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-missing-piece",
+      "expectFailure": "pattern-repair-incomplete",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "B"
+          ],
+          "period": 3,
+          "transform": "none"
+        },
+        "repair": [
+          {
+            "index": 6,
+            "token": "A"
+          },
+          {
+            "index": 7,
+            "token": "B"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-mismatch",
+      "expectFailure": "pattern-mismatch",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "B"
+          ],
+          "period": 3,
+          "transform": "none"
+        },
+        "repair": [
+          {
+            "index": 6,
+            "token": "A"
+          },
+          {
+            "index": 7,
+            "token": "A"
+          },
+          {
+            "index": 8,
+            "token": "B"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-relabel",
+      "axis": "representation",
+      "patch": {
+        "scenario": {
+          "symbols": {
+            "A": "round",
+            "B": "square"
+          }
+        }
+      }
+    },
+    {
+      "id": "v-shift",
+      "axis": "transfer",
+      "patch": {
+        "scenario": {
+          "startIndex": 1
+        }
+      }
+    }
+  ],
+  "feedback": {
+    "pattern-no-observation": {
+      "messageKey": "level.pattern.noObservation.message",
+      "hintKey": "level.pattern.noObservation.hint",
+      "focus": "strip"
+    },
+    "pattern-cycle-wrong": {
+      "messageKey": "level.pattern.cycleWrong.message",
+      "hintKey": "level.pattern.cycleWrong.hint",
+      "focus": "conflict-cell"
+    },
+    "pattern-repair-incomplete": {
+      "messageKey": "level.pattern.incomplete.message",
+      "hintKey": "level.pattern.incomplete.hint",
+      "focus": "missing-cells"
+    },
+    "pattern-mismatch": {
+      "messageKey": "level.pattern.mismatch.message",
+      "hintKey": "level.pattern.mismatch.hint",
+      "focus": "repair-cell"
+    },
+    "pattern-transfer-failed": {
+      "messageKey": "level.pattern.transfer.message",
+      "hintKey": "level.pattern.transfer.hint",
+      "focus": "variant"
+    },
+    "pattern-rule-invalid": {
+      "messageKey": "level.pattern.ruleInvalid.message",
+      "hintKey": "level.pattern.ruleInvalid.hint",
+      "focus": "pattern-card"
+    }
+  },
+  "badges": [
+    "pattern-spotter"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M0 walking skeleton",
+    "reviewedAt": "2026-10-31",
+    "notesKey": "level.pattern.manualAudit"
+  },
+  "thinkingTarget": "先找出重复单元，再用它预测下一块"
+}

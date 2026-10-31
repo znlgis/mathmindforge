@@ -1,0 +1,19 @@
+{
+  "name": "@mmf/game-forge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./k-structure-pattern-path": "./src/levels/k-structure-pattern-path.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@mmf/content": "workspace:*",
+    "@mmf/game-kit": "workspace:*",
+    "@mmf/templates": "workspace:*"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@mmf/canvas-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@mmf/game-kit": "workspace:*",
+    "phaser": "4.2.1"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

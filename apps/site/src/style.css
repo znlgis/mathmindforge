@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@source "../../../packages/toolkit-ui/src";
+
+@theme {
+  --color-paper: #f7f1e6;
+  --color-card: #fffdf8;
+  --color-cream: #efe4d2;
+  --color-ink: #22303c;
+  --color-ink-soft: #5b6b78;
+  --color-blueprint: #1f4e6b;
+  --color-brass: #b07d2b;
+  --color-teal: #2f7d78;
+  --color-red: #b4473f;
+  --color-mint: #cfe6d4;
+  --color-lavender: #d9d2ea;
+  --color-grid: #d8e2e8;
+  --color-grey: #7a746b;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+}
+
+.game-host {
+  position: relative;
+  overflow: hidden;
+}
+
+.game-host canvas {
+  display: block;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

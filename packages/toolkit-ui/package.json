@@ -1,0 +1,19 @@
+{
+  "name": "@mmf/toolkit-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@mmf/game-kit": "workspace:*",
+    "@mmf/toolkit": "workspace:*",
+    "@mmf/i18n": "workspace:*",
+    "vue": "3.5.44"
+  }
+}

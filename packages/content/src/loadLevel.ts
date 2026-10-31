@@ -1,0 +1,25 @@
+import type { Locale, ShippedLevelId } from './ids';
+import type { LevelDetail } from './schema';
+import { getLevelSummary } from './summaries';
+
+/**
+ * 详情走动态 import：Vite 会把每个 <id>.level.json 切成独立 chunk。
+ * 运行时不做 zod 校验（构建期 content:check 负责）；只做 id 一致性断言。
+ */
+const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
+  'k-structure-pattern-path': () => import('./details/k-structure-pattern-path.level.json'),
+};
+
+export async function loadLevel(
+  id: ShippedLevelId,
+  _locale: Locale = 'zh-CN',
+): Promise<LevelDetail | null> {
+  const summary = getLevelSummary(id);
+  if (!summary) return null;
+  const loader = LOADERS[id];
+  if (!loader) return null;
+  const raw = (await loader()) as { default?: unknown } | unknown;
+  const detail = (raw && typeof raw === 'object' && 'default' in raw ? raw.default : raw) as LevelDetail;
+  if (detail.id !== id) throw new Error('关卡详情 id 不一致：' + id);
+  return detail;
+}

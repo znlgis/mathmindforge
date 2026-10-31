@@ -1,0 +1,24 @@
+{
+  "id": "k-structure-pattern-path",
+  "title": "模式修补匠",
+  "emoji": "🧱",
+  "color": "#b07d2b",
+  "band": "k",
+  "thread": "structure",
+  "template": "pattern",
+  "tools": [
+    "pattern",
+    "construct"
+  ],
+  "estimatedMinutes": 5,
+  "thinkingTarget": "先找出重复单元，再用它预测下一块",
+  "difficulty": {
+    "structure": 1,
+    "representation": 2,
+    "constraint": 1,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}
