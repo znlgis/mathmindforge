@@ -7,6 +7,7 @@ import { constructScriptSchema } from './construct/schema';
 import { simulateScriptSchema } from './simulate/schema';
 import { queueScriptSchema } from './simulate/queue';
 import { experimentScriptSchema } from './experiment/schema';
+import { samplingScriptSchema } from './experiment/sampling';
 import { argueScriptSchema } from './argue/schema';
 
 /**
@@ -19,6 +20,6 @@ export const templateSchemas: Record<TemplateId, ZodType> = {
   rule: ruleScriptSchema,
   construct: constructScriptSchema,
   simulate: z.discriminatedUnion('mode', [simulateScriptSchema, queueScriptSchema]),
-  experiment: experimentScriptSchema,
+  experiment: z.discriminatedUnion('mode', [experimentScriptSchema, samplingScriptSchema]),
   argue: argueScriptSchema,
 };

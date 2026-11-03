@@ -312,5 +312,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.queue.manualAudit"
-  }
+  },
+  "titleEn": "Queue Planner",
+  "thinkingTargetEn": "Tune servers, service time and opening hours so waiting and overtime both pass.",
+  "introEn": "Fifteen customers arrive over 21 minutes. How many servers, and how long per customer?",
+  "promptEn": "Serve all 15, keep average wait ≤ 1 minute, no overtime, and cost ≤ 30.",
+  "doneEn": "You found a schedule that meets waiting, overtime and budget together.",
+  "retryEn": "Change one knob at a time, run, then compare average wait and overtime."
 }

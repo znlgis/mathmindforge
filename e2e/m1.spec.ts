@@ -150,3 +150,17 @@ test('完成面板显示变体通行证', async ({ page }) => {
   await expect(page.getByTestId('variant-passport')).toContainText('v-rotate-90');
   await expect(page.getByTestId('variant-passport')).toContainText('通过');
 });
+
+test('真实点击：抽样调查员可以通关', async ({ page }) => {
+  await page.goto('/#/play/g79-data-sampling');
+  await expect(page.getByTestId('sampling-tool')).toBeVisible();
+
+  await page.getByTestId('sampling-sample-20').click();
+  await page.getByTestId('sampling-sample-20').click();
+  await expect(page.getByTestId('sampling-count')).toContainText('40');
+  await expect(page.getByTestId('sampling-ci')).toBeVisible();
+
+  await page.getByTestId('sampling-claim').click();
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});

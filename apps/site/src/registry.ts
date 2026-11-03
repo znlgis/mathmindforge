@@ -19,4 +19,5 @@ export const registry: Record<ShippedLevelId, LevelLoader> = {
   'g13-structure-symmetry': () => import('@mmf/game-forge/g13-structure-symmetry'),
   'g46-structure-tiling': () => import('@mmf/game-forge/g46-structure-tiling'),
   'g46-modeling-queue': () => import('@mmf/game-forge/g46-modeling-queue'),
+  'g79-data-sampling': () => import('@mmf/game-forge/g79-data-sampling'),
 };

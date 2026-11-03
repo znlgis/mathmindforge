@@ -1,7 +1,7 @@
 import type {
   LevelContext, LevelDetail, LevelManifest, LevelModule, LevelRuntime, RuntimeOptions,
 } from '@mmf/game-kit';
-import { createExperimentRuntime } from './runtime';
+import { createExperimentRuntime } from './verifier';
 
 /**
  * experiment 模板：无画布关卡（分类计数 / 胜率实验）。

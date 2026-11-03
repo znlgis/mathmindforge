@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Queue Planner",
+  "thinkingTargetEn": "Tune servers, service time and opening hours so waiting and overtime both pass."
 }

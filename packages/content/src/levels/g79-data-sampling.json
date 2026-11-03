@@ -1,0 +1,25 @@
+{
+  "id": "g79-data-sampling",
+  "title": "抽样调查员",
+  "emoji": "🎒",
+  "color": "#2f7d78",
+  "band": "g79",
+  "thread": "data",
+  "template": "experiment",
+  "tools": [
+    "probe"
+  ],
+  "estimatedMinutes": 7,
+  "thinkingTarget": "从总体里抽两批样本，用样本比例和区间估计总体",
+  "difficulty": {
+    "structure": 2,
+    "representation": 2,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  },
+  "titleEn": "Sampling Surveyor",
+  "thinkingTargetEn": "Draw two samples and estimate the population proportion with a sample proportion and interval."
+}

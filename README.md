@@ -15,7 +15,7 @@
 
 ## 当前状态（M2b 进行中：argue + 结构不变量）
 
-**15 关可玩、6 个模板、6 件工具；证据 → 画像 → 徽章 → 日志/轨迹 → 报告已闭环**：
+**16 关可玩、6 个模板、6 件工具；证据 → 画像 → 徽章 → 日志/轨迹 → 报告已闭环**：
 
 - `k-structure-pattern-path` 模式修补匠（pattern）
 - `k-data-tally` 分类小站（experiment / tally）
@@ -32,6 +32,7 @@
 - `g13-structure-symmetry` 对称补墙（pattern / reflect）
 - `g46-structure-tiling` 铺砌边界（argue，7×7）
 - `g46-modeling-queue` 排队规划师（simulate / queue）
+- `g79-data-sampling` 抽样调查员（experiment / sampling）
 
 真实点击与 autoplay 走同一条动作路径；没有使用工具时提交会被拒绝。
 
@@ -39,14 +40,14 @@
 pnpm install
 pnpm dev          # http://127.0.0.1:5192
 pnpm verify       # typecheck / lint / 120 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
-pnpm e2e          # 44 条：15 关 autoplay、15 关无工具失败、7 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
+pnpm e2e          # 47 条：16 关 autoplay、16 关无工具失败、8 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
 ```
 
-实测（2026-11-03）：首屏 51.4 KB gzip，Phaser chunk 220.3 KB gzip，dist 1359.5 KB；`pnpm verify` 与 `pnpm e2e`（44 条）全绿。
+实测（2026-11-03）：首屏 51.5 KB gzip，Phaser chunk 220.3 KB gzip，dist 1372 KB；`pnpm verify` 与 `pnpm e2e`（47 条）全绿。
 
-已实现：workspace 基座、game-kit 契约、15 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、双语 UI、内容与证据/报告、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
+已实现：workspace 基座、game-kit 契约、16 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、双语 UI、内容与证据/报告、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
 
-**M2b 下一步**：其余 5 关（需 network/schedule/sampling/inference 新模式）、原生壳（需 Rust 与 Android SDK）、真实用户测试。
+**M2b 下一步**：其余 4 关（network/schedule/frontier/inference）、原生壳（需 Rust 与 Android SDK）、真实用户测试。
 
 ---
 

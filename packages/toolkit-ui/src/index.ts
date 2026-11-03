@@ -13,5 +13,6 @@ export { default as InvariantProbeTool } from './InvariantProbeTool.vue';
 export { default as ArgumentBoard } from './ArgumentBoard.vue';
 export { default as DistributeTool } from './DistributeTool.vue';
 export { default as QueueMetricsTool } from './QueueMetricsTool.vue';
+export { default as SamplingTool } from './SamplingTool.vue';
 import ToolDock from './ToolDock.vue';
 export default ToolDock;

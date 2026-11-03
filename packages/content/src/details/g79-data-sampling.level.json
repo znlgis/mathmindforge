@@ -1,0 +1,302 @@
+{
+  "id": "g79-data-sampling",
+  "title": "抽样调查员",
+  "band": "g79",
+  "thread": "data",
+  "template": "experiment",
+  "thinkingTarget": "从总体里抽两批样本，用样本比例和区间估计总体",
+  "intro": "袋子里有红球和蓝球。你不能倒出来数，只能一批一批地抽。",
+  "prompt": "至少抽两批、共 40 个，用样本比例和 95% 区间估计红球比例。",
+  "done": "你的结论来自样本，而且区间把真实比例包了进去。",
+  "retry": "样本太少时比例会飘；先抽够两批，再看区间有多宽。",
+  "tools": [
+    {
+      "kind": "probe",
+      "titleKey": "tool.probe.title",
+      "descriptionKey": "tool.probe.desc",
+      "requiredArtifacts": [
+        "dataset",
+        "claim"
+      ],
+      "config": {
+        "mode": "sampling",
+        "sampleSizes": [
+          20
+        ],
+        "chart": "proportion"
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "dataset",
+    "claim"
+  ],
+  "levelScript": {
+    "mode": "sampling",
+    "population": {
+      "red": 60,
+      "blue": 40,
+      "label": "红球"
+    },
+    "batchSizes": [
+      20
+    ],
+    "minSample": 40,
+    "tolerance": 0.12,
+    "minBatches": 2
+  },
+  "evidencePlan": [
+    {
+      "id": "sample",
+      "phase": "observe",
+      "require": "probe/sample >= 2",
+      "descriptionKey": "至少抽两批，每批 20 个"
+    },
+    {
+      "id": "claim",
+      "phase": "result",
+      "require": "probe/claim >= 1",
+      "descriptionKey": "记录样本比例与区间"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-two-batches",
+      "artifact": {
+        "sample": {
+          "n": 40,
+          "red": 22,
+          "proportion": 0.55,
+          "ci": [
+            0.3983,
+            0.6929
+          ],
+          "seed": 101
+        },
+        "claim": {
+          "kind": "stat",
+          "statistic": "proportion",
+          "value": 0.55,
+          "n": 40,
+          "ci": [
+            0.3983,
+            0.6929
+          ]
+        },
+        "batches": 2
+      }
+    },
+    {
+      "id": "s-more-batches",
+      "artifact": {
+        "sample": {
+          "n": 60,
+          "red": 33,
+          "proportion": 0.55,
+          "ci": [
+            0.4246,
+            0.6699
+          ],
+          "seed": 101
+        },
+        "claim": {
+          "kind": "stat",
+          "statistic": "proportion",
+          "value": 0.55,
+          "n": 60,
+          "ci": [
+            0.4246,
+            0.6699
+          ]
+        },
+        "batches": 3
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-small",
+      "expectFailure": "sampling-too-small",
+      "artifact": {
+        "sample": {
+          "n": 20,
+          "red": 13,
+          "proportion": 0.65,
+          "ci": [
+            0.4329,
+            0.8188
+          ],
+          "seed": 101
+        },
+        "claim": {
+          "kind": "stat",
+          "statistic": "proportion",
+          "value": 0.65,
+          "n": 20,
+          "ci": [
+            0.4329,
+            0.8188
+          ]
+        },
+        "batches": 1
+      }
+    },
+    {
+      "id": "n-far",
+      "expectFailure": "sampling-far",
+      "artifact": {
+        "sample": {
+          "n": 40,
+          "red": 36,
+          "proportion": 0.9,
+          "ci": [
+            0.772,
+            0.962
+          ],
+          "seed": 101
+        },
+        "claim": {
+          "kind": "stat",
+          "statistic": "proportion",
+          "value": 0.9,
+          "n": 40,
+          "ci": [
+            0.772,
+            0.962
+          ]
+        },
+        "batches": 2
+      }
+    },
+    {
+      "id": "n-batches",
+      "expectFailure": "sampling-too-few-batches",
+      "artifact": {
+        "sample": {
+          "n": 40,
+          "red": 22,
+          "proportion": 0.55,
+          "ci": [
+            0.3983,
+            0.6929
+          ],
+          "seed": 101
+        },
+        "claim": {
+          "kind": "stat",
+          "statistic": "proportion",
+          "value": 0.55,
+          "n": 40,
+          "ci": [
+            0.3983,
+            0.6929
+          ]
+        },
+        "batches": 1
+      }
+    },
+    {
+      "id": "n-claim",
+      "expectFailure": "sampling-claim-mismatch",
+      "artifact": {
+        "sample": {
+          "n": 40,
+          "red": 22,
+          "proportion": 0.55,
+          "ci": [
+            0.3983,
+            0.6929
+          ],
+          "seed": 101
+        },
+        "claim": {
+          "kind": "stat",
+          "statistic": "proportion",
+          "value": 0.6,
+          "n": 40,
+          "ci": [
+            0.3983,
+            0.6929
+          ]
+        },
+        "batches": 2
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-symbols",
+      "axis": "representation",
+      "patch": {
+        "population": {
+          "red": 60,
+          "blue": 40,
+          "label": "红球"
+        }
+      }
+    },
+    {
+      "id": "v-label",
+      "axis": "representation",
+      "patch": {
+        "population": {
+          "red": 60,
+          "blue": 40,
+          "label": "红珠子"
+        }
+      }
+    }
+  ],
+  "feedback": {
+    "sampling-no-sample": {
+      "messageKey": "还没有样本。",
+      "hintKey": "先抽一批，至少两批 40 个。",
+      "focus": "sample"
+    },
+    "sampling-too-small": {
+      "messageKey": "样本太少，比例还不稳。",
+      "hintKey": "再抽一批，累计到 40 个以上。",
+      "focus": "n"
+    },
+    "sampling-no-claim": {
+      "messageKey": "还差一句用样本比例与区间写出的结论。",
+      "hintKey": "看看样本比例和区间，再记录结论。",
+      "focus": "claim"
+    },
+    "sampling-claim-mismatch": {
+      "messageKey": "结论和样本对不上。",
+      "hintKey": "结论里的比例和 n 要从样本里来。",
+      "focus": "claim"
+    },
+    "sampling-too-few-batches": {
+      "messageKey": "只抽了一批，看不出波动。",
+      "hintKey": "至少抽两批，比较两次样本比例。",
+      "focus": "batches"
+    },
+    "sampling-far": {
+      "messageKey": "样本比例离总体太远，结论不可信。",
+      "hintKey": "多抽几批，或看看是不是抽样方式有偏。",
+      "focus": "value"
+    },
+    "sampling-ci-miss": {
+      "messageKey": "区间没有盖住真实比例。",
+      "hintKey": "样本量小时区间会宽，但不应漏掉真值。",
+      "focus": "ci"
+    }
+  },
+  "badges": [
+    "experimenter"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.sampling.manualAudit"
+  },
+  "titleEn": "Sampling Surveyor",
+  "thinkingTargetEn": "Draw two samples and estimate the population proportion with a sample proportion and interval.",
+  "introEn": "The bag has red and blue balls. You cannot pour it out; draw one batch at a time.",
+  "promptEn": "Draw at least two batches totaling 40 balls, then estimate the red proportion with a 95% interval.",
+  "doneEn": "Your claim came from a sample, and the interval covered the true proportion.",
+  "retryEn": "Small samples bounce around; draw two batches first, then look at the interval width."
+}

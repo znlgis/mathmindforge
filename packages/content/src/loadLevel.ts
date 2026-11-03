@@ -22,6 +22,7 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'g13-structure-symmetry': () => import('./details/g13-structure-symmetry.level.json'),
   'g46-structure-tiling': () => import('./details/g46-structure-tiling.level.json'),
   'g46-modeling-queue': () => import('./details/g46-modeling-queue.level.json'),
+  'g79-data-sampling': () => import('./details/g79-data-sampling.level.json'),
 };
 
 export async function loadLevel(

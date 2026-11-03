@@ -13,20 +13,12 @@ import { ruleVerifier } from './rule/logic';
 import { constructVerifier } from './construct/verifier';
 import { simulateVerifier } from './simulate/verifier';
 import { argueVerifier } from './argue/logic';
-import {
-  actionsFor as experimentActions,
-  applyVariant as experimentApplyVariant,
-  parseScript as parseExperimentScript,
-  reachableFailureClasses as experimentReachable,
-  transferFailureClass as experimentTransferFailureClass,
-  transferVariants as experimentTransferVariants,
-  validateArtifact as experimentValidate,
-} from './experiment/logic';
+import { experimentVerifier as experimentCoreVerifier } from './experiment/verifier';
 import { createPatternRuntime } from './pattern/runtime';
 import { createRuleRuntime } from './rule/runtime';
 import { createConstructRuntime } from './construct/verifier';
 import { createSimulateRuntime } from './simulate/verifier';
-import { createExperimentRuntime } from './experiment/runtime';
+import { createExperimentRuntime } from './experiment/verifier';
 import { createArgueRuntime } from './argue/runtime';
 
 export interface TemplateVerifier {
@@ -61,14 +53,13 @@ const argueVerifierShape: TemplateVerifier = {
 };
 
 const experimentVerifier: TemplateVerifier = {
-  parseScript: parseExperimentScript,
-  validateArtifact: experimentValidate,
-  actionsFor: experimentActions,
-  applyVariant: (detail, variant) =>
-    experimentApplyVariant(parseExperimentScript(detail.levelScript), variant),
-  reachableFailureClasses: experimentReachable,
-  transferVariants: experimentTransferVariants,
-  transferFailureClass: experimentTransferFailureClass,
+  parseScript: (input) => experimentCoreVerifier.parseScript(input),
+  validateArtifact: (detail, variant, artifact) => experimentCoreVerifier.validateArtifact(detail, variant, artifact),
+  actionsFor: (detail, variant, artifact) => experimentCoreVerifier.actionsFor(detail, variant, artifact),
+  applyVariant: (detail, variant) => experimentCoreVerifier.applyVariant(detail, variant),
+  reachableFailureClasses: (detail) => experimentCoreVerifier.reachableFailureClasses(detail),
+  transferVariants: (detail) => experimentCoreVerifier.transferVariants(detail),
+  transferFailureClass: (detail) => experimentCoreVerifier.transferFailureClass(detail),
 };
 
 export const verifiers: Record<TemplateId, TemplateVerifier> = {
