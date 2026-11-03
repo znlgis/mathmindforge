@@ -75,6 +75,14 @@ function goHome(): void {
         >
           {{ t('nav.badges') }}
         </button>
+        <button
+          type="button"
+          data-testid="locale-toggle"
+          class="rounded-full bg-paper px-3 py-2 text-xs font-bold text-ink-soft"
+          @click="settings.toggleLocale()"
+        >
+          {{ settings.locale === 'en' ? '中文' : 'EN' }}
+        </button>
       </nav>
     </header>
 
