@@ -2,8 +2,9 @@
 import type {
   DebugOptions, EvidenceDraft, LevelModule, LevelRuntime, RunSnapshot, ShippedLevelId, StampId, ToolId,
 } from '@mmf/game-kit';
-import { loadLevel, localizedDetail } from '@mmf/content';
+import { LEVEL_SUMMARIES, getLevelSummary, loadLevel, localizedDetail } from '@mmf/content';
 import type { LevelDetail } from '@mmf/content';
+import { evaluateBadges } from '@mmf/evidence';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import ToolDock, { ArgumentBoard } from '@mmf/toolkit-ui';
 import { navigate } from '../router';
@@ -15,9 +16,11 @@ import {
 import { platform } from '../shell/platform';
 import { seedFor } from '../shell/seed';
 import { safeRemove } from '../shell/lifecycle';
+import { nextLevelId } from '../shell/progression';
 import { useI18n } from '../shell/useI18n';
 import { useProgress } from '../stores/progress';
 import { useSettings } from '../stores/settings';
+import GuideBubble from '../components/GuideBubble.vue';
 
 const props = defineProps<{ levelId: ShippedLevelId }>();
 
@@ -25,8 +28,8 @@ const props = defineProps<{ levelId: ShippedLevelId }>();
 const MAX_EVIDENCE_QUEUE = 400;
 /** 同一批证据最多重试次数，超过就丢弃并记一条调试错误。 */
 const MAX_EVIDENCE_RETRY = 3;
-/** 通关后停留 1.8 秒再回星图，给孩子看完完成面板的时间。 */
-const EXIT_DELAY_MS = 1800;
+/** instant 模式（e2e）下完成面板停留多久再回星图；正常玩不自动跳。 */
+const INSTANT_EXIT_DELAY_MS = 300;
 
 const host = ref<HTMLDivElement | null>(null);
 const canvasHost = ref<HTMLDivElement | null>(null);
@@ -42,9 +45,18 @@ const saveFailed = ref(false);
 const actionPending = ref(false);
 const finalSnapshot = shallowRef<RunSnapshot | null>(null);
 const liveSnapshot = shallowRef<RunSnapshot | null>(null);
-const exitTimer = ref<number | null>(null);
+const newBadges = ref<{ id: string; title: string }[]>([]);
+/** 提交/运行那一刻的工具使用总数：之后只要玩家再动工具，旧横幅就作废（修"横幅粘住"）。 */
+const verdictUsageAt = ref<number | null>(null);
+/** 引导气泡当前步；dismissed 后这一轮不再出现。 */
+const guideStep = ref(0);
+const guideDismissed = ref(false);
 
 const display = computed(() => (detail.value ? localizedDetail(detail.value, locale.value) : null));
+/** 摘要里才有 emoji 与学段；标题栏用它把"这是哪个学段、什么主题"说清楚。 */
+const summary = computed(() => getLevelSummary(props.levelId));
+const bandLabel = computed(() => (summary.value ? t('band.' + summary.value.band) : ''));
+const threadLabel = computed(() => (summary.value ? t('thread.' + summary.value.thread) : ''));
 const usedTools = computed(() => {
   const usage = finalSnapshot.value?.toolUsage;
   if (!usage) return 0;
@@ -64,6 +76,55 @@ const progress = useProgress();
 const settings = useSettings();
 const { t, translator, locale } = useI18n();
 
+/** 证据检查点 = 关卡里的步骤；用于底部进度条与引导气泡。 */
+const steps = computed(() => (detail.value?.evidencePlan ?? []).map((item) => ({
+  id: item.id,
+  label: t(item.descriptionKey),
+  done: liveSnapshot.value?.checkpoints?.[item.id] === true,
+})));
+const doneSteps = computed(() => steps.value.filter((step) => step.done).length);
+
+/** 工具使用总数：变化即说明玩家刚动过工具。 */
+function usageTotal(snapshot: RunSnapshot | null): number {
+  if (!snapshot) return 0;
+  return Object.values(snapshot.toolUsage).reduce((sum, item) => sum + item.used, 0);
+}
+const usageNow = computed(() => usageTotal(liveSnapshot.value));
+
+/**
+ * 失败提示只属于"刚刚那次提交"：提交后玩家一旦再动工具，旧提示立刻消失。
+ * ToolDock 里原来常驻读 snapshot.verdict，导致补齐步骤后横幅还粘着旧文案。
+ */
+const failureCopy = computed<{ message: string; hint: string | null } | null>(() => {
+  const snapshot = liveSnapshot.value;
+  const currentDetail = detail.value;
+  if (!snapshot || !currentDetail) return null;
+  if (verdictUsageAt.value === null || usageNow.value !== verdictUsageAt.value) return null;
+  const verdict = snapshot.verdict;
+  if (!verdict || verdict.passed) return null;
+  if (verdict.failure) {
+    const copy = currentDetail.feedback[verdict.failure.class];
+    if (copy) return { message: t(copy.messageKey), hint: t(copy.hintKey) };
+    return { message: t('level.failed'), hint: currentDetail.retry };
+  }
+  const first = verdict.missingEvidence[0];
+  if (first) return { message: t('level.failureMissing', { step: t(first.messageKey) }), hint: null };
+  return null;
+});
+
+const nextId = computed(() => nextLevelId(progress.save, props.levelId));
+
+/** 只有还没走完的步骤才给引导；老玩家/已完成步骤不打扰。 */
+const guideVisible = computed(() => (
+  ready.value
+  && !completed.value
+  && !guideDismissed.value
+  && guideStep.value < steps.value.length
+  && !steps.value[guideStep.value]?.done
+));
+
+const guideText = computed(() => steps.value[guideStep.value]?.label ?? '');
+
 let disposed = false;
 let debugOptions: DebugOptions | undefined;
 let unsubscribe: (() => void) | null = null;
@@ -72,6 +133,7 @@ let offResume: (() => void) | null = null;
 let evidenceQueue: EvidenceDraft[] = [];
 let evidenceTimer: number | null = null;
 let evidenceRetries = 0;
+let exitTimer: number | null = null;
 const recordedEvidencePhases = new Set<string>();
 
 function scheduleEvidenceFlush(): void {
@@ -108,18 +170,10 @@ async function flushEvidence(): Promise<void> {
 }
 
 function clearExitTimer(): void {
-  if (exitTimer.value !== null) {
-    window.clearTimeout(exitTimer.value);
-    exitTimer.value = null;
+  if (exitTimer !== null) {
+    window.clearTimeout(exitTimer);
+    exitTimer = null;
   }
-}
-
-function scheduleExit(): void {
-  clearExitTimer();
-  exitTimer.value = window.setTimeout(() => {
-    exitTimer.value = null;
-    navigate('/forge');
-  }, EXIT_DELAY_MS);
 }
 
 /**
@@ -129,6 +183,7 @@ function scheduleExit(): void {
 async function completeNow(stamps: StampId[], variantId: string): Promise<void> {
   if (completed.value) return;
   completed.value = true;
+  guideDismissed.value = true;
   const levelId = props.levelId;
   try {
     await progress.completeLevel({
@@ -152,7 +207,12 @@ async function completeNow(stamps: StampId[], variantId: string): Promise<void> 
   }
   // 徽章刷新失败不影响"这一关过了"的事实，但要留下可诊断的痕迹。
   try {
-    await progress.refreshBadges();
+    const earned = await progress.refreshBadges();
+    if (earned.length > 0 && progress.save) {
+      const views = evaluateBadges(progress.save, progress.evidence, LEVEL_SUMMARIES, locale.value);
+      const byId = new Map(views.map((view) => [view.id, view.title]));
+      newBadges.value = earned.map((id) => ({ id, title: byId.get(id) ?? id }));
+    }
   } catch (cause) {
     recordDebugError('徽章刷新失败：' + String(cause));
   }
@@ -160,8 +220,15 @@ async function completeNow(stamps: StampId[], variantId: string): Promise<void> 
     recordDebugEvent('level:complete:' + levelId);
     recordDebugEvent('journal:add');
   }
-  if (!debugOptions?.instant) scheduleExit();
-  else navigate('/forge');
+  // 不再 1.8 秒踢走玩家：面板停住等玩家选"下一关/再玩一次/回星图"。
+  // 只有 e2e 的 instant 模式保留自动回星图，免得每个用例都要多点一下。
+  if (debugOptions?.instant) {
+    clearExitTimer();
+    exitTimer = window.setTimeout(() => {
+      exitTimer = null;
+      navigate('/forge');
+    }, INSTANT_EXIT_DELAY_MS);
+  }
 }
 
 async function submit(): Promise<void> {
@@ -172,11 +239,15 @@ async function submit(): Promise<void> {
     const result = await rt.dispatch({ type: 'submit', payload: {} });
     await flushEvidence();
     finalSnapshot.value = result.snapshot;
+    liveSnapshot.value = result.snapshot;
+    verdictUsageAt.value = usageTotal(result.snapshot);
     setDebugSnapshot(result.snapshot);
     const verdict = result.verdict;
     if (verdict?.passed) {
+      platform.audio.play('complete');
       await completeNow(verdict.stamps, result.snapshot.variantId);
     } else {
+      platform.audio.play('retry');
       recordDebugEvent('level:retry:' + (verdict?.failure?.class ?? 'missing-evidence'));
     }
   } catch (cause) {
@@ -192,7 +263,10 @@ async function run(): Promise<void> {
   actionPending.value = true;
   try {
     const result = await rt.dispatch({ type: 'run', payload: {} });
+    liveSnapshot.value = result.snapshot;
+    verdictUsageAt.value = usageTotal(result.snapshot);
     setDebugSnapshot(result.snapshot);
+    platform.audio.play(result.verdict?.passed ? 'correct' : 'retry');
     recordDebugEvent(result.verdict?.passed ? 'run:pass' : 'run:fail:' + (result.verdict?.failure?.class ?? 'none'));
   } catch (cause) {
     recordDebugError('运行失败：' + String(cause));
@@ -272,6 +346,8 @@ async function start(): Promise<void> {
       const result = await runtimeRef.autoplay();
       await flushEvidence();
       finalSnapshot.value = result.snapshot;
+      liveSnapshot.value = result.snapshot;
+      verdictUsageAt.value = usageTotal(result.snapshot);
       setDebugSnapshot(result.snapshot);
       if (result.verdict?.passed) await completeNow(result.verdict.stamps, result.snapshot.variantId);
     }
@@ -327,9 +403,20 @@ function leave(): void {
   navigate('/forge');
 }
 
+function goNext(): void {
+  const id = nextId.value;
+  platform.audio.stopSpeech();
+  if (id) navigate('/play/' + id);
+  else navigate('/forge');
+}
+
 async function replay(): Promise<void> {
   completed.value = false;
   saveFailed.value = false;
+  newBadges.value = [];
+  verdictUsageAt.value = null;
+  guideDismissed.value = false;
+  guideStep.value = 0;
   clearExitTimer();
   finalSnapshot.value = null;
   const rt = runtime.value;
@@ -343,6 +430,37 @@ async function replay(): Promise<void> {
   setDebugSnapshot(liveSnapshot.value);
   recordDebugEvent('level:replay');
 }
+
+/** 引导气泡：走一步、或整轮关掉。 */
+function advanceGuide(): void {
+  if (guideStep.value >= steps.value.length - 1) {
+    guideDismissed.value = true;
+    return;
+  }
+  guideStep.value += 1;
+}
+
+function dismissGuide(): void {
+  guideDismissed.value = true;
+}
+
+/**
+ * 即时音效：不在每个工具组件里各调一次，而是统一听快照变化。
+ * 好处是 toolkit-ui 保持"纯 UI 不依赖 platform"，新增工具也不用再接线。
+ */
+let lastUsageTotal = 0;
+let lastRunId: string | null = null;
+watch(liveSnapshot, (snapshot) => {
+  if (!snapshot || settings.muted) return;
+  const total = usageTotal(snapshot);
+  if (total > lastUsageTotal) platform.audio.play('tap');
+  lastUsageTotal = total;
+  const runId = snapshot.lastRun?.id ?? null;
+  if (runId !== null && runId !== lastRunId) {
+    platform.audio.play(snapshot.lastRun?.outcome === 'pass' ? 'correct' : 'retry');
+  }
+  lastRunId = runId;
+});
 
 onMounted(() => {
   void start();
@@ -371,22 +489,29 @@ watch(completed, async (value) => {
     :data-ready="ready ? '1' : '0'"
     class="relative flex h-full min-h-0 flex-col bg-cream"
   >
-    <header class="flex items-center justify-between gap-3 border-b border-grid bg-paper px-3 py-2">
+    <header class="flex shrink-0 items-center justify-between gap-3 border-b border-grid bg-paper px-3 py-2">
       <button
         type="button"
         data-testid="level-back"
-        class="min-h-11 rounded-2xl bg-card px-4 text-sm font-bold"
+        class="min-h-11 shrink-0 whitespace-nowrap rounded-2xl bg-card px-4 text-sm font-bold"
         @click="leave"
       >
         ← {{ t('level.back') }}
       </button>
       <div class="min-w-0 text-center">
-        <h1 class="truncate text-base font-black">{{ display?.title ?? t('level.loading') }}</h1>
-        <p class="truncate text-[11px] text-ink-soft">{{ display?.thinkingTarget ?? '' }}</p>
+        <h1 class="truncate text-base font-black">
+          <span aria-hidden="true">{{ summary?.emoji }}</span>
+          {{ display?.title ?? t('level.loading') }}
+        </h1>
+        <p class="truncate text-[11px] text-ink-soft">
+          <span v-if="bandLabel" class="font-bold text-brass">{{ bandLabel }} · {{ threadLabel }}</span>
+          <span v-if="bandLabel" aria-hidden="true"> · </span>
+          {{ display?.thinkingTarget ?? '' }}
+        </p>
       </div>
       <button
         type="button"
-        class="min-h-11 min-w-11 rounded-2xl bg-card px-3 text-lg"
+        class="min-h-11 min-w-11 shrink-0 rounded-2xl bg-card px-3 text-lg"
         :aria-label="settings.muted ? t('common.soundOn') : t('common.soundOff')"
         :aria-pressed="settings.muted"
         @click="settings.toggle()"
@@ -395,41 +520,113 @@ watch(completed, async (value) => {
       </button>
     </header>
 
+    <!-- 情境条：每关写好的 intro / prompt 终于上屏了（以前只渲染 title + thinkingTarget）。
+         压成一行：竖屏放不下时 prompt 自己换行，横屏只占 34px，把高度留给工具区。 -->
+    <div
+      v-if="display && (display.intro || display.prompt)"
+      data-testid="level-mission"
+      class="flex shrink-0 flex-wrap items-baseline justify-center gap-x-2 border-b border-grid bg-mint/40 px-3 py-1 text-center"
+    >
+      <p class="text-sm font-bold text-ink">{{ display.intro }}</p>
+      <p class="text-xs font-semibold text-ink-soft">{{ display.prompt }}</p>
+    </div>
+
     <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
       <section
         v-if="module?.manifest.hasCanvas"
-        class="relative min-h-[42vh] flex-1 border-b border-grid bg-paper lg:border-b-0 lg:border-r"
+        class="relative min-h-[38vh] flex-1 min-w-0 border-b border-grid bg-paper lg:min-h-0 lg:border-b-0 lg:border-r"
       >
         <div ref="canvasHost" data-testid="level-canvas" class="game-host h-full w-full" />
+        <GuideBubble
+          v-if="guideVisible"
+          :title="t('level.hintTitle')"
+          :step="guideText"
+          :index="guideStep"
+          :total="steps.length"
+          :next-label="guideStep >= steps.length - 1 ? t('level.guideStart') : t('level.guideNext')"
+          :skip-label="t('level.guideSkip')"
+          @next="advanceGuide"
+          @dismiss="dismissGuide"
+        />
       </section>
 
       <aside
         class="flex min-h-0 w-full flex-col"
-        :class="module?.manifest.hasCanvas ? 'lg:w-[420px]' : 'mx-auto max-w-3xl'"
+        :class="module?.manifest.hasCanvas ? 'lg:w-[420px] lg:flex-none' : ''"
       >
-        <div ref="host" data-testid="level-dock" class="min-h-0 flex-1 overflow-y-auto p-3">
-          <ToolDock
-            v-if="runtime && detail"
-            :tools="detail.tools"
-            :runtime="runtime"
-            :detail="detail"
-            :locale="locale"
-          />
-          <ArgumentBoard
-            v-if="runtime && detail?.template === 'argue' && liveSnapshot"
-            :runtime="runtime"
-            :snapshot="liveSnapshot"
-            :detail="detail"
-            :t="translator"
-          />
+        <!-- 进度条：把"还差几步"变成看得见的进度，替代清单式报错 -->
+        <div
+          v-if="steps.length > 0"
+          data-testid="level-progress"
+          class="flex shrink-0 items-center gap-2 border-b border-grid bg-paper px-3 py-1"
+        >
+          <p class="shrink-0 text-[11px] font-bold text-ink-soft">{{ t('level.progressDone', { done: doneSteps, total: steps.length }) }}</p>
+          <ol class="flex min-w-0 flex-1 gap-1">
+            <li
+              v-for="step in steps"
+              :key="step.id"
+              :data-testid="'level-step-' + step.id"
+              class="h-1.5 min-w-0 flex-1 rounded-full"
+              :class="step.done ? 'bg-teal' : 'bg-grid'"
+              :title="step.label"
+            />
+          </ol>
+          <p class="shrink-0 text-[11px] font-semibold text-teal">{{ t('level.progress', { n: Math.min(doneSteps + 1, steps.length), total: steps.length }) }}</p>
         </div>
-        <div class="border-t border-grid bg-paper p-3">
-          <div class="flex gap-2">
+
+        <GuideBubble
+          v-if="guideVisible && !module?.manifest.hasCanvas"
+          variant="inline"
+          :title="t('level.hintTitle')"
+          :step="guideText"
+          :index="guideStep"
+          :total="steps.length"
+          :next-label="guideStep >= steps.length - 1 ? t('level.guideStart') : t('level.guideNext')"
+          :skip-label="t('level.guideSkip')"
+          @next="advanceGuide"
+          @dismiss="dismissGuide"
+        />
+
+        <!-- 失败提示：移出滚动容器，钉在工具面板上方，永远不会被滚出视野 -->
+        <div
+          v-if="failureCopy"
+          data-testid="failure-banner"
+          role="alert"
+          class="shrink-0 border-b border-red/40 bg-red/10 px-3 py-2"
+        >
+          <p class="text-sm font-bold text-red">{{ failureCopy.message }}</p>
+          <p v-if="failureCopy.hint" class="mt-0.5 text-xs text-ink-soft">{{ failureCopy.hint }}</p>
+        </div>
+
+        <div ref="host" data-testid="level-dock" class="min-h-0 flex-1 overflow-y-auto p-2.5">
+          <div :class="module?.manifest.hasCanvas ? '' : 'mx-auto w-full max-w-3xl'">
+            <ToolDock
+              v-if="runtime && detail"
+              :tools="detail.tools"
+              :runtime="runtime"
+              :detail="detail"
+              :locale="locale"
+            />
+            <ArgumentBoard
+              v-if="runtime && detail?.template === 'argue' && liveSnapshot"
+              :runtime="runtime"
+              :snapshot="liveSnapshot"
+              :detail="detail"
+              :t="translator"
+            />
+          </div>
+        </div>
+
+        <div class="shrink-0 border-t border-grid bg-paper p-3">
+          <div
+            class="flex flex-wrap gap-2"
+            :class="module?.manifest.hasCanvas ? '' : 'mx-auto w-full max-w-3xl'"
+          >
             <button
               v-if="module?.manifest.runEnabled !== false"
               type="button"
               data-testid="level-run"
-              class="min-h-12 flex-1 rounded-2xl bg-brass px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-50"
+              class="min-h-12 flex-1 whitespace-nowrap rounded-2xl bg-brass px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-50"
               :disabled="actionPending || completed"
               @click="run"
             >
@@ -438,7 +635,7 @@ watch(completed, async (value) => {
             <button
               type="button"
               data-testid="level-submit"
-              class="min-h-12 flex-1 rounded-2xl bg-teal px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-50"
+              class="min-h-12 flex-1 whitespace-nowrap rounded-2xl bg-teal px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-50"
               :disabled="actionPending || completed"
               @click="submit"
             >
@@ -447,7 +644,7 @@ watch(completed, async (value) => {
             <button
               type="button"
               data-testid="level-reset"
-              class="min-h-12 rounded-2xl bg-card px-4 text-sm font-bold active:scale-95 disabled:opacity-50"
+              class="min-h-12 whitespace-nowrap rounded-2xl bg-card px-4 text-sm font-bold active:scale-95 disabled:opacity-50"
               :disabled="actionPending"
               @click="replay"
             >
@@ -495,14 +692,27 @@ watch(completed, async (value) => {
       class="absolute inset-0 z-20 flex items-center justify-center bg-ink/60 p-4 focus:outline-none"
     >
       <div class="w-full max-w-md rounded-3xl border border-grid bg-card p-6 text-center shadow-xl">
-        <p class="text-3xl" aria-hidden="true">🧩</p>
+        <p class="text-4xl" aria-hidden="true">🎉</p>
         <h2 id="completion-title" class="mt-2 text-2xl font-black text-blueprint">{{ t('complete.title') }}</h2>
-        <p class="mt-3 text-sm leading-6 text-ink-soft">{{ t('level.completed') }}</p>
+        <p class="mt-3 text-sm leading-6 text-ink">{{ display?.done || t('complete.done') }}</p>
         <div class="mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold text-ink-soft">
           <span class="rounded-full bg-paper px-3 py-1">用了 {{ usedTools }} 件工具</span>
           <span class="rounded-full bg-paper px-3 py-1">通过 {{ passedCheckpoints }} 个检查点</span>
-          <span class="rounded-full bg-paper px-3 py-1">印章 {{ finalSnapshot?.stamps.length ?? 0 }} 枚</span>
+          <span class="rounded-full bg-mint px-3 py-1 text-teal">印章 {{ finalSnapshot?.stamps.length ?? 0 }} 枚</span>
         </div>
+        <ul
+          v-if="newBadges.length > 0"
+          data-testid="completion-badges"
+          class="mt-3 flex flex-wrap justify-center gap-2"
+        >
+          <li
+            v-for="badge in newBadges"
+            :key="badge.id"
+            class="rounded-full bg-brass/15 px-3 py-1 text-xs font-bold text-brass"
+          >
+            🏅 新贴纸：{{ badge.title }}
+          </li>
+        </ul>
         <p v-if="saveFailed" role="alert" class="mt-3 rounded-xl bg-red/10 px-3 py-2 text-xs font-bold text-red">
           这一关的进度没有写进存档，刷新后可能丢失。
         </p>
@@ -519,7 +729,16 @@ watch(completed, async (value) => {
             </li>
           </ul>
         </div>
-        <div class="mt-6 flex justify-center gap-3">
+        <div class="mt-6 flex flex-wrap justify-center gap-3">
+          <button
+            v-if="nextId"
+            type="button"
+            data-testid="completion-next"
+            class="min-h-12 rounded-2xl bg-teal px-5 text-sm font-bold text-white"
+            @click="goNext"
+          >
+            {{ t('complete.next') }} →
+          </button>
           <button type="button" data-testid="completion-replay" class="min-h-12 rounded-2xl bg-card px-5 text-sm font-bold" @click="replay">
             {{ t('complete.replay') }}
           </button>

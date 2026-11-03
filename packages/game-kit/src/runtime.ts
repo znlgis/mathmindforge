@@ -87,7 +87,8 @@ export interface CounterPatch {
 export interface ActionPayloadMap {
   'pattern/inspect': { index: number };
   'pattern/setCycle': { cycle: string[]; transform: PatternTransform };
-  'pattern/preview': Record<string, never>;
+  /** 可选带规则：预览只写"预测"，不该把已提交状态打掉（玩家常先提交再点预览）。 */
+  'pattern/preview': { cycle?: string[]; transform?: PatternTransform };
   'pattern/commit': Record<string, never>;
   'construct/place': { piece: PiecePlacementInput };
   'construct/remove': { pieceId: string };

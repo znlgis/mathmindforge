@@ -5,13 +5,17 @@ import type {
 import type { PatternRule } from '@mmf/toolkit/pattern';
 import { validateRule } from '@mmf/toolkit/pattern';
 import { patternDigest } from '@mmf/toolkit/pattern';
-import { actionsFor, parseScript, toWorld, validateArtifact } from './logic';
-import type { PatternScript, PatternVariant } from './logic';
+import { actionsFor, buildPreview, parseScript, patternRuleKey, toWorld, validateArtifact } from './logic';
+import type { PatternPreview, PatternScript, PatternToolStateView, PatternVariant } from './logic';
 
 interface RuntimeState {
   inspected: number[];
   rule: PatternRule | null;
   committed: boolean;
+  /** 「预览一下」的预测格；只给画布画 ghost，不参与判定。 */
+  preview?: PatternPreview;
+  /** 预览序号单调递增：ToolDock 每次预览前都会重发 setCycle，不能拿 preview.seq 自增。 */
+  previewSeq: number;
   placements: Map<number, string>;
   checkpoints: Record<string, boolean>;
   runs: RunRecord[];
@@ -38,6 +42,7 @@ function initialState(now: number): RuntimeState {
     inspected: [],
     rule: null,
     committed: false,
+    previewSeq: 0,
     placements: new Map(),
     checkpoints: {},
     runs: [],
@@ -121,18 +126,22 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         x: index,
         y: 0,
       }));
+    // 快照里比公共 PatternToolState 多一个 preview：公共类型不该为了一个模板扩字段，
+    // 写入侧按结构化子类型（多了可选字段仍可赋给父类型），画布读取时再窄化回来。
+    const patternState: PatternToolStateView = {
+      inspected: [...state.inspected],
+      cycle: state.rule?.tokens,
+      transform: state.rule?.transform,
+      committed: state.committed,
+      preview: state.preview,
+    };
     return {
       levelId: detail.id,
       variantId: 'base',
       phase: state.phase,
       artifacts: artifactSummaries(),
       toolState: {
-        pattern: {
-          inspected: [...state.inspected],
-          cycle: state.rule?.tokens,
-          transform: state.rule?.transform,
-          committed: state.committed,
-        },
+        pattern: patternState,
         construct: { pieces },
       },
       // 快照是浅拷贝：toolUsage 逐工具复制，避免监听方拿到的旧快照被后续动作改写。
@@ -201,6 +210,8 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         usage('pattern').lastAction = action.type;
         state.rule = { tokens: [...cycle], period: cycle.length, transform };
         state.committed = false;
+        // 周期/变换变了，旧预测就不再是这条规则的脸；留着会画出过期的 ghost。
+        state.preview = undefined;
         state.phase = 'editing';
         emit({
           phase: 'hypothesize',
@@ -212,9 +223,28 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         return { ok: true, snapshot: snapshot() };
       }
       case 'pattern/preview': {
+        const cycle = action.payload.cycle;
+        const transform = action.payload.transform;
+        if (cycle !== undefined) {
+          if (!Array.isArray(cycle) || cycle.length < 2 || cycle.length > 6) {
+            return fail('重复单元至少要两块。');
+          }
+          const rule: PatternRule = { tokens: [...cycle], period: cycle.length, transform: transform ?? 'none' };
+          const sameAsCommitted = state.committed && state.rule
+            && patternRuleKey(state.rule) === patternRuleKey(rule);
+          state.rule = rule;
+          // 预览不是提交：只有预览的规则与已提交的规则不一致时，才让旧提交失效；
+          // 否则玩家先点「用这条规律」再点「预览一下」，已提交状态会被无故打掉，run/submit 全部失败。
+          if (!sameAsCommitted) state.committed = false;
+        }
         if (!state.rule) return fail('先拼出一个重复单元，再预览。');
         usage('pattern').used += 1;
         usage('pattern').lastAction = action.type;
+        // 预览必须在画布上看得见：把规则对整条带子的预测记进快照，场景据此画 ghost。
+        // seq 每次 +1，连点「预览一下」也能重新跑一遍。
+        state.previewSeq += 1;
+        state.preview = buildPreview(script, state.rule, opts.now(), state.previewSeq);
+        state.phase = 'editing';
         emit({ phase: 'observe', tool: 'pattern', action: action.type });
         notify();
         return { ok: true, snapshot: snapshot() };
@@ -230,6 +260,8 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         usage('pattern').used += 1;
         usage('pattern').lastAction = action.type;
         state.committed = true;
+        // 提交后画布要让位给「哪块放错了」的即时提示，预览 ghost 先收起。
+        state.preview = undefined;
         state.checkpoints.hypothesis = true;
         state.phase = 'editing';
         emit({
@@ -280,6 +312,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
       case 'run': {
         const artifact = artifactOf();
         if (!artifact) return fail('先提交一条规律，再运行。');
+        state.preview = undefined;
         const verdict = validateArtifact(script, baseVariant, artifact);
         state.verdict = verdict;
         state.stamps = verdict.stamps;
@@ -299,6 +332,8 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         return { ok: true, verdict, snapshot: snapshot() };
       }
       case 'submit': {
+        // 判定结果要干净：预览 ghost 不参与、也不该在结果画面上抢视线。
+        state.preview = undefined;
         const missing = missingEvidence();
         if (missing.length > 0) {
           const verdict: Verdict = {

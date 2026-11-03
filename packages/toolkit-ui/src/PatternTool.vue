@@ -82,18 +82,18 @@ async function useCycle(mode: 'preview' | 'commit'): Promise<void> {
   busy.value = true;
   error.value = null;
   try {
-    const selected = await props.runtime.dispatch({
-      type: 'pattern/setCycle',
-      payload: { cycle: [...cycle.value], transform: transform.value },
-    });
+    // 预览把规则一起带上：以前先发 setCycle 再发 preview，而 setCycle 会清掉"已提交"，
+    // 于是"先点用这条规律、再点预览一下"会把提交状态打掉，之后 run/submit 全部失败。
+    const action: LevelAction = mode === 'preview'
+      ? { type: 'pattern/preview', payload: { cycle: [...cycle.value], transform: transform.value } }
+      : { type: 'pattern/setCycle', payload: { cycle: [...cycle.value], transform: transform.value } };
+    const selected = await props.runtime.dispatch(action);
     if (!selected.ok) {
       error.value = selected.message ? translate(selected.message) : null;
       return;
     }
-    const action: LevelAction = mode === 'preview'
-      ? { type: 'pattern/preview', payload: {} }
-      : { type: 'pattern/commit', payload: {} };
-    const result = await props.runtime.dispatch(action);
+    if (mode === 'preview') return;
+    const result = await props.runtime.dispatch({ type: 'pattern/commit', payload: {} });
     if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
@@ -120,7 +120,7 @@ watch(
 </script>
 
 <template>
-  <section class="mt-3 flex flex-col gap-3" data-testid="pattern-tool">
+  <section class="mt-2 flex flex-col gap-1.5" data-testid="pattern-tool">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-xs font-semibold text-ink-soft">{{ translate('pattern.inspected', { n: inspectedCount }) }}</p>
       <span
@@ -135,14 +135,14 @@ watch(
     <div v-if="spec.config.cells && spec.config.cells.length > 0">
       <p class="text-sm font-bold text-ink">观察带子</p>
       <p class="mt-1 text-xs text-ink-soft">点格子，看看它是第几位、第几个单元。</p>
-      <div class="mt-2 flex flex-wrap gap-1.5">
+      <div class="mt-2 flex flex-wrap gap-1">
         <button
           v-for="cell in spec.config.cells"
           :key="cell"
           type="button"
           :data-testid="'pattern-inspect-' + cell"
           :aria-label="'观察第 ' + (cell + 1) + ' 格'"
-          class="h-9 min-w-9 rounded-lg border border-grid bg-paper px-1 text-xs font-bold text-ink-soft active:scale-95"
+          class="h-8 min-w-9 rounded-lg border border-grid bg-paper px-1 text-xs font-bold text-ink-soft active:scale-95"
           @click="inspect(cell)"
         >
           {{ cell + 1 }}
@@ -161,7 +161,7 @@ watch(
           :data-testid="'pattern-token-' + token"
           :disabled="busy || cycle.length >= spec.config.maxPeriod"
           :aria-label="translate('pattern.cycle') + ' ' + token"
-          class="flex h-12 w-12 items-center justify-center rounded-2xl border border-grid bg-paper text-lg font-black text-ink active:scale-95 disabled:opacity-40"
+          class="flex h-11 w-11 items-center justify-center rounded-2xl border border-grid bg-paper text-lg font-black text-ink active:scale-95 disabled:opacity-40"
           @click="pushToken(token)"
         >
           {{ token }}
@@ -208,7 +208,7 @@ watch(
         type="button"
         data-testid="pattern-preview"
         :disabled="!canUseCycle || busy"
-        class="min-h-12 flex-1 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
+        class="min-h-11 flex-1 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
         @click="useCycle('preview')"
       >
         {{ translate('pattern.preview') }}
@@ -217,7 +217,7 @@ watch(
         type="button"
         data-testid="pattern-commit"
         :disabled="!canUseCycle || busy"
-        class="min-h-12 flex-1 rounded-2xl bg-blueprint px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+        class="min-h-11 flex-1 rounded-2xl bg-blueprint px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
         @click="useCycle('commit')"
       >
         {{ translate('pattern.commit') }}

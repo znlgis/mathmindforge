@@ -45,6 +45,9 @@ button {
 .game-host canvas {
   display: block;
   margin: 0 auto;
+  /* Phaser 的 FIT 模式会给 canvas 写死像素宽；不限制最大宽度，画布会把
+     flex 的 min-content 顶到设计尺寸 900px，窄屏就会出现横向滚动条。 */
+  max-width: 100%;
   touch-action: none;
 }
 

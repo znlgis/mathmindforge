@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { LevelContext, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
+import type { PatternRule } from '@mmf/toolkit/pattern';
 import {
   BaseScene,
   PALETTE,
@@ -11,7 +12,14 @@ import {
   toColor,
 } from '@mmf/canvas-kit';
 import { PATH_LAYOUT } from '../layout';
-import { parseScript } from './logic';
+import {
+  mismatchedPlacements,
+  parseScript,
+  patternRuleKey,
+  patternStateOf,
+  sameTokenShape,
+} from './logic';
+import type { PatternPreview, PatternToolStateView } from './logic';
 import type { PatternScript } from './schema';
 
 interface TileBox {
@@ -28,9 +36,15 @@ interface TileState {
   failed: boolean;
   passed: boolean;
   piece: boolean;
+  /** 已提交规律下这块放错了：只是过程提示，不进 verdict。 */
+  wrong: boolean;
+  /** 预览预测：空格画 ghost；有内容时标出与预测一致/冲突。 */
+  ghost?: { token: string; conflict: boolean };
 }
 
 const TILE_RADIUS = 12;
+/** 预览 ghost 的透明度：要看得见，又要一眼看出「还没填」。 */
+const GHOST_ALPHA = 0.5;
 
 function tileBox(index: number): TileBox {
   const x = PATH_LAYOUT.startX + index * (PATH_LAYOUT.cellW + PATH_LAYOUT.gap);
@@ -62,13 +76,16 @@ function parseCellRefs(ref: string): number[] {
 function tokenColor(token: string): string {
   if (token === 'A') return PALETTE.teal;
   if (token === 'B') return PALETTE.brass;
+  // C 在 g13 的调色板里是三角形；用蓝图色把第三种形状和 A/B 分开。
+  if (token === 'C') return PALETTE.blueprint;
   return PALETTE.ink;
 }
 
-/** A 是圆、B 是圆角方；construct 传来的 palette shape（round/square）也认。 */
-function tokenShape(token: string): 'circle' | 'square' {
+/** A 是圆、B 是圆角方、C 是三角；construct 传来的 palette shape（round/square）也认。 */
+function tokenShape(token: string): 'circle' | 'square' | 'triangle' {
   const normalized = token.toLowerCase();
   if (normalized === 'a' || normalized === 'round' || normalized === 'circle') return 'circle';
+  if (normalized === 'c' || normalized === 'triangle') return 'triangle';
   return 'square';
 }
 
@@ -78,14 +95,17 @@ function tokenCaption(token: string): string {
 
 /**
  * 模式关画布：一条 12 格的纸带。
- * 只读 runtime 快照重绘，不接管指针；所有动作由 ToolDock 派发。
+ * 只读 runtime 快照重绘；画布本身也能点格子（与右侧「观察带子」按钮等价）。
  */
 class PatternScene extends BaseScene {
   private readonly runtime: LevelRuntime;
   private script: PatternScript | null = null;
   private strip: Phaser.GameObjects.Container | null = null;
+  private hover: Phaser.GameObjects.Graphics | null = null;
   private unsubscribe: (() => void) | null = null;
   private lastSignature = '';
+  /** 命中检测用的格数：放指针回调里读，避免每次点都重新 parse 脚本。 */
+  private tileTotal = 0;
 
   constructor(ctx: LevelContext, runtime: LevelRuntime) {
     super(ctx.manifest.id, ctx);
@@ -95,6 +115,7 @@ class PatternScene extends BaseScene {
   create(): void {
     this.script = parseScript(this.ctx.detail.levelScript);
     this.lastSignature = '';
+    this.tileTotal = Math.max(this.script.scenario.length, this.script.scenario.visible.length);
     this.drawPaperBackground();
     this.add
       .text(26, 160, '先点几格，看看它是怎么重复的。', {
@@ -112,14 +133,90 @@ class PatternScene extends BaseScene {
       .setOrigin(1, 0)
       .setDepth(1);
     this.strip = this.add.container(0, 0).setDepth(10);
+    // 悬停高亮单独一层：指针移动只重画这一个 Graphics，不触发整条带子的 signature 重绘。
+    this.hover = this.add.graphics().setDepth(12);
+
+    this.input.on('pointerdown', this.handlePointerDown, this);
+    this.input.on('pointermove', this.handlePointerMove, this);
+    // 指针移出画布时 Phaser 不再发 pointermove，悬停环与手型光标要在这里收掉。
+    this.input.on('gameout', this.clearHover, this);
 
     this.unsubscribe = this.runtime.subscribe((snapshot) => this.render(snapshot));
     this.onShutdownCleanup(() => {
       this.unsubscribe?.();
       this.unsubscribe = null;
+      this.input.off('pointerdown', this.handlePointerDown, this);
+      this.input.off('pointermove', this.handlePointerMove, this);
+      this.input.off('gameout', this.clearHover, this);
+      this.hover = null;
+      this.setCanvasCursor(false);
     });
 
     this.render(this.runtime.snapshot());
+  }
+
+  /**
+   * 设计坐标命中：整张纸带卡片都算可点，落在卡片里就取横向最近的格子。
+   * 孩子点偏一点也能观察，e2e 也不必像素级对准格子中心。
+   */
+  private indexAt(x: number, y: number): number {
+    const total = this.tileTotal;
+    if (total <= 0) return -1;
+    const left = PATH_LAYOUT.startX - 26;
+    const right = PATH_LAYOUT.startX + stripWidth(total) + 26;
+    const top = PATH_LAYOUT.y - 52;
+    const bottom = PATH_LAYOUT.y + PATH_LAYOUT.cellH + 72;
+    if (x < left || x > right || y < top || y > bottom) return -1;
+    let nearest = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < total; index += 1) {
+      const distance = Math.abs(tileCenterX(index) - x);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = index;
+      }
+    }
+    return nearest;
+  }
+
+  private handlePointerDown(pointer: Phaser.Input.Pointer): void {
+    const index = this.indexAt(pointer.worldX, pointer.worldY);
+    if (index < 0) return;
+    // 派发会同步 notify → 重画整条带子（含销毁显示对象）。延到微任务，
+    // 避免在 Phaser 输入处理的栈里销毁正在派发事件的显示对象。
+    queueMicrotask(() => {
+      void this.runtime.dispatch({ type: 'pattern/inspect', payload: { index } });
+    });
+  }
+
+  private handlePointerMove(pointer: Phaser.Input.Pointer): void {
+    const hover = this.hover;
+    if (!hover) return;
+    const index = this.indexAt(pointer.worldX, pointer.worldY);
+    this.setCanvasCursor(index >= 0);
+    hover.clear();
+    if (index < 0) return;
+    const box = tileBox(index);
+    // 比观察环再外扩一点：两个环同时出现时不叠成一根线。
+    dashedRect(hover, box.x - 9, box.y - 9, box.w + 18, box.h + 18, {
+      color: PALETTE.brass,
+      lineWidth: 2,
+      dash: 7,
+      gap: 5,
+      alpha: 0.8,
+    });
+  }
+
+  /** 指针离开画布：收掉悬停环与手型光标。 */
+  private clearHover(): void {
+    this.hover?.clear();
+    this.setCanvasCursor(false);
+  }
+
+  /** 让「可点」在鼠标上看得见；触屏没有指针样式，不影响。 */
+  private setCanvasCursor(pointer: boolean): void {
+    const canvas = this.input.manager?.canvas;
+    if (canvas) canvas.style.cursor = pointer ? 'pointer' : 'default';
   }
 
   private render(snapshot: RunSnapshot): void {
@@ -136,37 +233,71 @@ class PatternScene extends BaseScene {
 
     const visible = script.scenario.visible;
     const length = Math.max(script.scenario.length, visible.length);
-    const inspected = new Set(snapshot.toolState.pattern?.inspected ?? []);
+    this.tileTotal = length;
+    const pattern = patternStateOf(snapshot);
+    const inspected = new Set(pattern?.inspected ?? []);
     const pieces = new Map<number, string>();
     for (const piece of snapshot.toolState.construct?.pieces ?? []) {
       if (Number.isInteger(piece.x)) pieces.set(piece.x, piece.shape);
     }
     const failed = this.failedCells(snapshot);
     const passed = snapshot.lastRun?.outcome === 'pass';
+    const rule = this.committedRule(pattern);
+    // 放错块只画裂纹/红圈提示，submit 的最终判定仍由 runtime 的校验决定。
+    const wrong = new Set(mismatchedPlacements(rule, pieces));
+    const preview = this.activePreview(pattern);
+    const predicted = new Map<number, string>();
+    for (const cell of preview?.cells ?? []) predicted.set(cell.index, cell.token);
 
-    this.drawStrip(length, passed);
+    this.drawStrip(length, passed, preview !== undefined);
 
     for (let index = 0; index < length; index += 1) {
       const piece = pieces.get(index);
       const token = piece ?? visible[index] ?? null;
+      const ghostToken = predicted.get(index);
       const tile = this.add.container(0, 0);
       this.paintTile(tile, index, token, {
         inspected: inspected.has(index),
         failed: failed.has(index),
         passed,
         piece: piece !== undefined,
+        wrong: wrong.has(index),
+        ghost: ghostToken === undefined
+          ? undefined
+          : { token: ghostToken, conflict: token !== null && !sameTokenShape(token, ghostToken) },
       });
       strip.add(tile);
-      this.reveal(tile, Math.min(index * 18, 180));
+      // 预览时按格错峰亮起，让「规则跑了一遍」看得见。
+      const delay = preview ? Math.min(index * 26, 260) : Math.min(index * 18, 180);
+      this.reveal(tile, delay);
     }
 
     if (passed && length > 0) this.drawWalker(length);
   }
 
+  /** 已提交的规则；没提交就没有「放错」提示，避免拿草稿规则误伤玩家。 */
+  private committedRule(pattern: PatternToolStateView | undefined): PatternRule | null {
+    if (!pattern?.committed || !pattern.cycle || pattern.cycle.length < 2) return null;
+    return {
+      tokens: [...pattern.cycle],
+      period: pattern.cycle.length,
+      transform: pattern.transform ?? 'none',
+    };
+  }
+
+  /** 预览只对生成它的那条规则有效：周期/变换被改过就作废，不画过期 ghost。 */
+  private activePreview(pattern: PatternToolStateView | undefined): PatternPreview | undefined {
+    const preview = pattern?.preview;
+    if (!preview || !pattern?.cycle) return undefined;
+    const key = patternRuleKey({ tokens: pattern.cycle, transform: pattern.transform ?? 'none' });
+    return preview.ruleKey === key ? preview : undefined;
+  }
+
   private signatureOf(snapshot: RunSnapshot): string {
-    const pattern = snapshot.toolState.pattern;
+    const pattern = patternStateOf(snapshot);
     const pieces = snapshot.toolState.construct?.pieces ?? [];
     const causes = snapshot.verdict?.failure?.causes ?? [];
+    const preview = this.activePreview(pattern);
     return [
       snapshot.phase,
       String(snapshot.revision),
@@ -177,6 +308,9 @@ class PatternScene extends BaseScene {
       snapshot.lastRun?.id ?? '',
       snapshot.lastRun?.outcome ?? '',
       causes.map((cause) => `${cause.kind}:${cause.ref}`).join(';'),
+      // 预览也要进 signature：ghost 与「连点重新跑一遍」都靠它触发重绘。
+      preview ? preview.ruleKey + '@' + preview.seq : '',
+      preview?.cells.map((cell) => `${cell.index}:${cell.token}`).join(',') ?? '',
     ].join('|');
   }
 
@@ -190,16 +324,17 @@ class PatternScene extends BaseScene {
     return cells;
   }
 
-  private drawStrip(length: number, passed: boolean): void {
+  private drawStrip(length: number, passed: boolean, previewing: boolean): void {
     const strip = this.strip;
     if (!strip) return;
     const total = stripWidth(length);
+    const frameColor = passed ? PALETTE.teal : previewing ? PALETTE.brass : PALETTE.grid;
     const g = this.add.graphics();
     roundRect(g, PATH_LAYOUT.startX - 18, PATH_LAYOUT.y - 34, total + 36, PATH_LAYOUT.cellH + 68, {
       fill: PALETTE.card,
       fillAlpha: 0.62,
-      stroke: passed ? PALETTE.teal : PALETTE.grid,
-      lineWidth: passed ? 2 : 1.5,
+      stroke: frameColor,
+      lineWidth: passed || previewing ? 2 : 1.5,
       radius: 20,
     });
     dashLine(
@@ -209,13 +344,23 @@ class PatternScene extends BaseScene {
       PATH_LAYOUT.startX + total + 6,
       PATH_LAYOUT.y + PATH_LAYOUT.cellH + 30,
       {
-        color: passed ? PALETTE.teal : PALETTE.grid,
+        color: frameColor,
         lineWidth: 2,
         dash: 10,
         gap: 8,
         alpha: 0.7,
       },
     );
+    // 预览中：纸带外面套一圈铜色虚线，和「已经填好」的实线状态区分开。
+    if (previewing) {
+      dashedRect(g, PATH_LAYOUT.startX - 24, PATH_LAYOUT.y - 40, total + 48, PATH_LAYOUT.cellH + 80, {
+        color: PALETTE.brass,
+        lineWidth: 2,
+        dash: 9,
+        gap: 7,
+        alpha: 0.55,
+      });
+    }
     strip.add(g);
   }
 
@@ -227,8 +372,9 @@ class PatternScene extends BaseScene {
   ): void {
     const box = tileBox(index);
     const tile = this.add.graphics();
-    const stroke = state.failed ? PALETTE.red : state.passed ? PALETTE.teal : PALETTE.grid;
-    const strokeWidth = state.failed ? 2.5 : state.passed ? 2 : 1.5;
+    const broken = state.failed || state.wrong;
+    const stroke = broken ? PALETTE.red : state.passed ? PALETTE.teal : PALETTE.grid;
+    const strokeWidth = broken ? 2.5 : state.passed ? 2 : 1.5;
 
     if (token === null) {
       roundRect(tile, box.x, box.y, box.w, box.h, {
@@ -237,11 +383,11 @@ class PatternScene extends BaseScene {
         radius: TILE_RADIUS,
       });
       dashedRect(tile, box.x + 2, box.y + 2, box.w - 4, box.h - 4, {
-        color: state.failed ? PALETTE.red : PALETTE.blueprint,
+        color: broken ? PALETTE.red : state.ghost ? PALETTE.brass : PALETTE.blueprint,
         lineWidth: 2,
         dash: 8,
         gap: 6,
-        alpha: state.failed ? 1 : 0.8,
+        alpha: broken ? 1 : 0.8,
       });
     } else {
       roundRect(tile, box.x, box.y, box.w, box.h, {
@@ -254,13 +400,28 @@ class PatternScene extends BaseScene {
     }
     target.add(tile);
 
-    const caption = token === null ? '?' : tokenCaption(token);
-    const text = centeredLabel(this, box.cx, box.cy, caption, {
-      size: 20,
-      bold: true,
-      color: token === null ? PALETTE.inkSoft : tokenColor(token),
-    });
-    target.add(text);
+    if (token === null && state.ghost) {
+      // 空格上画预测：虚线铜框 + 半透明字母/形状，左下角的小问号提醒「其实还空着」。
+      this.paintGhost(target, box, state.ghost.token);
+      const hint = centeredLabel(this, box.x + 11, box.y + 13, '?', {
+        size: 11,
+        color: PALETTE.inkSoft,
+      });
+      hint.setAlpha(0.75);
+      target.add(hint);
+    } else {
+      const caption = token === null ? '?' : tokenCaption(token);
+      const text = centeredLabel(this, box.cx, box.cy, caption, {
+        size: 20,
+        bold: true,
+        color: token === null ? PALETTE.inkSoft : tokenColor(token),
+      });
+      target.add(text);
+      if (token !== null && state.ghost) {
+        if (state.ghost.conflict) this.paintPreviewConflict(target, box, state.ghost.token);
+        else this.paintPreviewMatch(target, box);
+      }
+    }
 
     // 下标贴纸：ToolDock 的 index 与画布一一对应
     const indexText = centeredLabel(this, box.cx, box.y + box.h + 16, String(index + 1), {
@@ -272,7 +433,7 @@ class PatternScene extends BaseScene {
     if (state.inspected) {
       const ring = this.add.graphics();
       roundRect(ring, box.x - 5, box.y - 5, box.w + 10, box.h + 10, {
-        stroke: state.failed ? PALETTE.red : PALETTE.blueprint,
+        stroke: broken ? PALETTE.red : PALETTE.blueprint,
         lineWidth: 3,
         radius: TILE_RADIUS + 5,
       });
@@ -288,7 +449,111 @@ class PatternScene extends BaseScene {
       target.add(mark);
     }
 
+    // 判定失败照旧用实线裂纹；过程提示（放错块）用虚线框+浅裂纹，两者都不改 verdict。
     if (state.failed) this.paintFailure(target, box);
+    else if (state.wrong) this.paintWrongHint(target, box);
+  }
+
+  /** 预测格：铜色半透明形状 + 字母，看得见「规则猜这里是什么」。 */
+  private paintGhost(
+    target: Phaser.GameObjects.Container,
+    box: TileBox,
+    token: string,
+  ): void {
+    const shape = this.add.graphics();
+    this.paintGhostShape(shape, token, box);
+    target.add(shape);
+    const text = centeredLabel(this, box.cx, box.cy, tokenCaption(token), {
+      size: 20,
+      bold: true,
+      color: PALETTE.brass,
+    });
+    text.setAlpha(GHOST_ALPHA);
+    target.add(text);
+  }
+
+  private paintGhostShape(
+    g: Phaser.GameObjects.Graphics,
+    token: string,
+    box: TileBox,
+  ): void {
+    const half = 17;
+    const tint = PALETTE.brass;
+    const shape = tokenShape(token);
+    if (shape === 'circle') {
+      circle(g, box.cx, box.cy, half, {
+        fill: tint,
+        fillAlpha: 0.1,
+        stroke: tint,
+        strokeAlpha: 0.55,
+        lineWidth: 2,
+      });
+      return;
+    }
+    if (shape === 'triangle') {
+      g.fillStyle(toColor(tint), 0.1);
+      g.fillTriangle(box.cx, box.cy - half, box.cx + half, box.cy + half - 3, box.cx - half, box.cy + half - 3);
+      g.lineStyle(2, toColor(tint), 0.55);
+      g.strokeTriangle(box.cx, box.cy - half, box.cx + half, box.cy + half - 3, box.cx - half, box.cy + half - 3);
+      return;
+    }
+    roundRect(g, box.cx - half, box.cy - half, half * 2, half * 2, {
+      fill: tint,
+      fillAlpha: 0.1,
+      stroke: tint,
+      strokeAlpha: 0.55,
+      lineWidth: 2,
+      radius: 9,
+    });
+  }
+
+  /** 规律预测和已经填好的内容对不上：红虚线框 + 右下角标注规律猜的 token。 */
+  private paintPreviewConflict(
+    target: Phaser.GameObjects.Container,
+    box: TileBox,
+    token: string,
+  ): void {
+    const g = this.add.graphics();
+    dashedRect(g, box.x - 5, box.y - 5, box.w + 10, box.h + 10, {
+      color: PALETTE.red,
+      lineWidth: 2,
+      dash: 6,
+      gap: 4,
+      alpha: 0.9,
+    });
+    target.add(g);
+    const guess = centeredLabel(this, box.x + box.w - 12, box.y + box.h - 12, tokenCaption(token), {
+      size: 12,
+      bold: true,
+      color: PALETTE.brass,
+    });
+    guess.setAlpha(0.95);
+    target.add(guess);
+  }
+
+  /** 规律在已有内容上成立：格子底部一条青色细线，像「规则跑过了这一格」。 */
+  private paintPreviewMatch(target: Phaser.GameObjects.Container, box: TileBox): void {
+    const g = this.add.graphics();
+    g.lineStyle(2, toColor(PALETTE.teal), 0.55);
+    g.lineBetween(box.x + 14, box.y + box.h - 9, box.x + box.w - 14, box.y + box.h - 9);
+    target.add(g);
+  }
+
+  /** 即时提示：放下的块和已提交规律不一致 —— 虚线红框 + 浅裂纹，改掉就消失。 */
+  private paintWrongHint(target: Phaser.GameObjects.Container, box: TileBox): void {
+    const g = this.add.graphics();
+    dashedRect(g, box.x - 4, box.y - 4, box.w + 8, box.h + 8, {
+      color: PALETTE.red,
+      lineWidth: 2.5,
+      dash: 7,
+      gap: 5,
+      alpha: 0.95,
+    });
+    g.lineStyle(2, toColor(PALETTE.red), 0.8);
+    g.lineBetween(box.x + 16, box.y + 10, box.cx + 4, box.y + box.h * 0.36);
+    g.lineBetween(box.cx + 4, box.y + box.h * 0.36, box.cx - 4, box.y + box.h * 0.62);
+    g.lineBetween(box.cx - 4, box.y + box.h * 0.62, box.x + box.w - 16, box.y + box.h - 10);
+    target.add(g);
   }
 
   private paintTokenShape(
@@ -299,13 +564,21 @@ class PatternScene extends BaseScene {
   ): void {
     const half = 17;
     const tint = passed ? PALETTE.teal : tokenColor(token);
-    if (tokenShape(token) === 'circle') {
+    const shape = tokenShape(token);
+    if (shape === 'circle') {
       circle(g, box.cx, box.cy, half, {
         fill: tint,
         fillAlpha: 0.18,
         stroke: tint,
         lineWidth: 2.5,
       });
+      return;
+    }
+    if (shape === 'triangle') {
+      g.fillStyle(toColor(tint), 0.18);
+      g.fillTriangle(box.cx, box.cy - half, box.cx + half, box.cy + half - 3, box.cx - half, box.cy + half - 3);
+      g.lineStyle(2.5, toColor(tint), 1);
+      g.strokeTriangle(box.cx, box.cy - half, box.cx + half, box.cy + half - 3, box.cx - half, box.cy + half - 3);
       return;
     }
     roundRect(g, box.cx - half, box.cy - half, half * 2, half * 2, {

@@ -18,8 +18,8 @@ test('界面可切英文，并在刷新后记住选择', async ({ page }) => {
 
   await page.goto('/#/play/k-structure-pattern-path');
   await expect(page.getByText('Pattern Tinkerer').first()).toBeVisible();
-  await expect(page.getByTestId('level-submit')).toContainText('Check structure');
-  await expect(page.getByTestId('level-run')).toContainText('Run');
+  await expect(page.getByTestId('level-submit')).toContainText('Finish');
+  await expect(page.getByTestId('level-run')).toContainText('Try it');
 
   await page.goto('/#/');
   await page.getByTestId('locale-toggle').click();

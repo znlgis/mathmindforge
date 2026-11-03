@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { events, saveSnapshot, waitEvent } from './shared';
+import { events, openTool, saveSnapshot, waitEvent } from './shared';
 
 const LEVEL_ID = 'k-structure-pattern-path';
 
@@ -48,7 +48,8 @@ test('真实点击工具台可以通关（不靠 autoplay）', async ({ page }) 
   await page.getByTestId('pattern-commit').click();
   await expect(page.getByTestId('pattern-committed')).toBeVisible();
 
-  // 给三个缺口分别放 A / B / B
+  // 给三个缺口分别放 A / B / B（construct 是第二张卡，先展开它）
+  await openTool(page, 'construct', 1);
   for (const [slot, token] of [[6, 'A'], [7, 'B'], [8, 'B']] as const) {
     await page.getByTestId('construct-slot-' + slot).click();
     await page.getByTestId('construct-place-' + token).click();

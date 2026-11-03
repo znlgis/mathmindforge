@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { SHIPPED_LEVEL_IDS } from '../packages/content/src/ids';
-import { saveSnapshot, waitEvent } from './shared';
+import { openTool, saveSnapshot, waitEvent } from './shared';
 
 const M1_LEVELS = SHIPPED_LEVEL_IDS.filter((id) => id !== 'k-structure-pattern-path');
 
@@ -32,6 +32,7 @@ test('真实点击：最少枚数支付 + 反例可以通关', async ({ page }) 
   await page.getByTestId('payment-add-3').click();
   await expect(page.getByTestId('payment-total')).toContainText('2 枚');
 
+  await openTool(page, 'counter', 1);
   await page.getByTestId('counter-target').fill('10');
   await page.getByTestId('counter-target').blur();
   await page.getByTestId('counter-denom-1').click();
@@ -78,6 +79,7 @@ test('真实点击：结构不变量论证可以通关', async ({ page }) => {
   await page.getByTestId('domino-cell-0-1').click();
   await page.getByTestId('domino-cell-0-2').click();
 
+  await openTool(page, 'probe', 1);
   await page.getByTestId('invariant-sample').click();
   await expect(page.getByTestId('invariant-counts')).toContainText('11');
 
@@ -133,6 +135,7 @@ test('真实点击：对称补墙可以通关', async ({ page }) => {
   await page.getByTestId('pattern-transform').selectOption('reflect');
   await page.getByTestId('pattern-commit').click();
 
+  await openTool(page, 'construct', 1);
   for (const [slot, token] of [[3, 'C'], [4, 'B'], [5, 'A']] as const) {
     await page.getByTestId('construct-slot-' + slot).click();
     await page.getByTestId('construct-place-' + token).click();
