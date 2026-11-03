@@ -19,6 +19,7 @@ import g13StructureSymmetryDetail from './details/g13-structure-symmetry.level.j
 import g46StructureTilingDetail from './details/g46-structure-tiling.level.json';
 import g46ModelingQueueDetail from './details/g46-modeling-queue.level.json';
 import g79DataSamplingDetail from './details/g79-data-sampling.level.json';
+import g79StructureNetworkDetail from './details/g79-structure-network.level.json';
 import type { ShippedLevelId } from './ids';
 import type { LevelDetail } from './schema';
 
@@ -39,4 +40,5 @@ export const LEVEL_DETAILS: Record<ShippedLevelId, LevelDetail> = {
   'g46-structure-tiling': g46StructureTilingDetail as LevelDetail,
   'g46-modeling-queue': g46ModelingQueueDetail as LevelDetail,
   'g79-data-sampling': g79DataSamplingDetail as LevelDetail,
+  'g79-structure-network': g79StructureNetworkDetail as LevelDetail,
 };

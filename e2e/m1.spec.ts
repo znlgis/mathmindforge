@@ -164,3 +164,15 @@ test('真实点击：抽样调查员可以通关', async ({ page }) => {
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：路网规划师可以通关', async ({ page }) => {
+  await page.goto('/#/play/g79-structure-network');
+  await expect(page.getByTestId('network-tool')).toBeVisible();
+
+  for (const edge of ['ab', 'bc', 'bd', 'ce']) {
+    await page.getByTestId('network-edge-' + edge).click();
+  }
+  await expect(page.getByTestId('network-cost')).toContainText('6');
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});

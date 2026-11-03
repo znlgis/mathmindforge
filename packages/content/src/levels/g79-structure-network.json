@@ -1,0 +1,25 @@
+{
+  "id": "g79-structure-network",
+  "title": "路网规划师",
+  "emoji": "🛣️",
+  "color": "#1f4e6b",
+  "band": "g79",
+  "thread": "structure",
+  "template": "construct",
+  "tools": [
+    "construct"
+  ],
+  "estimatedMinutes": 7,
+  "thinkingTarget": "在预算内选边，把五个站点连成一张连通的网",
+  "difficulty": {
+    "structure": 3,
+    "representation": 3,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  },
+  "titleEn": "Network Planner",
+  "thinkingTargetEn": "Choose roads within budget so all five stations become one connected network."
+}

@@ -73,6 +73,7 @@ export const SHIPPED_LEVEL_IDS = [
   'g46-structure-tiling',
   'g46-modeling-queue',
   'g79-data-sampling',
+  'g79-structure-network',
 ] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 

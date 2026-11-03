@@ -1,0 +1,311 @@
+{
+  "id": "g79-structure-network",
+  "title": "路网规划师",
+  "band": "g79",
+  "thread": "structure",
+  "template": "construct",
+  "thinkingTarget": "在预算内选边，把五个站点连成一张连通的网",
+  "intro": "五个站点之间有一些候选道路。预算只够修一部分，但所有站点必须连起来。",
+  "prompt": "选一组道路，让五个站点全部连通，成本 ≤ 9，最多选 5 条，并且连到学校与医院。",
+  "done": "你选的边把所有站点连成了一张网，而且没有超预算。",
+  "retry": "先看哪些边能连到关键站点，再检查有没有孤立的块。",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "network"
+      ],
+      "config": {
+        "mode": "network",
+        "palette": [
+          {
+            "id": "edge",
+            "label": "道路",
+            "shape": "edge"
+          }
+        ],
+        "maxPieces": 5
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "network"
+  ],
+  "levelScript": {
+    "mode": "network",
+    "nodes": [
+      {
+        "id": "A",
+        "label": "学校",
+        "x": 10,
+        "y": 20,
+        "key": true
+      },
+      {
+        "id": "B",
+        "label": "公园",
+        "x": 40,
+        "y": 10,
+        "key": false
+      },
+      {
+        "id": "C",
+        "label": "医院",
+        "x": 70,
+        "y": 20,
+        "key": true
+      },
+      {
+        "id": "D",
+        "label": "市场",
+        "x": 40,
+        "y": 50,
+        "key": false
+      },
+      {
+        "id": "E",
+        "label": "车站",
+        "x": 70,
+        "y": 50,
+        "key": false
+      }
+    ],
+    "edges": [
+      {
+        "id": "ab",
+        "a": "A",
+        "b": "B",
+        "cost": 2
+      },
+      {
+        "id": "bc",
+        "a": "B",
+        "b": "C",
+        "cost": 2
+      },
+      {
+        "id": "cd",
+        "a": "C",
+        "b": "D",
+        "cost": 2
+      },
+      {
+        "id": "de",
+        "a": "D",
+        "b": "E",
+        "cost": 2
+      },
+      {
+        "id": "ae",
+        "a": "A",
+        "b": "E",
+        "cost": 5
+      },
+      {
+        "id": "bd",
+        "a": "B",
+        "b": "D",
+        "cost": 1
+      },
+      {
+        "id": "ce",
+        "a": "C",
+        "b": "E",
+        "cost": 1
+      }
+    ],
+    "budget": 9,
+    "maxEdges": 5,
+    "minKeyEdges": 2
+  },
+  "evidencePlan": [
+    {
+      "id": "edges",
+      "phase": "construct",
+      "require": "construct/place >= 1",
+      "descriptionKey": "先选一条道路"
+    },
+    {
+      "id": "connected",
+      "phase": "construct",
+      "require": "connected",
+      "descriptionKey": "把所有站点连成一个连通块"
+    },
+    {
+      "id": "commit",
+      "phase": "run",
+      "require": "network/complete",
+      "descriptionKey": "提交满足预算的路网"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-chain",
+      "artifact": {
+        "edges": [
+          "ab",
+          "bc",
+          "cd",
+          "de"
+        ]
+      }
+    },
+    {
+      "id": "s-short",
+      "artifact": {
+        "edges": [
+          "ab",
+          "bc",
+          "bd",
+          "ce"
+        ]
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-empty",
+      "expectFailure": "network-empty",
+      "artifact": {
+        "edges": []
+      }
+    },
+    {
+      "id": "n-disconnected",
+      "expectFailure": "network-disconnected",
+      "artifact": {
+        "edges": [
+          "ab"
+        ]
+      }
+    },
+    {
+      "id": "n-too-many",
+      "expectFailure": "network-too-many",
+      "artifact": {
+        "edges": [
+          "ab",
+          "bc",
+          "cd",
+          "de",
+          "ae",
+          "bd"
+        ]
+      }
+    },
+    {
+      "id": "n-budget",
+      "expectFailure": "network-budget",
+      "artifact": {
+        "edges": [
+          "ab",
+          "bc",
+          "cd",
+          "de",
+          "ae"
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-labels",
+      "axis": "representation",
+      "patch": {
+        "nodes": [
+          {
+            "id": "A",
+            "label": "学校站",
+            "x": 10,
+            "y": 20,
+            "key": true
+          },
+          {
+            "id": "B",
+            "label": "公园站",
+            "x": 40,
+            "y": 10,
+            "key": false
+          },
+          {
+            "id": "C",
+            "label": "医院站",
+            "x": 70,
+            "y": 20,
+            "key": true
+          },
+          {
+            "id": "D",
+            "label": "市场站",
+            "x": 40,
+            "y": 50,
+            "key": false
+          },
+          {
+            "id": "E",
+            "label": "车站站",
+            "x": 70,
+            "y": 50,
+            "key": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "v-costs",
+      "axis": "representation",
+      "patch": {
+        "budget": 10
+      }
+    }
+  ],
+  "feedback": {
+    "network-empty": {
+      "messageKey": "一条路都没选。",
+      "hintKey": "至少先把入口和中心连起来。",
+      "focus": "edges"
+    },
+    "network-disconnected": {
+      "messageKey": "还有站点没有连进路网。",
+      "hintKey": "检查是不是分成了两块。",
+      "focus": "connected"
+    },
+    "network-budget": {
+      "messageKey": "路网成本超过预算。",
+      "hintKey": "找一条更短的边替换长边。",
+      "focus": "budget"
+    },
+    "network-too-many": {
+      "messageKey": "选的道路太多，超过上限。",
+      "hintKey": "连通 5 个点最多需要 4 条边，通常不需要 5 条以上。",
+      "focus": "count"
+    },
+    "network-key": {
+      "messageKey": "关键站点没有连上。",
+      "hintKey": "学校与医院都要接入路网。",
+      "focus": "key"
+    },
+    "network-not-general": {
+      "messageKey": "条件变了之后路网不通了。",
+      "hintKey": "检查变体里的预算与站点。",
+      "focus": "variant"
+    }
+  },
+  "badges": [
+    "modeler"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.network.manualAudit"
+  },
+  "titleEn": "Network Planner",
+  "thinkingTargetEn": "Choose roads within budget so all five stations become one connected network.",
+  "introEn": "Five stations have candidate roads. The budget only covers some of them, but every station must be connected.",
+  "promptEn": "Choose roads so all five stations are connected, cost ≤ 9, at most 5 roads, and both school and hospital are linked.",
+  "doneEn": "Your roads connected every station without going over budget.",
+  "retryEn": "Check which roads touch the key stations, then look for isolated blocks."
+}

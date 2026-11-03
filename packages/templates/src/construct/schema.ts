@@ -62,10 +62,13 @@ export const distributionScriptSchema = z.object({
 });
 export type DistributionScript = z.infer<typeof distributionScriptSchema>;
 
+import { networkScriptSchema } from './network';
+
 export const constructScriptSchema = z.discriminatedUnion('mode', [
   paymentScriptSchema,
   placementScriptSchema,
   distributionScriptSchema,
+  networkScriptSchema,
 ]);
 export type ConstructScript = z.infer<typeof constructScriptSchema>;
 

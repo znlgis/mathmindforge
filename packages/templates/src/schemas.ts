@@ -4,6 +4,7 @@ import type { TemplateId } from '@mmf/content/ids';
 import { patternScriptSchema } from './pattern/schema';
 import { ruleScriptSchema } from './rule/schema';
 import { constructScriptSchema } from './construct/schema';
+import { networkScriptSchema } from './construct/network';
 import { simulateScriptSchema } from './simulate/schema';
 import { queueScriptSchema } from './simulate/queue';
 import { experimentScriptSchema } from './experiment/schema';
@@ -18,7 +19,7 @@ import { argueScriptSchema } from './argue/schema';
 export const templateSchemas: Record<TemplateId, ZodType> = {
   pattern: patternScriptSchema,
   rule: ruleScriptSchema,
-  construct: constructScriptSchema,
+  construct: z.discriminatedUnion('mode', [constructScriptSchema, networkScriptSchema]),
   simulate: z.discriminatedUnion('mode', [simulateScriptSchema, queueScriptSchema]),
   experiment: z.discriminatedUnion('mode', [experimentScriptSchema, samplingScriptSchema]),
   argue: argueScriptSchema,

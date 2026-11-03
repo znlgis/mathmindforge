@@ -12,6 +12,7 @@ import KnobTool from './KnobTool.vue';
 import MetricsTool from './MetricsTool.vue';
 import QueueMetricsTool from './QueueMetricsTool.vue';
 import SamplingTool from './SamplingTool.vue';
+import NetworkTool from './NetworkTool.vue';
 import PatternTool from './PatternTool.vue';
 import PaymentTool from './PaymentTool.vue';
 import RuleTool from './RuleTool.vue';
@@ -106,6 +107,14 @@ onBeforeUnmount(() => {
       />
       <DominoTool
         v-else-if="spec.kind === 'construct' && spec.config.mode === 'domino'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :detail="detail"
+        :t="translator"
+      />
+      <NetworkTool
+        v-else-if="spec.kind === 'construct' && spec.config.mode === 'network'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"
