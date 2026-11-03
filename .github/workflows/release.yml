@@ -63,7 +63,7 @@ jobs:
       - name: 质量门禁（类型 / lint / 单测 / 内容 / 审计 / build / size）
         run: |
           pnpm verify
-          pnpm content:check -- --require-all
+          pnpm content:check --require-all
 
       - name: 校验站点产物
         run: |

@@ -33,7 +33,7 @@ jobs:
       - run: pnpm verify
 
       - name: 内容矩阵必须 20/20
-        run: pnpm content:check -- --require-all
+        run: pnpm content:check --require-all
 
   e2e:
     runs-on: ubuntu-latest

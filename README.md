@@ -70,8 +70,8 @@ pnpm e2e          # 59 条：20 关 autoplay、20 关无工具失败、12 关真
 
 ## CI / 发布
 
-- `ci.yml`：verify、e2e、preview（生产产物 `e2e:dist`），Playwright 缓存与失败截图/轨迹；
-- `release.yml`：push `v*` tag 时创建 GitHub Release，附 Web 静态 zip；`workflow_dispatch` 只出产物；
+- `ci.yml`：verify（含 `content:check --require-all`）、e2e、preview（生产产物 `e2e:dist`），Playwright 缓存与失败截图/轨迹；
+- `release.yml`：push `v*` tag 时创建 GitHub Release，附 Web 静态 zip；`workflow_dispatch` 只出产物；tag 发布路径尚未实跑；
 - 原生 EXE/APK 任务未纳入：仓库尚无 Tauri/Capacitor 工程，构建环境也缺 Rust/Android SDK。
 
 ## 范围与默认决策

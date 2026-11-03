@@ -11,6 +11,8 @@ function ok(message: string): void {
   console.log('  ✓ ' + message);
 }
 
+const requireAll = process.argv.includes('--require-all');
+
 const BANNED = ['失败', '惩罚', '笨蛋', '输了', '淘汰', '粗心', '扣分', '排名', '倒数'];
 const summaryById = new Map(LEVEL_SUMMARIES.map((s) => [s.id, s]));
 const baseVariant = { id: 'base', axis: 'structure', patch: {} };
@@ -110,7 +112,10 @@ for (const id of SHIPPED_LEVEL_IDS) {
 
 const shipped = new Set<string>(SHIPPED_LEVEL_IDS);
 const missingTarget = LEVEL_IDS.filter((id) => !shipped.has(id));
-console.log('\n目标矩阵：' + (LEVEL_IDS.length - missingTarget.length) + '/' + LEVEL_IDS.length + ' 已发布；其余 ' + missingTarget.length + ' 关在后续里程碑（--require-all 时才算错误）。');
+console.log('\n目标矩阵：' + (LEVEL_IDS.length - missingTarget.length) + '/' + LEVEL_IDS.length + ' 已发布；其余 ' + missingTarget.length + ' 关在后续里程碑' + (requireAll ? '（已要求全量）' : '') + '。');
+if (requireAll && missingTarget.length > 0) {
+  fail('目标矩阵缺 ' + missingTarget.length + ' 关：' + missingTarget.join('、'));
+}
 
 if (errors > 0) {
   console.error('\n内容校验失败：' + errors + ' 个问题');
