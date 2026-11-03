@@ -5,6 +5,7 @@ const translator = createTranslator('zh-CN');
 export function useI18n() {
   return {
     t: translator.t,
+    translator,
     locale: 'zh-CN' as const,
   };
 }

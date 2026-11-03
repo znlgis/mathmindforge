@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { ZodType } from 'zod';
 import type { TemplateId } from '@mmf/content/ids';
 import { patternScriptSchema } from './pattern/schema';
@@ -6,6 +5,7 @@ import { ruleScriptSchema } from './rule/schema';
 import { paymentScriptSchema } from './construct/schema';
 import { simulateScriptSchema } from './simulate/schema';
 import { experimentScriptSchema } from './experiment/schema';
+import { argueScriptSchema } from './argue/schema';
 
 /**
  * 模板 id → 关卡脚本 schema。M1 已实现 pattern/rule/construct/simulate/experiment；
@@ -18,5 +18,5 @@ export const templateSchemas: Record<TemplateId, ZodType> = {
   construct: paymentScriptSchema,
   simulate: simulateScriptSchema,
   experiment: experimentScriptSchema,
-  argue: z.unknown(),
+  argue: argueScriptSchema,
 };

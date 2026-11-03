@@ -5,6 +5,8 @@ import type { Translator } from '@mmf/i18n';
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import ConstructTool from './ConstructTool.vue';
 import CounterTool from './CounterTool.vue';
+import DominoTool from './DominoTool.vue';
+import InvariantProbeTool from './InvariantProbeTool.vue';
 import KnobTool from './KnobTool.vue';
 import MetricsTool from './MetricsTool.vue';
 import PatternTool from './PatternTool.vue';
@@ -93,10 +95,18 @@ onBeforeUnmount(() => {
         :t="translator"
       />
       <ConstructTool
-        v-else-if="spec.kind === 'construct' && spec.config.mode !== 'payment'"
+        v-else-if="spec.kind === 'construct' && spec.config.mode !== 'payment' && spec.config.mode !== 'domino'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"
+        :t="translator"
+      />
+      <DominoTool
+        v-else-if="spec.kind === 'construct' && spec.config.mode === 'domino'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :detail="detail"
         :t="translator"
       />
       <PaymentTool
@@ -122,6 +132,13 @@ onBeforeUnmount(() => {
       />
       <KnobTool
         v-else-if="spec.kind === 'knob'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <InvariantProbeTool
+        v-else-if="spec.kind === 'probe' && spec.config.mode === 'invariant'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"

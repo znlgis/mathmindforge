@@ -25,7 +25,10 @@
     "./experiment": "./src/experiment/index.ts",
     "./experiment.logic": "./src/experiment/logic.ts",
     "./experiment.runtime": "./src/experiment/runtime.ts",
-    "./verifiers": "./src/verifiers.ts"
+    "./verifiers": "./src/verifiers.ts",
+    "./argue": "./src/argue/index.ts",
+    "./argue.logic": "./src/argue/logic.ts",
+    "./argue.runtime": "./src/argue/runtime.ts"
   },
   "scripts": {
     "test": "vitest run",

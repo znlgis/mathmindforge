@@ -69,3 +69,25 @@ test('真实点击：分类小站采样、记录、下结论可以通关', async
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：结构不变量论证可以通关', async ({ page }) => {
+  await page.goto('/#/play/g1012-structure-invariant');
+  await expect(page.getByTestId('domino-tool')).toBeVisible();
+
+  // 先真的铺一块，满足 attempt 检查点
+  await page.getByTestId('domino-cell-0-1').click();
+  await page.getByTestId('domino-cell-0-2').click();
+
+  await page.getByTestId('invariant-sample').click();
+  await expect(page.getByTestId('invariant-counts')).toContainText('11');
+
+  await expect(page.getByTestId('argument-board')).toBeVisible();
+  await page.getByTestId('argue-claim').selectOption('impossible');
+  await page.getByTestId('argue-warrant').selectOption('coloring');
+  await page.getByTestId('argue-attach').click();
+  await page.getByTestId('argue-scope').selectOption('domino-tiling');
+  await page.getByTestId('argue-commit').click();
+
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});

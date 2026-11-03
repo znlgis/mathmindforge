@@ -35,7 +35,7 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
     kind: z.literal('construct'),
     ...ToolSpecBase,
     config: z.object({
-      mode: z.enum(['placement', 'payment']).default('placement'),
+      mode: z.enum(['placement', 'payment', 'domino']).default('placement'),
       palette: z.array(z.object({
         id: z.string().min(1), label: z.string().min(1), shape: z.string().min(1),
         value: z.number().int().positive().optional(),
@@ -63,7 +63,7 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
     kind: z.literal('probe'),
     ...ToolSpecBase,
     config: z.object({
-      mode: z.enum(['sample', 'tally', 'metrics']).default('sample'),
+      mode: z.enum(['sample', 'tally', 'metrics', 'invariant']).default('sample'),
       sampleSizes: z.array(z.number().int().positive()).min(1),
       chart: z.string().max(40).optional(),
       categories: z.array(z.object({

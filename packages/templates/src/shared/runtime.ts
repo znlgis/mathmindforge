@@ -1,5 +1,5 @@
 import type {
-  ActionResult, ArtifactSummary, EvidenceDraft, LevelAction, LevelDetail, LevelRuntime,
+  ActionResult, ArgumentSnapshot, ArtifactSummary, EvidenceDraft, LevelAction, LevelDetail, LevelRuntime,
   RunRecord, RunSnapshot, RuntimeOptions, StampId, ToolId, ToolStateMap, ToolUsageState, Verdict,
 } from '@mmf/game-kit';
 import { TOOL_IDS } from '@mmf/game-kit';
@@ -29,6 +29,8 @@ export interface RuntimeAdapter<S> {
   actionsFor(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): LevelAction[];
   transferVariants?(detail: LevelDetail): RuntimeVariant[];
   transferFailureClass?(detail: LevelDetail): string;
+  /** argue 模板的结构化证书状态；其他模板不实现 */
+  argumentState?(state: S): ArgumentSnapshot | undefined;
 }
 
 export const BASE_VARIANT: RuntimeVariant = { id: 'base', axis: 'structure', patch: {} };
@@ -96,6 +98,7 @@ export function createRuntimeWithAdapter<S>(
       runs: [...meta.runs],
       lastRun: meta.lastRun,
       verdict: meta.verdict,
+      argument: adapter.argumentState?.(meta.state),
       stamps: [...meta.stamps],
       revision: meta.revision,
       updatedAt: opts.now(),

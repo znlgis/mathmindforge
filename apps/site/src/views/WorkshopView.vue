@@ -3,7 +3,7 @@ import type { EvidenceDraft, LevelModule, LevelRuntime, RunSnapshot, ShippedLeve
 import { loadLevel } from '@mmf/content';
 import type { LevelDetail } from '@mmf/content';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
-import ToolDock from '@mmf/toolkit-ui';
+import ToolDock, { ArgumentBoard } from '@mmf/toolkit-ui';
 import { navigate } from '../router';
 import { registry } from '../registry';
 import { createLevelContext, readDebugOptions } from '../shell/createLevelContext';
@@ -27,6 +27,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const completed = ref(false);
 const finalSnapshot = ref<RunSnapshot | null>(null);
+const liveSnapshot = ref<RunSnapshot | null>(null);
 const exitTimer = ref<number | null>(null);
 
 const usedTools = computed(() => {
@@ -42,7 +43,7 @@ const passedCheckpoints = computed(() => {
 
 const progress = useProgress();
 const settings = useSettings();
-const { t } = useI18n();
+const { t, translator } = useI18n();
 
 let disposed = false;
 let offPause: (() => void) | null = null;
@@ -164,7 +165,9 @@ async function start(): Promise<void> {
       },
     });
     runtime.value = runtimeRef;
+    liveSnapshot.value = runtimeRef.snapshot();
     runtimeRef.subscribe((snapshot) => {
+      liveSnapshot.value = snapshot;
       setDebugSnapshot(snapshot);
     });
     const ctx = createLevelContext({
@@ -295,6 +298,13 @@ onBeforeUnmount(async () => {
             :runtime="runtime"
             :detail="detail"
             locale="zh-CN"
+          />
+          <ArgumentBoard
+            v-if="runtime && detail?.template === 'argue' && liveSnapshot"
+            :runtime="runtime"
+            :snapshot="liveSnapshot"
+            :detail="detail"
+            :t="translator"
           />
         </div>
         <div class="border-t border-grid bg-paper p-3">

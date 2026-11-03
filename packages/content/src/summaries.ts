@@ -8,6 +8,7 @@ import g13Route from './levels/g13-algorithm-route.json';
 import g46Payment from './levels/g46-algorithm-payment.json';
 import g79Dispatch from './levels/g79-modeling-dispatch.json';
 import g1012Winrate from './levels/g1012-modeling-winrate.json';
+import g1012StructureInvariant from './levels/g1012-structure-invariant.json';
 
 /**
  * 摘要表：只静态加载已发布关卡。M0 只有一关；M1/M2 随 SHIPPED_LEVEL_IDS 增补。
@@ -20,6 +21,7 @@ const RAW: Record<string, unknown> = {
   'g46-algorithm-payment': g46Payment,
   'g79-modeling-dispatch': g79Dispatch,
   'g1012-modeling-winrate': g1012Winrate,
+  'g1012-structure-invariant': g1012StructureInvariant,
 };
 
 export const LEVEL_SUMMARIES: readonly LevelSummary[] = SHIPPED_LEVEL_IDS.map((id) => {

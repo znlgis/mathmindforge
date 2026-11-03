@@ -1,0 +1,24 @@
+{
+  "id": "g1012-structure-invariant",
+  "title": "结构不变量",
+  "emoji": "♟️",
+  "color": "#1f4e6b",
+  "band": "g1012",
+  "thread": "structure",
+  "template": "argue",
+  "tools": [
+    "construct",
+    "probe"
+  ],
+  "estimatedMinutes": 10,
+  "thinkingTarget": "用一个不随操作改变的量，说明某类铺砌为什么不可能",
+  "difficulty": {
+    "structure": 4,
+    "representation": 4,
+    "constraint": 4,
+    "transfer": 4
+  },
+  "unlock": {
+    "after": []
+  }
+}

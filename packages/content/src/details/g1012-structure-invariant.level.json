@@ -1,0 +1,279 @@
+{
+  "id": "g1012-structure-invariant",
+  "title": "结构不变量",
+  "band": "g1012",
+  "thread": "structure",
+  "template": "argue",
+  "intro": "这张棋盘少了两个角。先试着铺几块，再找一个不随摆放改变的量。",
+  "prompt": "说明它为什么不能被 1×2 多米诺铺满；主张、依据、证据和适用范围都要写清楚。",
+  "done": "你用染色或奇偶不变量排除了整类铺砌，而不是只试了几种摆法。",
+  "retry": "先数黑白格或总格数，再问：每次铺一块，这个量会怎么变？",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "domino-set"
+      ],
+      "config": {
+        "mode": "domino",
+        "palette": [
+          {
+            "id": "domino",
+            "label": "多米诺",
+            "shape": "domino"
+          }
+        ],
+        "maxPieces": 12
+      }
+    },
+    {
+      "kind": "probe",
+      "titleKey": "tool.probe.title",
+      "descriptionKey": "tool.probe.desc",
+      "requiredArtifacts": [
+        "counts"
+      ],
+      "config": {
+        "mode": "invariant",
+        "sampleSizes": [
+          23
+        ],
+        "chart": "invariant"
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "counts"
+  ],
+  "levelScript": {
+    "mode": "tiling",
+    "board": {
+      "width": 5,
+      "height": 5,
+      "removed": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 4,
+          "y": 4
+        }
+      ]
+    },
+    "claims": [
+      "possible",
+      "impossible"
+    ],
+    "warrants": [
+      "coloring",
+      "parity",
+      "area"
+    ],
+    "scopes": [
+      "domino-tiling"
+    ]
+  },
+  "evidencePlan": [
+    {
+      "id": "attempt",
+      "phase": "construct",
+      "require": "construct/place >= 1",
+      "descriptionKey": "先真的铺一块试试"
+    },
+    {
+      "id": "counts",
+      "phase": "observe",
+      "require": "probe/sample >= 1",
+      "descriptionKey": "统计黑白格或总格数"
+    },
+    {
+      "id": "claim",
+      "phase": "argue",
+      "require": "argue/attachEvidence >= 1",
+      "descriptionKey": "把证据挂到论证上"
+    },
+    {
+      "id": "commit",
+      "phase": "generalize",
+      "require": "argue/commit >= 1",
+      "descriptionKey": "提交论证证书"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-coloring",
+      "artifact": {
+        "counts": {
+          "black": 11,
+          "white": 12,
+          "cells": 23
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "coloring",
+          "scope": "domino-tiling",
+          "evidence": {
+            "black": 11,
+            "white": 12,
+            "cells": 23
+          }
+        }
+      }
+    },
+    {
+      "id": "s-parity",
+      "artifact": {
+        "counts": {
+          "black": 11,
+          "white": 12,
+          "cells": 23
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "parity",
+          "scope": "domino-tiling",
+          "evidence": {
+            "cells": 23
+          }
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-possible",
+      "expectFailure": "argue-claim-unsupported",
+      "artifact": {
+        "counts": {
+          "black": 11,
+          "white": 12,
+          "cells": 23
+        },
+        "argument": {
+          "claim": "possible",
+          "warrant": "coloring",
+          "scope": "domino-tiling",
+          "evidence": {
+            "black": 11,
+            "white": 12,
+            "cells": 23
+          }
+        }
+      }
+    },
+    {
+      "id": "n-false-invariant",
+      "expectFailure": "argue-invariant-false",
+      "artifact": {
+        "counts": {
+          "black": 11,
+          "white": 12,
+          "cells": 23
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "coloring",
+          "scope": "domino-tiling",
+          "evidence": {
+            "black": 12,
+            "white": 11,
+            "cells": 23
+          }
+        }
+      }
+    },
+    {
+      "id": "n-wrong-scope",
+      "expectFailure": "argue-scope-wrong",
+      "artifact": {
+        "counts": {
+          "black": 11,
+          "white": 12,
+          "cells": 23
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "coloring",
+          "scope": "all-tilings",
+          "evidence": {
+            "black": 11,
+            "white": 12,
+            "cells": 23
+          }
+        }
+      }
+    },
+    {
+      "id": "n-missing",
+      "expectFailure": "argue-evidence-missing",
+      "artifact": {
+        "counts": {
+          "black": 11,
+          "white": 12,
+          "cells": 23
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-rotate-90",
+      "axis": "structure",
+      "patch": {
+        "rotate": 90
+      }
+    },
+    {
+      "id": "v-rotate-180",
+      "axis": "structure",
+      "patch": {
+        "rotate": 180
+      }
+    }
+  ],
+  "feedback": {
+    "argue-claim-unsupported": {
+      "messageKey": "这个图形确实铺不满；主张选错了。",
+      "hintKey": "先试几块，看看最后总会剩下什么。",
+      "focus": "claim"
+    },
+    "argue-warrant-unsupported": {
+      "messageKey": "这条依据在这一关还检验不了。",
+      "hintKey": "换一条能由黑白格或总格数验证的依据。",
+      "focus": "warrant"
+    },
+    "argue-invariant-false": {
+      "messageKey": "证据和图形对不上，或这个量其实不能排除铺满。",
+      "hintKey": "重新数一遍，并检查每次铺一块这个量会怎么变。",
+      "focus": "evidence"
+    },
+    "argue-evidence-missing": {
+      "messageKey": "论证还缺一块：主张、依据、证据或范围。",
+      "hintKey": "先统计，再把数据挂到论证上。",
+      "focus": "argument"
+    },
+    "argue-scope-wrong": {
+      "messageKey": "适用范围写错了。",
+      "hintKey": "这是 1×2 多米诺铺满，不是任意铺砌。",
+      "focus": "scope"
+    },
+    "argue-not-general": {
+      "messageKey": "棋盘转过之后，你的论证没有跟上。",
+      "hintKey": "不变量要在旋转后的棋盘上也成立。",
+      "focus": "variant"
+    }
+  },
+  "badges": [
+    "boundary-explorer"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b argue 走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.argue.manualAudit"
+  },
+  "thinkingTarget": "用一个不随操作改变的量，说明某类铺砌为什么不可能"
+}

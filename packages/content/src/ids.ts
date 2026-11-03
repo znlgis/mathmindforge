@@ -63,6 +63,7 @@ export const SHIPPED_LEVEL_IDS = [
   'g46-algorithm-payment',
   'g79-modeling-dispatch',
   'g1012-modeling-winrate',
+  'g1012-structure-invariant',
 ] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 

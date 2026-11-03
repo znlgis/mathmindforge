@@ -10,4 +10,5 @@ export const registry: Record<ShippedLevelId, LevelLoader> = {
   'g46-algorithm-payment': () => import('@mmf/game-forge/g46-algorithm-payment'),
   'g79-modeling-dispatch': () => import('@mmf/game-forge/g79-modeling-dispatch'),
   'g1012-modeling-winrate': () => import('@mmf/game-forge/g1012-modeling-winrate'),
+  'g1012-structure-invariant': () => import('@mmf/game-forge/g1012-structure-invariant'),
 };

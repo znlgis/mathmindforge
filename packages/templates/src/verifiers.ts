@@ -12,6 +12,7 @@ import {
 import { ruleVerifier } from './rule/logic';
 import { constructVerifier } from './construct/logic';
 import { simulateVerifier } from './simulate/logic';
+import { argueVerifier } from './argue/logic';
 import {
   actionsFor as experimentActions,
   applyVariant as experimentApplyVariant,
@@ -26,6 +27,7 @@ import { createRuleRuntime } from './rule/runtime';
 import { createConstructRuntime } from './construct/runtime';
 import { createSimulateRuntime } from './simulate/runtime';
 import { createExperimentRuntime } from './experiment/runtime';
+import { createArgueRuntime } from './argue/runtime';
 
 export interface TemplateVerifier {
   parseScript(input: unknown): unknown;
@@ -48,6 +50,16 @@ const patternVerifier: TemplateVerifier = {
   reachableFailureClasses: (detail) => patternReachable(parsePatternScript(detail.levelScript)),
 };
 
+const argueVerifierShape: TemplateVerifier = {
+  parseScript: (input) => argueVerifier.parseScript(input),
+  validateArtifact: (detail, variant, artifact) => argueVerifier.validateArtifact(detail, variant, artifact),
+  actionsFor: (detail, variant, artifact) => argueVerifier.actionsFor(detail, variant, artifact),
+  applyVariant: (detail, variant) => argueVerifier.applyVariant(detail, variant),
+  reachableFailureClasses: (detail) => argueVerifier.reachableFailureClasses(detail),
+  transferVariants: (detail) => argueVerifier.transferVariants(detail),
+  transferFailureClass: (detail) => argueVerifier.transferFailureClass(detail),
+};
+
 const experimentVerifier: TemplateVerifier = {
   parseScript: parseExperimentScript,
   validateArtifact: experimentValidate,
@@ -65,13 +77,7 @@ export const verifiers: Record<TemplateId, TemplateVerifier> = {
   construct: constructVerifier,
   simulate: simulateVerifier,
   experiment: experimentVerifier,
-  argue: {
-    parseScript: (input) => input,
-    validateArtifact: () => ({ passed: false, stamps: [], missingEvidence: [], artifacts: [], failure: { class: 'argue-not-implemented', causes: [] } }),
-    actionsFor: () => [],
-    applyVariant: (detail) => detail.levelScript,
-    reachableFailureClasses: () => ['argue-not-implemented'],
-  },
+  argue: argueVerifierShape,
 };
 
 export type TemplateRuntimeFactory = (detail: LevelDetail, opts: RuntimeOptions) => LevelRuntime;
@@ -82,7 +88,5 @@ export const runtimes: Record<TemplateId, TemplateRuntimeFactory> = {
   construct: createConstructRuntime,
   simulate: createSimulateRuntime,
   experiment: createExperimentRuntime,
-  argue: (_detail, _opts) => {
-    throw new Error('argue 模板还没有运行时');
-  },
+  argue: createArgueRuntime,
 };

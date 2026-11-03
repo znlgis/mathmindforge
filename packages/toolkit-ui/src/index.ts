@@ -8,5 +8,8 @@ export { default as KnobTool } from './KnobTool.vue';
 export { default as MetricsTool } from './MetricsTool.vue';
 export { default as TallyTool } from './TallyTool.vue';
 export { default as SampleTool } from './SampleTool.vue';
+export { default as DominoTool } from './DominoTool.vue';
+export { default as InvariantProbeTool } from './InvariantProbeTool.vue';
+export { default as ArgumentBoard } from './ArgumentBoard.vue';
 import ToolDock from './ToolDock.vue';
 export default ToolDock;

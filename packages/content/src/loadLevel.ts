@@ -13,6 +13,7 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'g46-algorithm-payment': () => import('./details/g46-algorithm-payment.level.json'),
   'g79-modeling-dispatch': () => import('./details/g79-modeling-dispatch.level.json'),
   'g1012-modeling-winrate': () => import('./details/g1012-modeling-winrate.level.json'),
+  'g1012-structure-invariant': () => import('./details/g1012-structure-invariant.level.json'),
 };
 
 export async function loadLevel(

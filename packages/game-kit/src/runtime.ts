@@ -115,6 +115,12 @@ export interface ActionPayloadMap {
   'counter/annotate': { premiseId: string };
   'counter/commit': Record<string, never>;
 
+  'argue/setClaim': { claim: string };
+  'argue/setWarrant': { warrant: string };
+  'argue/attachEvidence': Record<string, never>;
+  'argue/setScope': { scope: string };
+  'argue/commit': Record<string, never>;
+
   'run': Record<string, never>;
   'submit': Record<string, never>;
   'reset': Record<string, never>;
@@ -223,6 +229,14 @@ export interface ToolUsageState {
   lastAction?: string;
 }
 
+export interface ArgumentSnapshot {
+  claim?: string;
+  warrant?: string;
+  scope?: string;
+  evidence?: { black?: number; white?: number; cells?: number };
+  committed: boolean;
+}
+
 export interface RunSnapshot {
   levelId: LevelId;
   variantId: string;
@@ -234,6 +248,8 @@ export interface RunSnapshot {
   runs: RunRecord[];
   lastRun?: RunRecord;
   verdict?: Verdict;
+  /** argue 模板的结构化论证证书；其他模板不出现 */
+  argument?: ArgumentSnapshot;
   stamps: StampId[];
   revision: number;
   updatedAt: number;
