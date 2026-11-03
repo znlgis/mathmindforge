@@ -1,4 +1,4 @@
-export type PatternTransform = 'none' | 'mirror' | 'rotate' | 'shift';
+export type PatternTransform = 'none' | 'mirror' | 'rotate' | 'shift' | 'reflect';
 
 export interface PatternRule {
   tokens: string[];
@@ -38,7 +38,7 @@ export interface PatternValidation {
   mismatchIndices?: number[];
 }
 
-const TRANSFORMS: PatternTransform[] = ['none', 'mirror', 'rotate', 'shift'];
+const TRANSFORMS: PatternTransform[] = ['none', 'mirror', 'rotate', 'shift', 'reflect'];
 
 export function isPatternTransform(value: unknown): value is PatternTransform {
   return typeof value === 'string' && (TRANSFORMS as string[]).includes(value);
@@ -47,6 +47,11 @@ export function isPatternTransform(value: unknown): value is PatternTransform {
 /** 规则在第 index 位应该生成的 token。index 从 0 开始。 */
 export function tokenAt(rule: PatternRule, index: number): string {
   const period = rule.period > 0 ? rule.period : rule.tokens.length;
+  if (rule.transform === 'reflect') {
+    const cycle = period * 2;
+    const position = ((index % cycle) + cycle) % cycle;
+    return rule.tokens[position < period ? position : cycle - 1 - position] ?? '';
+  }
   const i = ((index % period) + period) % period;
   switch (rule.transform) {
     case 'mirror':

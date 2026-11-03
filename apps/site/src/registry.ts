@@ -16,4 +16,5 @@ export const registry: Record<ShippedLevelId, LevelLoader> = {
   'g46-data-invariant': () => import('@mmf/game-forge/g46-data-invariant'),
   'k-modeling-share': () => import('@mmf/game-forge/k-modeling-share'),
   'g13-modeling-pack': () => import('@mmf/game-forge/g13-modeling-pack'),
+  'g13-structure-symmetry': () => import('@mmf/game-forge/g13-structure-symmetry'),
 };

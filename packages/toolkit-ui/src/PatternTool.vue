@@ -22,7 +22,7 @@ function translate(key: string, params?: MessageParams): string {
   return props.t.t(key, params);
 }
 
-const TRANSFORMS: PatternTransform[] = ['none', 'mirror', 'rotate', 'shift'];
+const TRANSFORMS: PatternTransform[] = ['none', 'mirror', 'rotate', 'shift', 'reflect'];
 const transformOptions = TRANSFORMS.map((value) => ({
   value,
   labelKey: 'pattern.transform.' + value,
@@ -72,7 +72,7 @@ function clearCycle(): void {
 
 function onTransformChange(event: Event): void {
   const value = (event.target as HTMLSelectElement | null)?.value;
-  if (value === 'none' || value === 'mirror' || value === 'rotate' || value === 'shift') {
+  if (value === 'none' || value === 'mirror' || value === 'rotate' || value === 'shift' || value === 'reflect') {
     transform.value = value;
   }
 }

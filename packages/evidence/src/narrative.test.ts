@@ -17,6 +17,7 @@ import {
   buildTrail,
   emptyAggregate,
   evaluateBadges,
+  parseReportPack,
   toReportPack,
 } from './index';
 import type { BadgeView, EvidenceProfile } from './types';
@@ -506,5 +507,15 @@ describe('aggregate（保留原有行为）', () => {
     expect(result.byPhase.run).toBe(2);
     expect(result.byFailure['tally-mismatch']).toBe(1);
     expect(result.lastAggregatedAt).toBe(30);
+  });
+
+  it('parses a valid report pack and rejects malformed ones', () => {
+    const save = emptySave();
+    const report = buildReport(save, [], LEVEL_SUMMARIES, 1234);
+    const pack = toReportPack(report);
+    expect(parseReportPack(pack)).not.toBeNull();
+    expect(parseReportPack({ ...pack, version: 2 })).toBeNull();
+    expect(parseReportPack(null)).toBeNull();
+    expect(parseReportPack({ ...pack, tools: 'oops' })).not.toBeNull();
   });
 });

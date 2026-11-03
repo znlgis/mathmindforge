@@ -15,6 +15,7 @@ import g13DataWeatherDetail from './details/g13-data-weather.level.json';
 import g46DataInvariantDetail from './details/g46-data-invariant.level.json';
 import kModelingShareDetail from './details/k-modeling-share.level.json';
 import g13ModelingPackDetail from './details/g13-modeling-pack.level.json';
+import g13StructureSymmetryDetail from './details/g13-structure-symmetry.level.json';
 import type { ShippedLevelId } from './ids';
 import type { LevelDetail } from './schema';
 
@@ -31,4 +32,5 @@ export const LEVEL_DETAILS: Record<ShippedLevelId, LevelDetail> = {
   'g46-data-invariant': g46DataInvariantDetail as LevelDetail,
   'k-modeling-share': kModelingShareDetail as LevelDetail,
   'g13-modeling-pack': g13ModelingPackDetail as LevelDetail,
+  'g13-structure-symmetry': g13StructureSymmetryDetail as LevelDetail,
 };

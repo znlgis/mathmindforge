@@ -120,3 +120,33 @@ test('真实点击：规则小火车可以通关', async ({ page }) => {
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：对称补墙可以通关', async ({ page }) => {
+  await page.goto('/#/play/g13-structure-symmetry');
+  await expect(page.getByTestId('pattern-tool')).toBeVisible();
+
+  await page.getByTestId('pattern-inspect-0').click();
+  await page.getByTestId('pattern-inspect-1').click();
+  await page.getByTestId('pattern-token-A').click();
+  await page.getByTestId('pattern-token-B').click();
+  await page.getByTestId('pattern-token-C').click();
+  await page.getByTestId('pattern-transform').selectOption('reflect');
+  await page.getByTestId('pattern-commit').click();
+
+  for (const [slot, token] of [[3, 'C'], [4, 'B'], [5, 'A']] as const) {
+    await page.getByTestId('construct-slot-' + slot).click();
+    await page.getByTestId('construct-place-' + token).click();
+  }
+
+  await page.getByTestId('level-run').click();
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});
+
+test('完成面板显示变体通行证', async ({ page }) => {
+  await page.goto('/#/play/g13-algorithm-route?autoplay=1');
+  await expect(page.getByTestId('completion-panel')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('variant-passport')).toBeVisible();
+  await expect(page.getByTestId('variant-passport')).toContainText('v-rotate-90');
+  await expect(page.getByTestId('variant-passport')).toContainText('通过');
+});

@@ -35,6 +35,7 @@ const usedTools = computed(() => {
   if (!usage) return 0;
   return Object.values(usage).filter((item) => item.used > 0).length;
 });
+const variantResults = computed(() => finalSnapshot.value?.verdict?.variantResults ?? []);
 const passedCheckpoints = computed(() => {
   const checkpoints = finalSnapshot.value?.checkpoints;
   if (!checkpoints) return 0;
@@ -361,10 +362,23 @@ onBeforeUnmount(async () => {
         <p class="text-3xl" aria-hidden="true">🧩</p>
         <h2 class="mt-2 text-2xl font-black text-blueprint">{{ t('complete.title') }}</h2>
         <p class="mt-3 text-sm leading-6 text-ink-soft">{{ t('level.completed') }}</p>
-        <div class="mt-4 flex justify-center gap-2 text-xs font-semibold text-ink-soft">
+        <div class="mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold text-ink-soft">
           <span class="rounded-full bg-paper px-3 py-1">用了 {{ usedTools }} 件工具</span>
           <span class="rounded-full bg-paper px-3 py-1">通过 {{ passedCheckpoints }} 个检查点</span>
           <span class="rounded-full bg-paper px-3 py-1">印章 {{ finalSnapshot?.stamps.length ?? 0 }} 枚</span>
+        </div>
+        <div v-if="variantResults.length > 0" data-testid="variant-passport" class="mt-3 rounded-2xl bg-paper p-3 text-left">
+          <p class="text-xs font-bold text-ink">变体通行证</p>
+          <ul class="mt-1 flex flex-wrap gap-1.5">
+            <li
+              v-for="variant in variantResults"
+              :key="variant.id"
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+              :class="variant.passed ? 'bg-mint text-teal' : 'bg-red/10 text-red'"
+            >
+              {{ variant.id }} {{ variant.passed ? '通过' : '失效' }}
+            </li>
+          </ul>
         </div>
         <div class="mt-6 flex justify-center gap-3">
           <button type="button" class="min-h-12 rounded-2xl bg-card px-5 text-sm font-bold" @click="replay">

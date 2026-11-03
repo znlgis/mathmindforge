@@ -118,6 +118,7 @@ export const zh = {
   'pattern.transform.mirror': '镜像',
   'pattern.transform.rotate': '旋转',
   'pattern.transform.shift': '错一位',
+  'pattern.transform.reflect': '镜像展开',
   'construct.slots': '要补的格子',
   'construct.palette': '选一块',
   'construct.place': '放进去',

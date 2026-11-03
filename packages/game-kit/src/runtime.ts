@@ -50,7 +50,7 @@ export interface RuntimeOptions {
   onEvidence?: (draft: EvidenceDraft) => void;
 }
 
-export type PatternTransform = 'none' | 'mirror' | 'rotate' | 'shift';
+export type PatternTransform = 'none' | 'mirror' | 'rotate' | 'shift' | 'reflect';
 
 export interface ProgramBlock {
   id: string;
@@ -157,6 +157,8 @@ export interface Verdict {
   missingEvidence: EvidenceRequirement[];
   metrics?: Record<string, number>;
   artifacts: ArtifactSummary[];
+  /** 迁移门的逐变体结果；没有迁移门的关卡不出现 */
+  variantResults?: { id: string; passed: boolean }[];
 }
 
 export interface RunRecord {

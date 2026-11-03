@@ -1,0 +1,354 @@
+{
+  "id": "g13-structure-symmetry",
+  "title": "对称补墙",
+  "band": "g13",
+  "thread": "structure",
+  "template": "pattern",
+  "thinkingTarget": "先定出对称规则，再把缺的半面墙补成镜像",
+  "intro": "这面墙被拆掉了一半。先看看完整的一半有什么规律。",
+  "prompt": "判断它是重复还是镜像，再把缺的三块补上，让整面墙对称。",
+  "done": "你先定规则再补墙，整面墙从中间对折后完全重合。",
+  "retry": "从中间对折试试：左边第 1 格应该和右边第 1 格一样。",
+  "tools": [
+    {
+      "kind": "pattern",
+      "titleKey": "tool.pattern.title",
+      "descriptionKey": "tool.pattern.desc",
+      "requiredArtifacts": [
+        "pattern-rule"
+      ],
+      "config": {
+        "tokens": [
+          "A",
+          "B",
+          "C"
+        ],
+        "maxPeriod": 4,
+        "cells": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "repair-set"
+      ],
+      "config": {
+        "palette": [
+          {
+            "id": "A",
+            "label": "A",
+            "shape": "round"
+          },
+          {
+            "id": "B",
+            "label": "B",
+            "shape": "square"
+          },
+          {
+            "id": "C",
+            "label": "C",
+            "shape": "triangle"
+          }
+        ],
+        "maxPieces": 6,
+        "slots": [
+          3,
+          4,
+          5
+        ]
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "pattern-rule",
+    "repair-set"
+  ],
+  "levelScript": {
+    "scenario": {
+      "kind": "path",
+      "length": 6,
+      "visible": [
+        "A",
+        "B",
+        "C",
+        null,
+        null,
+        null
+      ],
+      "startIndex": 0
+    },
+    "pattern": {
+      "allowedPeriods": [
+        3,
+        6
+      ],
+      "allowedTransforms": [
+        "none",
+        "reflect"
+      ],
+      "ambiguous": false
+    }
+  },
+  "evidencePlan": [
+    {
+      "id": "observe",
+      "phase": "observe",
+      "require": "pattern/inspect >= 2",
+      "descriptionKey": "先点几格看看左半墙的规律"
+    },
+    {
+      "id": "hypothesis",
+      "phase": "hypothesize",
+      "require": "pattern/commit >= 1",
+      "descriptionKey": "提交一条对称/重复规则"
+    },
+    {
+      "id": "repair",
+      "phase": "construct",
+      "require": "construct/commit >= 1",
+      "descriptionKey": "把缺的三块补上"
+    },
+    {
+      "id": "run",
+      "phase": "run",
+      "require": "run >= 1",
+      "descriptionKey": "运行一次，看墙合不合"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-reflect",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C"
+          ],
+          "period": 3,
+          "transform": "reflect"
+        },
+        "repair": [
+          {
+            "index": 3,
+            "token": "C"
+          },
+          {
+            "index": 4,
+            "token": "B"
+          },
+          {
+            "index": 5,
+            "token": "A"
+          }
+        ]
+      }
+    },
+    {
+      "id": "s-explicit",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C",
+            "C",
+            "B",
+            "A"
+          ],
+          "period": 6,
+          "transform": "none"
+        },
+        "repair": [
+          {
+            "index": 3,
+            "token": "C"
+          },
+          {
+            "index": 4,
+            "token": "B"
+          },
+          {
+            "index": 5,
+            "token": "A"
+          }
+        ]
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-repeat",
+      "expectFailure": "pattern-mismatch",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C"
+          ],
+          "period": 3,
+          "transform": "none"
+        },
+        "repair": [
+          {
+            "index": 3,
+            "token": "C"
+          },
+          {
+            "index": 4,
+            "token": "B"
+          },
+          {
+            "index": 5,
+            "token": "A"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-missing",
+      "expectFailure": "pattern-repair-incomplete",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C"
+          ],
+          "period": 3,
+          "transform": "reflect"
+        },
+        "repair": [
+          {
+            "index": 3,
+            "token": "C"
+          },
+          {
+            "index": 4,
+            "token": "B"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-wrong",
+      "expectFailure": "pattern-mismatch",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C"
+          ],
+          "period": 3,
+          "transform": "reflect"
+        },
+        "repair": [
+          {
+            "index": 3,
+            "token": "C"
+          },
+          {
+            "index": 4,
+            "token": "C"
+          },
+          {
+            "index": 5,
+            "token": "A"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n-cycle",
+      "expectFailure": "pattern-cycle-wrong",
+      "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "A"
+          ],
+          "period": 3,
+          "transform": "none"
+        },
+        "repair": []
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-relabel",
+      "axis": "representation",
+      "patch": {
+        "scenario": {
+          "symbols": {
+            "A": "round",
+            "B": "square",
+            "C": "triangle"
+          }
+        }
+      }
+    },
+    {
+      "id": "v-shift",
+      "axis": "transfer",
+      "patch": {
+        "scenario": {
+          "startIndex": 1
+        }
+      }
+    }
+  ],
+  "feedback": {
+    "pattern-no-observation": {
+      "messageKey": "先点几格看看它是怎么重复的。",
+      "hintKey": "从中间对折，比较两边的格子。",
+      "focus": "strip"
+    },
+    "pattern-cycle-wrong": {
+      "messageKey": "你的规则和左边的墙对不上。",
+      "hintKey": "看看第一个和最后一个可见格是否对称。",
+      "focus": "conflict"
+    },
+    "pattern-repair-incomplete": {
+      "messageKey": "还有缺口没补。",
+      "hintKey": "三个缺口都要放上块。",
+      "focus": "missing"
+    },
+    "pattern-mismatch": {
+      "messageKey": "补的块和你的对称规则不一致。",
+      "hintKey": "按镜像规则，第 4 格应该和第 3 格一样。",
+      "focus": "repair"
+    },
+    "pattern-transfer-failed": {
+      "messageKey": "换了符号后，对称规则还在。",
+      "hintKey": "A/B/C 换成形状，次序没有变。",
+      "focus": "variant"
+    },
+    "pattern-rule-invalid": {
+      "messageKey": "这条规则不在这一关允许的范围里。",
+      "hintKey": "周期只能选 3 或 6；变换只能原样或镜像展开。",
+      "focus": "pattern-card"
+    }
+  },
+  "badges": [
+    "pattern-spotter"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.symmetry.manualAudit"
+  }
+}

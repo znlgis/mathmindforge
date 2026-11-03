@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { LEVEL_SUMMARIES } from '@mmf/content';
 import { TOOL_LABELS } from '@mmf/content/ids';
-import { buildReport, toReportPack } from '@mmf/evidence';
-import type { ReportModel } from '@mmf/evidence';
+import { buildReport, parseReportPack, toReportPack } from '@mmf/evidence';
+import type { ReportModel, ReportPack } from '@mmf/evidence';
 import { onMounted, ref } from 'vue';
 import AdultGate from '../components/AdultGate.vue';
 import { platform } from '../shell/platform';
@@ -11,6 +11,8 @@ import { useProgress } from '../stores/progress';
 const progress = useProgress();
 const unlocked = ref(false);
 const report = ref<ReportModel | null>(null);
+const imported = ref<ReportPack | null>(null);
+const importError = ref<string | null>(null);
 
 function toolLabel(tool: string): string {
   return TOOL_LABELS[tool as keyof typeof TOOL_LABELS] ?? tool;
@@ -27,6 +29,22 @@ async function unlock(): Promise<void> {
   if (!progress.save) return;
   report.value = buildReport(progress.save, progress.evidence, LEVEL_SUMMARIES, platform.now());
   unlocked.value = true;
+}
+
+async function importReport(): Promise<void> {
+  importError.value = null;
+  try {
+    const text = await platform.files.pickText('application/json,.json', 512 * 1024);
+    if (!text) return;
+    const pack = parseReportPack(JSON.parse(text));
+    if (!pack) {
+      importError.value = '这个文件不是本机的证据包，或版本不符。';
+      return;
+    }
+    imported.value = pack;
+  } catch {
+    importError.value = '读取失败：请选择导出的 .json 证据包。';
+  }
 }
 
 function printReport(): void {
@@ -72,6 +90,14 @@ onMounted(async () => {
           @click="exportReport"
         >
           导出证据包
+        </button>
+        <button
+          type="button"
+          data-testid="report-import"
+          class="min-h-11 rounded-2xl bg-card px-4 text-sm font-bold text-ink"
+          @click="importReport"
+        >
+          导入只读证据包
         </button>
       </div>
     </header>
@@ -142,6 +168,25 @@ onMounted(async () => {
           </li>
         </ul>
       </section>
+
+      <section v-if="imported" data-testid="report-imported" class="mt-6 rounded-2xl border border-grid bg-paper p-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="text-lg font-bold">导入的只读证据包</h2>
+          <span class="text-[11px] text-ink-soft">{{ imported.nickname || '未署名' }} · {{ formatDate(imported.generatedAt) }}</span>
+        </div>
+        <p class="mt-2 text-sm text-ink-soft">这是从文件导入的只读报告，不会合并进本机存档。</p>
+        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+          <div v-for="dimension in imported.dimensions" :key="dimension.id" class="rounded-xl border border-grid bg-card p-3">
+            <p class="text-sm font-bold">{{ dimension.id }} · 档位 {{ dimension.band }}/3</p>
+            <p class="mt-1 text-xs text-ink-soft">{{ dimension.summary }}</p>
+          </div>
+        </div>
+        <ul v-if="imported.recommendations.length" class="mt-3 list-disc pl-5 text-xs text-ink-soft">
+          <li v-for="item in imported.recommendations" :key="item.title">{{ item.title }}：{{ item.reason }}</li>
+        </ul>
+      </section>
+
+      <p v-if="importError" class="mt-3 text-xs font-bold text-red">{{ importError }}</p>
 
       <footer class="mt-8 border-t border-grid pt-3 text-xs text-ink-soft">
         <p>{{ report.privacyNote }}</p>

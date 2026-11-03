@@ -69,6 +69,7 @@ export const SHIPPED_LEVEL_IDS = [
   'g46-data-invariant',
   'k-modeling-share',
   'g13-modeling-pack',
+  'g13-structure-symmetry',
 ] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 

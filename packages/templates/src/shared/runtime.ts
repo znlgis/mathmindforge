@@ -152,13 +152,20 @@ export function createRuntimeWithAdapter<S>(
     if (!verdict.passed) meta.revision += 1;
   }
 
-  function transferCheck(artifact: unknown): { passed: boolean; verdict?: Verdict; variantId?: string } {
+  function transferCheck(artifact: unknown): {
+    passed: boolean;
+    verdict?: Verdict;
+    variantId?: string;
+    results: { id: string; passed: boolean }[];
+  } {
     const variants = adapter.transferVariants?.(detail) ?? [];
+    const results: { id: string; passed: boolean }[] = [];
     for (const variant of variants) {
       const verdict = adapter.validate(detail, variant, artifact);
-      if (!verdict.passed) return { passed: false, verdict, variantId: variant.id };
+      results.push({ id: variant.id, passed: verdict.passed });
+      if (!verdict.passed) return { passed: false, verdict, variantId: variant.id, results };
     }
-    return { passed: true };
+    return { passed: true, results };
   }
 
   async function dispatch(action: LevelAction): Promise<ActionResult> {
@@ -181,8 +188,8 @@ export function createRuntimeWithAdapter<S>(
         return fail('还差一个可以提交的结构。');
       }
       const verdict = adapter.validate(detail, BASE_VARIANT, artifact);
+      const transfer = transferCheck(artifact);
       if (verdict.passed) {
-        const transfer = transferCheck(artifact);
         if (!transfer.passed) {
           const failureClass = adapter.transferFailureClass?.(detail) ?? 'transfer-failed';
           const failed: Verdict = {
@@ -195,6 +202,7 @@ export function createRuntimeWithAdapter<S>(
             },
             missingEvidence: [],
             artifacts: adapter.artifactSummaries(meta.state),
+            variantResults: transfer.results,
           };
           applyVerdict(failed);
           recordRun('fail', failureClass);
@@ -205,6 +213,7 @@ export function createRuntimeWithAdapter<S>(
         if ((adapter.transferVariants?.(detail) ?? []).length > 0 && !verdict.stamps.includes('transfer')) {
           verdict.stamps = [...verdict.stamps, 'transfer'];
         }
+        verdict.variantResults = transfer.results;
       }
       applyVerdict(verdict);
       recordRun(verdict.passed ? 'pass' : 'fail', verdict.failure?.class);

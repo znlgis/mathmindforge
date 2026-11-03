@@ -38,4 +38,14 @@ test('完成两关后日志、徽章与报告可用', async ({ page }) => {
   await page.getByTestId('report-export').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('mmf-report.json');
+
+  // 再把这个证据包只读导入，验证"教师/家长拿到文件也能看"。
+  const filePath = await download.path();
+  if (!filePath) throw new Error('download 没有落在临时路径');
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.getByTestId('report-import').click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles(filePath);
+  await expect(page.getByTestId('report-imported')).toBeVisible();
+  await expect(page.getByTestId('report-imported')).toContainText('只读');
 });

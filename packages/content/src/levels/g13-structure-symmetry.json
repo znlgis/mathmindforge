@@ -1,0 +1,24 @@
+{
+  "id": "g13-structure-symmetry",
+  "title": "对称补墙",
+  "emoji": "🧱",
+  "color": "#2f7d78",
+  "band": "g13",
+  "thread": "structure",
+  "template": "pattern",
+  "tools": [
+    "pattern",
+    "construct"
+  ],
+  "estimatedMinutes": 6,
+  "thinkingTarget": "先定出对称规则，再把缺的半面墙补成镜像",
+  "difficulty": {
+    "structure": 2,
+    "representation": 2,
+    "constraint": 2,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  }
+}

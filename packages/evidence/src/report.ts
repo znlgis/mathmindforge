@@ -141,3 +141,57 @@ export function toReportPack(report: ReportModel): ReportPack {
   if (report.nickname) pack.nickname = report.nickname;
   return pack;
 }
+
+
+function text(value: unknown, max = 120): string {
+  return typeof value === 'string' ? value.slice(0, max) : '';
+}
+
+/**
+ * 只读导入：把用户选中的 JSON 收敛成 ReportPack。
+ * 不信任文件内容：版本不对、字段缺失、超长文本、非数组一律截断或丢弃。
+ */
+export function parseReportPack(input: unknown): ReportPack | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const raw = input as Record<string, unknown>;
+  if (raw.version !== 1 || typeof raw.generatedAt !== 'number' || !Number.isFinite(raw.generatedAt)) return null;
+  const tools = Array.isArray(raw.tools)
+    ? raw.tools.slice(0, 12).map((item) => {
+        const record = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+        return { tool: text(record.tool, 32), uses: typeof record.uses === 'number' ? Math.max(0, Math.trunc(record.uses)) : 0 };
+      }).filter((item) => item.tool.length > 0)
+    : [];
+  const levels = Array.isArray(raw.levels)
+    ? raw.levels.slice(0, 40).map((item) => {
+        const record = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+        return {
+          id: text(record.id, 64),
+          title: text(record.title, 40),
+          completed: record.completed === true,
+          stamps: Array.isArray(record.stamps) ? record.stamps.slice(0, 8).map((stamp) => text(stamp, 24)).filter(Boolean) : [],
+        };
+      }).filter((item) => item.id.length > 0)
+    : [];
+  const dimensions = Array.isArray(raw.dimensions)
+    ? raw.dimensions.slice(0, 8).map((item) => {
+        const record = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+        const band = typeof record.band === 'number' ? Math.max(0, Math.min(3, Math.trunc(record.band))) : 0;
+        return { id: text(record.id, 24), band, summary: text(record.summary, 200) };
+      }).filter((item) => item.id.length > 0)
+    : [];
+  const recommendations = Array.isArray(raw.recommendations)
+    ? raw.recommendations.slice(0, 5).map((item) => {
+        const record = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+        return { title: text(record.title, 60), reason: text(record.reason, 200) };
+      }).filter((item) => item.title.length > 0)
+    : [];
+  return {
+    version: 1,
+    generatedAt: Math.trunc(raw.generatedAt),
+    nickname: typeof raw.nickname === 'string' ? text(raw.nickname, 24) : undefined,
+    tools,
+    levels,
+    dimensions,
+    recommendations,
+  };
+}

@@ -15,7 +15,7 @@
 
 ## 当前状态（M2b 进行中：argue + 结构不变量）
 
-**12 关可玩、6 个模板、6 件工具；证据 → 画像 → 徽章 → 日志/轨迹 → 报告已闭环**：
+**13 关可玩、6 个模板、6 件工具；证据 → 画像 → 徽章 → 日志/轨迹 → 报告已闭环**：
 
 - `k-structure-pattern-path` 模式修补匠（pattern）
 - `k-data-tally` 分类小站（experiment / tally）
@@ -29,21 +29,22 @@
 - `g46-data-invariant` 不变量侦探（argue，7×7）
 - `k-modeling-share` 公平分点心（construct / distribution）
 - `g13-modeling-pack` 公平分装（construct / distribution）
+- `g13-structure-symmetry` 对称补墙（pattern / reflect）
 
 真实点击与 autoplay 走同一条动作路径；没有使用工具时提交会被拒绝。
 
 ```bash
 pnpm install
 pnpm dev          # http://127.0.0.1:5192
-pnpm verify       # typecheck / lint / 119 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
-pnpm e2e          # 34 条：12 关 autoplay、12 关无工具失败、6 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
+pnpm verify       # typecheck / lint / 120 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
+pnpm e2e          # 38 条：13 关 autoplay、13 关无工具失败、7 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
 ```
 
-实测（2026-11-03）：首屏 48.6 KB gzip，Phaser chunk 220.3 KB gzip，dist 1312.9 KB；`pnpm verify` 与 `pnpm e2e`（34 条）全绿。
+实测（2026-11-03）：首屏 48.9 KB gzip，Phaser chunk 220.3 KB gzip，dist 1322 KB；`pnpm verify` 与 `pnpm e2e`（38 条）全绿。
 
-已实现：workspace 基座、game-kit 契约、7 关内容、6 个模板（含 argue）、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出）、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
+已实现：workspace 基座、game-kit 契约、13 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
 
-**M2b 下一步**：其余 8 关、报告导入/教师视图、变体通行证 UI、内容 i18n 化、原生壳与用户测试。
+**M2b 下一步**：其余 7 关、内容 i18n 化、原生壳与用户测试。
 
 ---
 

@@ -10,7 +10,7 @@ export const patternScriptSchema = z.object({
   }),
   pattern: z.object({
     allowedPeriods: z.array(z.number().int().min(2).max(6)).min(1),
-    allowedTransforms: z.array(z.enum(['none', 'mirror', 'rotate', 'shift'])).min(1),
+    allowedTransforms: z.array(z.enum(['none', 'mirror', 'rotate', 'shift', 'reflect'])).min(1),
     ambiguous: z.boolean().default(false),
   }),
 });
@@ -20,7 +20,7 @@ export const patternArtifactSchema = z.object({
   patternRule: z.object({
     tokens: z.array(z.string().min(1)).min(2).max(6),
     period: z.number().int().min(2).max(6),
-    transform: z.enum(['none', 'mirror', 'rotate', 'shift']),
+    transform: z.enum(['none', 'mirror', 'rotate', 'shift', 'reflect']),
   }),
   repair: z.array(z.object({ index: z.number().int().min(0), token: z.string().min(1) })),
 });

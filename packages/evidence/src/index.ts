@@ -32,7 +32,7 @@ export type {
 export { buildEvidenceProfile } from './profile';
 export { evaluateBadges } from './badges';
 export { buildTrail } from './trail';
-export { buildReport, toReportPack } from './report';
+export { buildReport, parseReportPack, toReportPack } from './report';
 
 /** 空聚合：6 件工具的计数全部归零，便于 UI 直接读 byTool[tool]。 */
 export function emptyAggregate(): EvidenceAggregate {
