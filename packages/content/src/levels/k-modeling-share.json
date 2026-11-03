@@ -1,0 +1,23 @@
+{
+  "id": "k-modeling-share",
+  "title": "公平分点心",
+  "emoji": "🍪",
+  "color": "#b07d2b",
+  "band": "k",
+  "thread": "modeling",
+  "template": "construct",
+  "tools": [
+    "construct"
+  ],
+  "estimatedMinutes": 5,
+  "thinkingTarget": "把饼干和苹果分到四个盘子，每盘一样多且用完",
+  "difficulty": {
+    "structure": 1,
+    "representation": 1,
+    "constraint": 2,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}

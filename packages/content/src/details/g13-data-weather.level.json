@@ -1,0 +1,395 @@
+{
+  "id": "g13-data-weather",
+  "title": "天气记录站",
+  "band": "g13",
+  "thread": "data",
+  "template": "experiment",
+  "thinkingTarget": "记录 14 天天气，用统计条回答最多和最少",
+  "intro": "这 14 天的天气还没统计。先逐日记录，再做一张天气统计。",
+  "prompt": "把 14 天全部记下来，按类别做好统计，再回答“最多/最少”。",
+  "done": "你先记录再统计，回答是从数据里读出来的。",
+  "retry": "先看看哪一类一天都没漏，再点统计条。",
+  "tools": [
+    {
+      "kind": "probe",
+      "titleKey": "tool.probe.title",
+      "descriptionKey": "tool.probe.desc",
+      "requiredArtifacts": [
+        "dataset",
+        "tally",
+        "claim"
+      ],
+      "config": {
+        "mode": "tally",
+        "sampleSizes": [
+          7
+        ],
+        "chart": "tally",
+        "batchSize": 7,
+        "categories": [
+          {
+            "id": "sunny",
+            "label": "晴",
+            "token": "☀"
+          },
+          {
+            "id": "cloudy",
+            "label": "云",
+            "token": "☁"
+          },
+          {
+            "id": "rainy",
+            "label": "雨",
+            "token": "☂"
+          },
+          {
+            "id": "snowy",
+            "label": "雪",
+            "token": "❄"
+          }
+        ]
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "dataset",
+    "tally",
+    "claim"
+  ],
+  "levelScript": {
+    "mode": "tally",
+    "batchSize": 7,
+    "categories": [
+      {
+        "id": "sunny",
+        "label": "晴",
+        "token": "☀",
+        "count": 5
+      },
+      {
+        "id": "cloudy",
+        "label": "云",
+        "token": "☁",
+        "count": 4
+      },
+      {
+        "id": "rainy",
+        "label": "雨",
+        "token": "☂",
+        "count": 3
+      },
+      {
+        "id": "snowy",
+        "label": "雪",
+        "token": "❄",
+        "count": 2
+      }
+    ],
+    "items": [
+      "sunny",
+      "sunny",
+      "cloudy",
+      "rainy",
+      "sunny",
+      "cloudy",
+      "snowy",
+      "sunny",
+      "rainy",
+      "cloudy",
+      "sunny",
+      "rainy",
+      "cloudy",
+      "snowy"
+    ]
+  },
+  "evidencePlan": [
+    {
+      "id": "sample",
+      "phase": "observe",
+      "require": "probe/sample >= 2",
+      "descriptionKey": "把 14 天分两把采完"
+    },
+    {
+      "id": "tally",
+      "phase": "construct",
+      "require": "probe/tally >= 1",
+      "descriptionKey": "把每一类数量记进统计条"
+    },
+    {
+      "id": "claim",
+      "phase": "result",
+      "require": "probe/claim >= 1",
+      "descriptionKey": "提交最多/最少结论"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-most",
+      "artifact": {
+        "dataset": {
+          "n": 14,
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "tally": {
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "claim": {
+          "kind": "count-compare",
+          "category": "sunny",
+          "direction": "most",
+          "tiedWith": [],
+          "n": 14
+        }
+      }
+    },
+    {
+      "id": "s-least",
+      "artifact": {
+        "dataset": {
+          "n": 14,
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "tally": {
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "claim": {
+          "kind": "count-compare",
+          "category": "snowy",
+          "direction": "least",
+          "tiedWith": [],
+          "n": 14
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-small",
+      "expectFailure": "probe-sample-small",
+      "artifact": {
+        "dataset": {
+          "n": 7,
+          "counts": {
+            "sunny": 3,
+            "cloudy": 2,
+            "rainy": 1,
+            "snowy": 1
+          }
+        },
+        "tally": {
+          "counts": {
+            "sunny": 3,
+            "cloudy": 2,
+            "rainy": 1,
+            "snowy": 1
+          }
+        },
+        "claim": {
+          "kind": "count-compare",
+          "category": "sunny",
+          "direction": "most",
+          "tiedWith": [],
+          "n": 7
+        }
+      }
+    },
+    {
+      "id": "n-tally",
+      "expectFailure": "probe-tally-wrong",
+      "artifact": {
+        "dataset": {
+          "n": 14,
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "tally": {
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 4,
+            "snowy": 1
+          }
+        },
+        "claim": {
+          "kind": "count-compare",
+          "category": "sunny",
+          "direction": "most",
+          "tiedWith": [],
+          "n": 14
+        }
+      }
+    },
+    {
+      "id": "n-claim",
+      "expectFailure": "probe-claim-mismatch",
+      "artifact": {
+        "dataset": {
+          "n": 14,
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "tally": {
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "claim": {
+          "kind": "count-compare",
+          "category": "rainy",
+          "direction": "most",
+          "tiedWith": [],
+          "n": 14
+        }
+      }
+    },
+    {
+      "id": "n-not-collected",
+      "expectFailure": "probe-not-collected",
+      "artifact": {
+        "tally": {
+          "counts": {
+            "sunny": 5,
+            "cloudy": 4,
+            "rainy": 3,
+            "snowy": 2
+          }
+        },
+        "claim": {
+          "kind": "count-compare",
+          "category": "sunny",
+          "direction": "most",
+          "tiedWith": [],
+          "n": 14
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-symbols",
+      "axis": "representation",
+      "patch": {
+        "categories": [
+          {
+            "id": "sunny",
+            "label": "太阳",
+            "token": "🌞",
+            "count": 5
+          },
+          {
+            "id": "cloudy",
+            "label": "云朵",
+            "token": "🌥",
+            "count": 4
+          },
+          {
+            "id": "rainy",
+            "label": "雨伞",
+            "token": "🌧",
+            "count": 3
+          },
+          {
+            "id": "snowy",
+            "label": "雪花",
+            "token": "🌨",
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "v-labels",
+      "axis": "representation",
+      "patch": {
+        "categories": [
+          {
+            "id": "sunny",
+            "label": "晴天",
+            "token": "☀",
+            "count": 5
+          },
+          {
+            "id": "cloudy",
+            "label": "多云",
+            "token": "☁",
+            "count": 4
+          },
+          {
+            "id": "rainy",
+            "label": "下雨",
+            "token": "☂",
+            "count": 3
+          },
+          {
+            "id": "snowy",
+            "label": "下雪",
+            "token": "❄",
+            "count": 2
+          }
+        ]
+      }
+    }
+  ],
+  "feedback": {
+    "probe-not-collected": {
+      "messageKey": "还没采集：先按“采集一把”把天气收进来。",
+      "hintKey": "14 天分成两把，每把 7 天。",
+      "focus": "sample"
+    },
+    "probe-sample-small": {
+      "messageKey": "样本太少，结论还不准。",
+      "hintKey": "把 14 天都采集完。",
+      "focus": "count"
+    },
+    "probe-tally-wrong": {
+      "messageKey": "统计条和天气记录对不上。",
+      "hintKey": "逐类数一遍，再改统计条。",
+      "focus": "tally"
+    },
+    "probe-claim-mismatch": {
+      "messageKey": "结论和数据不一致。",
+      "hintKey": "最多/最少要和统计条对上。",
+      "focus": "claim"
+    }
+  },
+  "badges": [
+    "observer"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.weather.manualAudit"
+  }
+}

@@ -1,0 +1,451 @@
+{
+  "id": "k-modeling-share",
+  "title": "公平分点心",
+  "band": "k",
+  "thread": "modeling",
+  "template": "construct",
+  "thinkingTarget": "把饼干和苹果分到四个盘子，每盘一样多且用完",
+  "intro": "四个盘子，8 块饼干和 4 个苹果。每个盘子要一样多，而且不能剩。",
+  "prompt": "把 12 件点心全分完，每个盘子 3 件。",
+  "done": "你先算总数，再一盘一盘分，最后每盘都是 3 件。",
+  "retry": "先数一数一共有多少件，再想每个盘子该几件。",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "distribution"
+      ],
+      "config": {
+        "mode": "distribution",
+        "palette": [
+          {
+            "id": "cookie",
+            "label": "饼干",
+            "shape": "cookie"
+          },
+          {
+            "id": "apple",
+            "label": "苹果",
+            "shape": "apple"
+          }
+        ],
+        "maxPieces": 12,
+        "containers": [
+          {
+            "id": "plate0",
+            "label": "盘子 1"
+          },
+          {
+            "id": "plate1",
+            "label": "盘子 2"
+          },
+          {
+            "id": "plate2",
+            "label": "盘子 3"
+          },
+          {
+            "id": "plate3",
+            "label": "盘子 4"
+          }
+        ],
+        "items": [
+          {
+            "id": "cookie",
+            "label": "饼干",
+            "token": "🍪",
+            "count": 8
+          },
+          {
+            "id": "apple",
+            "label": "苹果",
+            "token": "🍎",
+            "count": 4
+          }
+        ],
+        "constraints": {
+          "equalCounts": true,
+          "minKinds": 0,
+          "maxPerContainer": 4
+        }
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "distribution"
+  ],
+  "levelScript": {
+    "mode": "distribution",
+    "containers": [
+      {
+        "id": "plate0",
+        "label": "盘子 1"
+      },
+      {
+        "id": "plate1",
+        "label": "盘子 2"
+      },
+      {
+        "id": "plate2",
+        "label": "盘子 3"
+      },
+      {
+        "id": "plate3",
+        "label": "盘子 4"
+      }
+    ],
+    "items": [
+      {
+        "id": "cookie",
+        "label": "饼干",
+        "token": "🍪",
+        "count": 8
+      },
+      {
+        "id": "apple",
+        "label": "苹果",
+        "token": "🍎",
+        "count": 4
+      }
+    ],
+    "constraints": {
+      "equalCounts": true,
+      "minKinds": 0,
+      "maxPerContainer": 4
+    }
+  },
+  "evidencePlan": [
+    {
+      "id": "place",
+      "phase": "construct",
+      "require": "construct/place >= 1",
+      "descriptionKey": "先分一件"
+    },
+    {
+      "id": "fill",
+      "phase": "construct",
+      "require": "fill",
+      "descriptionKey": "把物品全部分完"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-each-2c1a",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate3",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            }
+          ],
+          "totals": {
+            "cookie": 8,
+            "apple": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "s-mixed",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "cookie": 3
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "cookie": 3
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "cookie": 1,
+                "apple": 2
+              },
+              "total": 3
+            },
+            {
+              "id": "plate3",
+              "counts": {
+                "cookie": 1,
+                "apple": 2
+              },
+              "total": 3
+            }
+          ],
+          "totals": {
+            "cookie": 8,
+            "apple": 4
+          }
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-shortage",
+      "expectFailure": "distribution-shortage",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate3",
+              "counts": {
+                "cookie": 1,
+                "apple": 1
+              },
+              "total": 2
+            }
+          ],
+          "totals": {
+            "cookie": 7,
+            "apple": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "n-unequal",
+      "expectFailure": "distribution-unequal",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "cookie": 3,
+                "apple": 1
+              },
+              "total": 4
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "cookie": 3
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate3",
+              "counts": {
+                "apple": 2
+              },
+              "total": 2
+            }
+          ],
+          "totals": {
+            "cookie": 8,
+            "apple": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "n-overflow",
+      "expectFailure": "distribution-overflow",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "cookie": 3,
+                "apple": 2
+              },
+              "total": 5
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "cookie": 2,
+                "apple": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate3",
+              "counts": {
+                "cookie": 1
+              },
+              "total": 1
+            }
+          ],
+          "totals": {
+            "cookie": 8,
+            "apple": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "n-empty",
+      "expectFailure": "distribution-empty",
+      "artifact": {
+        "distribution": {
+          "containers": [],
+          "totals": {}
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-fruit",
+      "axis": "representation",
+      "patch": {
+        "items": [
+          {
+            "id": "cookie",
+            "label": "小饼干",
+            "token": "🍪",
+            "count": 8
+          },
+          {
+            "id": "apple",
+            "label": "红苹果",
+            "token": "🍎",
+            "count": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "v-labels",
+      "axis": "representation",
+      "patch": {
+        "containers": [
+          {
+            "id": "plate0",
+            "label": "一号盘"
+          },
+          {
+            "id": "plate1",
+            "label": "二号盘"
+          },
+          {
+            "id": "plate2",
+            "label": "三号盘"
+          },
+          {
+            "id": "plate3",
+            "label": "四号盘"
+          }
+        ]
+      }
+    }
+  ],
+  "feedback": {
+    "distribution-shortage": {
+      "messageKey": "还有点心没分完。",
+      "hintKey": "把剩下的按类别补到盘子里。",
+      "focus": "remaining"
+    },
+    "distribution-overflow": {
+      "messageKey": "有盘子装得太多了。",
+      "hintKey": "每个盘子最多放 4 件。",
+      "focus": "container"
+    },
+    "distribution-unequal": {
+      "messageKey": "每个盘子的数量要一样。",
+      "hintKey": "先算 12 ÷ 4，再按这个数分。",
+      "focus": "counts"
+    },
+    "distribution-missing-kind": {
+      "messageKey": "每个盘子至少要有两种东西。",
+      "hintKey": "别让一个盘子只有饼干。",
+      "focus": "kinds"
+    },
+    "distribution-empty": {
+      "messageKey": "还没开始分。",
+      "hintKey": "先给每个盘子放一件。",
+      "focus": "place"
+    }
+  },
+  "badges": [
+    "modeler"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.share.manualAudit"
+  }
+}

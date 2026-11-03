@@ -1,0 +1,23 @@
+{
+  "id": "g13-data-weather",
+  "title": "天气记录站",
+  "emoji": "🌦️",
+  "color": "#2f7d78",
+  "band": "g13",
+  "thread": "data",
+  "template": "experiment",
+  "tools": [
+    "probe"
+  ],
+  "estimatedMinutes": 6,
+  "thinkingTarget": "记录 14 天天气，用统计条回答最多和最少",
+  "difficulty": {
+    "structure": 1,
+    "representation": 2,
+    "constraint": 2,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}

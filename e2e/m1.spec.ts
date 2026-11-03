@@ -91,3 +91,32 @@ test('真实点击：结构不变量论证可以通关', async ({ page }) => {
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：公平分点心可以通关', async ({ page }) => {
+  await page.goto('/#/play/k-modeling-share');
+  await expect(page.getByTestId('distribute-tool')).toBeVisible();
+
+  for (const container of [0, 1, 2, 3]) {
+    await page.getByTestId('dist-plus-' + container + '-cookie').click();
+    await page.getByTestId('dist-plus-' + container + '-cookie').click();
+    await page.getByTestId('dist-plus-' + container + '-apple').click();
+  }
+
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});
+
+test('真实点击：规则小火车可以通关', async ({ page }) => {
+  await page.goto('/#/play/k-algorithm-train');
+  await expect(page.getByTestId('rule-tool')).toBeVisible();
+
+  await page.getByTestId('rule-add-forward').click();
+  await page.getByTestId('rule-add-forward').click();
+  await page.getByTestId('rule-add-collect').click();
+  await page.getByTestId('rule-add-forward').click();
+  await page.getByTestId('rule-add-forward').click();
+  await page.getByTestId('rule-commit').click();
+  await page.getByTestId('level-run').click();
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});

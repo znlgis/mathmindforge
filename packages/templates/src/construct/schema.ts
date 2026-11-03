@@ -45,9 +45,27 @@ export const placementScriptSchema = z.object({
 });
 export type PlacementScript = z.infer<typeof placementScriptSchema>;
 
+export const distributionScriptSchema = z.object({
+  mode: z.literal('distribution'),
+  containers: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).min(2).max(6),
+  items: z.array(z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    token: z.string().min(1),
+    count: z.number().int().min(1).max(40),
+  })).min(1).max(4),
+  constraints: z.object({
+    equalCounts: z.boolean().default(true),
+    minKinds: z.number().int().min(0).max(4).default(0),
+    maxPerContainer: z.number().int().min(1).max(40),
+  }),
+});
+export type DistributionScript = z.infer<typeof distributionScriptSchema>;
+
 export const constructScriptSchema = z.discriminatedUnion('mode', [
   paymentScriptSchema,
   placementScriptSchema,
+  distributionScriptSchema,
 ]);
 export type ConstructScript = z.infer<typeof constructScriptSchema>;
 

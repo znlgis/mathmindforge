@@ -10,7 +10,7 @@ import {
   validateArtifact as patternValidate,
 } from './pattern/logic';
 import { ruleVerifier } from './rule/logic';
-import { constructVerifier } from './construct/logic';
+import { constructVerifier } from './construct/verifier';
 import { simulateVerifier } from './simulate/logic';
 import { argueVerifier } from './argue/logic';
 import {
@@ -24,7 +24,7 @@ import {
 } from './experiment/logic';
 import { createPatternRuntime } from './pattern/runtime';
 import { createRuleRuntime } from './rule/runtime';
-import { createConstructRuntime } from './construct/runtime';
+import { createConstructRuntime } from './construct/verifier';
 import { createSimulateRuntime } from './simulate/runtime';
 import { createExperimentRuntime } from './experiment/runtime';
 import { createArgueRuntime } from './argue/runtime';

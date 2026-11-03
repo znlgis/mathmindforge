@@ -11,5 +11,6 @@ export { default as SampleTool } from './SampleTool.vue';
 export { default as DominoTool } from './DominoTool.vue';
 export { default as InvariantProbeTool } from './InvariantProbeTool.vue';
 export { default as ArgumentBoard } from './ArgumentBoard.vue';
+export { default as DistributeTool } from './DistributeTool.vue';
 import ToolDock from './ToolDock.vue';
 export default ToolDock;

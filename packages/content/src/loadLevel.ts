@@ -14,6 +14,11 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'g79-modeling-dispatch': () => import('./details/g79-modeling-dispatch.level.json'),
   'g1012-modeling-winrate': () => import('./details/g1012-modeling-winrate.level.json'),
   'g1012-structure-invariant': () => import('./details/g1012-structure-invariant.level.json'),
+  'k-algorithm-train': () => import('./details/k-algorithm-train.level.json'),
+  'g13-data-weather': () => import('./details/g13-data-weather.level.json'),
+  'g46-data-invariant': () => import('./details/g46-data-invariant.level.json'),
+  'k-modeling-share': () => import('./details/k-modeling-share.level.json'),
+  'g13-modeling-pack': () => import('./details/g13-modeling-pack.level.json'),
 };
 
 export async function loadLevel(

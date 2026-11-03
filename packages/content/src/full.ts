@@ -10,6 +10,11 @@ import g46PaymentDetail from './details/g46-algorithm-payment.level.json';
 import g79DispatchDetail from './details/g79-modeling-dispatch.level.json';
 import g1012WinrateDetail from './details/g1012-modeling-winrate.level.json';
 import g1012StructureInvariantDetail from './details/g1012-structure-invariant.level.json';
+import kAlgorithmTrainDetail from './details/k-algorithm-train.level.json';
+import g13DataWeatherDetail from './details/g13-data-weather.level.json';
+import g46DataInvariantDetail from './details/g46-data-invariant.level.json';
+import kModelingShareDetail from './details/k-modeling-share.level.json';
+import g13ModelingPackDetail from './details/g13-modeling-pack.level.json';
 import type { ShippedLevelId } from './ids';
 import type { LevelDetail } from './schema';
 
@@ -21,4 +26,9 @@ export const LEVEL_DETAILS: Record<ShippedLevelId, LevelDetail> = {
   'g79-modeling-dispatch': g79DispatchDetail as LevelDetail,
   'g1012-modeling-winrate': g1012WinrateDetail as LevelDetail,
   'g1012-structure-invariant': g1012StructureInvariantDetail as LevelDetail,
+  'k-algorithm-train': kAlgorithmTrainDetail as LevelDetail,
+  'g13-data-weather': g13DataWeatherDetail as LevelDetail,
+  'g46-data-invariant': g46DataInvariantDetail as LevelDetail,
+  'k-modeling-share': kModelingShareDetail as LevelDetail,
+  'g13-modeling-pack': g13ModelingPackDetail as LevelDetail,
 };

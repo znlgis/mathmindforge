@@ -1,0 +1,463 @@
+{
+  "id": "g13-modeling-pack",
+  "title": "公平分装",
+  "band": "g13",
+  "thread": "modeling",
+  "template": "construct",
+  "thinkingTarget": "把三类玩具装进三个盒子，每盒一样多且至少两类",
+  "intro": "三个盒子，积木、球、书各 3 件。每个盒子要一样多，而且不能只有一种玩具。",
+  "prompt": "把 9 件玩具装进 3 个盒子，每盒 3 件、至少两类。",
+  "done": "你先满足数量，再满足种类，两个约束一起看。",
+  "retry": "先保证每盒 3 件，再检查有没有盒子只有一种玩具。",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "distribution"
+      ],
+      "config": {
+        "mode": "distribution",
+        "palette": [
+          {
+            "id": "block",
+            "label": "积木",
+            "shape": "block"
+          },
+          {
+            "id": "ball",
+            "label": "球",
+            "shape": "ball"
+          },
+          {
+            "id": "book",
+            "label": "书",
+            "shape": "book"
+          }
+        ],
+        "maxPieces": 9,
+        "containers": [
+          {
+            "id": "box0",
+            "label": "盒子 1"
+          },
+          {
+            "id": "box1",
+            "label": "盒子 2"
+          },
+          {
+            "id": "box2",
+            "label": "盒子 3"
+          }
+        ],
+        "items": [
+          {
+            "id": "block",
+            "label": "积木",
+            "token": "🧱",
+            "count": 3
+          },
+          {
+            "id": "ball",
+            "label": "球",
+            "token": "⚽",
+            "count": 3
+          },
+          {
+            "id": "book",
+            "label": "书",
+            "token": "📕",
+            "count": 3
+          }
+        ],
+        "constraints": {
+          "equalCounts": true,
+          "minKinds": 2,
+          "maxPerContainer": 4
+        }
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "distribution"
+  ],
+  "levelScript": {
+    "mode": "distribution",
+    "containers": [
+      {
+        "id": "box0",
+        "label": "盒子 1"
+      },
+      {
+        "id": "box1",
+        "label": "盒子 2"
+      },
+      {
+        "id": "box2",
+        "label": "盒子 3"
+      }
+    ],
+    "items": [
+      {
+        "id": "block",
+        "label": "积木",
+        "token": "🧱",
+        "count": 3
+      },
+      {
+        "id": "ball",
+        "label": "球",
+        "token": "⚽",
+        "count": 3
+      },
+      {
+        "id": "book",
+        "label": "书",
+        "token": "📕",
+        "count": 3
+      }
+    ],
+    "constraints": {
+      "equalCounts": true,
+      "minKinds": 2,
+      "maxPerContainer": 4
+    }
+  },
+  "evidencePlan": [
+    {
+      "id": "place",
+      "phase": "construct",
+      "require": "construct/place >= 1",
+      "descriptionKey": "先分一件"
+    },
+    {
+      "id": "fill",
+      "phase": "construct",
+      "require": "fill",
+      "descriptionKey": "把物品全部分完"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-one-each",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "block": 1,
+                "ball": 1,
+                "book": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "block": 1,
+                "ball": 1,
+                "book": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "block": 1,
+                "ball": 1,
+                "book": 1
+              },
+              "total": 3
+            }
+          ],
+          "totals": {
+            "block": 3,
+            "ball": 3,
+            "book": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "s-mixed",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "block": 2,
+                "ball": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "ball": 2,
+                "book": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "book": 2,
+                "block": 1
+              },
+              "total": 3
+            }
+          ],
+          "totals": {
+            "block": 3,
+            "ball": 3,
+            "book": 3
+          }
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-shortage",
+      "expectFailure": "distribution-shortage",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "block": 1,
+                "ball": 1,
+                "book": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "block": 1,
+                "ball": 1,
+                "book": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "block": 1,
+                "ball": 1
+              },
+              "total": 2
+            }
+          ],
+          "totals": {
+            "block": 3,
+            "ball": 3,
+            "book": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "n-overflow",
+      "expectFailure": "distribution-overflow",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "block": 2,
+                "ball": 2,
+                "book": 1
+              },
+              "total": 5
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "block": 1,
+                "ball": 1
+              },
+              "total": 2
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "book": 2
+              },
+              "total": 2
+            }
+          ],
+          "totals": {
+            "block": 3,
+            "ball": 3,
+            "book": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "n-missing-kind",
+      "expectFailure": "distribution-missing-kind",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "book": 3
+              },
+              "total": 3
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "block": 3
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "ball": 3
+              },
+              "total": 3
+            }
+          ],
+          "totals": {
+            "book": 3,
+            "block": 3,
+            "ball": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "n-unequal",
+      "expectFailure": "distribution-unequal",
+      "artifact": {
+        "distribution": {
+          "containers": [
+            {
+              "id": "plate0",
+              "counts": {
+                "block": 2,
+                "ball": 2
+              },
+              "total": 4
+            },
+            {
+              "id": "plate1",
+              "counts": {
+                "book": 2,
+                "block": 1
+              },
+              "total": 3
+            },
+            {
+              "id": "plate2",
+              "counts": {
+                "ball": 1,
+                "book": 1
+              },
+              "total": 2
+            }
+          ],
+          "totals": {
+            "block": 3,
+            "ball": 3,
+            "book": 3
+          }
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-labels",
+      "axis": "representation",
+      "patch": {
+        "items": [
+          {
+            "id": "block",
+            "label": "木积木",
+            "token": "🧱",
+            "count": 3
+          },
+          {
+            "id": "ball",
+            "label": "皮球",
+            "token": "⚽",
+            "count": 3
+          },
+          {
+            "id": "book",
+            "label": "绘本",
+            "token": "📕",
+            "count": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "v-boxes",
+      "axis": "representation",
+      "patch": {
+        "containers": [
+          {
+            "id": "box0",
+            "label": "红盒"
+          },
+          {
+            "id": "box1",
+            "label": "蓝盒"
+          },
+          {
+            "id": "box2",
+            "label": "黄盒"
+          }
+        ]
+      }
+    }
+  ],
+  "feedback": {
+    "distribution-shortage": {
+      "messageKey": "还有玩具没装完。",
+      "hintKey": "三类各 3 件，都要全部装进盒子。",
+      "focus": "remaining"
+    },
+    "distribution-overflow": {
+      "messageKey": "有盒子装得太多了。",
+      "hintKey": "每个盒子最多 4 件。",
+      "focus": "container"
+    },
+    "distribution-unequal": {
+      "messageKey": "每个盒子的数量要一样。",
+      "hintKey": "9 ÷ 3，每盒 3 件。",
+      "focus": "counts"
+    },
+    "distribution-missing-kind": {
+      "messageKey": "有盒子只有一种玩具。",
+      "hintKey": "每个盒子至少放两类。",
+      "focus": "kinds"
+    },
+    "distribution-empty": {
+      "messageKey": "还没开始装。",
+      "hintKey": "先给每个盒子放一件。",
+      "focus": "place"
+    }
+  },
+  "badges": [
+    "builder"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.pack.manualAudit"
+  }
+}

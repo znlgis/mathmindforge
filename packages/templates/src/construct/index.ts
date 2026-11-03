@@ -1,32 +1,20 @@
 import type {
   LevelContext, LevelDetail, LevelManifest, LevelModule, LevelRuntime, RuntimeOptions,
 } from '@mmf/game-kit';
-import { createConstructRuntime } from './runtime';
+import { createConstructRuntime } from './verifier';
 
-export { createConstructRuntime } from './runtime';
-export { constructVerifier } from './logic';
+export { createConstructRuntime } from './verifier';
+export { constructVerifier } from './verifier';
 
-/**
- * construct 模板的关卡入口。
- * 支付关没有画布：收款台、面额盘、反例面板全部由 ToolDock 承担，mount 是空操作。
- */
 export function defineConstructLevel(manifest: LevelManifest): LevelModule {
   return {
     manifest,
     createRuntime(detail: LevelDetail, opts: RuntimeOptions): LevelRuntime {
       return createConstructRuntime(detail, opts);
     },
-    async mount(_ctx: LevelContext, _runtime: LevelRuntime): Promise<void> {
-      // 无画布关卡：宿主会把 ToolDock 拉满宽度。
-    },
-    async unmount(): Promise<void> {
-      // 没有 Phaser 实例需要销毁。
-    },
-    pause(): void {
-      // 无画布，无需暂停。
-    },
-    resume(): void {
-      // 无画布，无需恢复。
-    },
+    async mount(_ctx: LevelContext, _runtime: LevelRuntime): Promise<void> {},
+    async unmount(): Promise<void> {},
+    pause(): void {},
+    resume(): void {},
   };
 }

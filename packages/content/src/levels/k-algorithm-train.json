@@ -1,0 +1,23 @@
+{
+  "id": "k-algorithm-train",
+  "title": "规则小火车",
+  "emoji": "🚂",
+  "color": "#1f4e6b",
+  "band": "k",
+  "thread": "algorithm",
+  "template": "rule",
+  "tools": [
+    "rule"
+  ],
+  "estimatedMinutes": 5,
+  "thinkingTarget": "用顺序指令让小火车收星到站",
+  "difficulty": {
+    "structure": 1,
+    "representation": 1,
+    "constraint": 1,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}

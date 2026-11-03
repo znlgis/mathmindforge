@@ -2,7 +2,7 @@ import type { ZodType } from 'zod';
 import type { TemplateId } from '@mmf/content/ids';
 import { patternScriptSchema } from './pattern/schema';
 import { ruleScriptSchema } from './rule/schema';
-import { paymentScriptSchema } from './construct/schema';
+import { constructScriptSchema } from './construct/schema';
 import { simulateScriptSchema } from './simulate/schema';
 import { experimentScriptSchema } from './experiment/schema';
 import { argueScriptSchema } from './argue/schema';
@@ -15,7 +15,7 @@ import { argueScriptSchema } from './argue/schema';
 export const templateSchemas: Record<TemplateId, ZodType> = {
   pattern: patternScriptSchema,
   rule: ruleScriptSchema,
-  construct: paymentScriptSchema,
+  construct: constructScriptSchema,
   simulate: simulateScriptSchema,
   experiment: experimentScriptSchema,
   argue: argueScriptSchema,

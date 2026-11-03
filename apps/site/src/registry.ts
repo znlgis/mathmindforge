@@ -11,4 +11,9 @@ export const registry: Record<ShippedLevelId, LevelLoader> = {
   'g79-modeling-dispatch': () => import('@mmf/game-forge/g79-modeling-dispatch'),
   'g1012-modeling-winrate': () => import('@mmf/game-forge/g1012-modeling-winrate'),
   'g1012-structure-invariant': () => import('@mmf/game-forge/g1012-structure-invariant'),
+  'k-algorithm-train': () => import('@mmf/game-forge/k-algorithm-train'),
+  'g13-data-weather': () => import('@mmf/game-forge/g13-data-weather'),
+  'g46-data-invariant': () => import('@mmf/game-forge/g46-data-invariant'),
+  'k-modeling-share': () => import('@mmf/game-forge/k-modeling-share'),
+  'g13-modeling-pack': () => import('@mmf/game-forge/g13-modeling-pack'),
 };

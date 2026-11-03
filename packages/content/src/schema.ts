@@ -35,7 +35,7 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
     kind: z.literal('construct'),
     ...ToolSpecBase,
     config: z.object({
-      mode: z.enum(['placement', 'payment', 'domino']).default('placement'),
+      mode: z.enum(['placement', 'payment', 'domino', 'distribution']).default('placement'),
       palette: z.array(z.object({
         id: z.string().min(1), label: z.string().min(1), shape: z.string().min(1),
         value: z.number().int().positive().optional(),
@@ -45,6 +45,15 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
       target: z.number().int().positive().optional(),
       denominations: z.array(z.number().int().positive()).optional(),
       maxCoins: z.number().int().positive().optional(),
+      containers: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).optional(),
+      items: z.array(z.object({
+        id: z.string().min(1), label: z.string().min(1), token: z.string().min(1), count: z.number().int().positive(),
+      })).optional(),
+      constraints: z.object({
+        equalCounts: z.boolean().default(true),
+        minKinds: z.number().int().min(0).max(4).default(0),
+        maxPerContainer: z.number().int().min(1).max(40),
+      }).optional(),
     }),
   }),
   z.object({

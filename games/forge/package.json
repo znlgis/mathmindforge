@@ -11,7 +11,12 @@
     "./g46-algorithm-payment": "./src/levels/g46-algorithm-payment.ts",
     "./g79-modeling-dispatch": "./src/levels/g79-modeling-dispatch.ts",
     "./g1012-modeling-winrate": "./src/levels/g1012-modeling-winrate.ts",
-    "./g1012-structure-invariant": "./src/levels/g1012-structure-invariant.ts"
+    "./g1012-structure-invariant": "./src/levels/g1012-structure-invariant.ts",
+    "./k-algorithm-train": "./src/levels/k-algorithm-train.ts",
+    "./g13-data-weather": "./src/levels/g13-data-weather.ts",
+    "./g46-data-invariant": "./src/levels/g46-data-invariant.ts",
+    "./k-modeling-share": "./src/levels/k-modeling-share.ts",
+    "./g13-modeling-pack": "./src/levels/g13-modeling-pack.ts"
   },
   "scripts": {
     "test": "vitest run",

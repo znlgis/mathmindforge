@@ -1,0 +1,24 @@
+{
+  "id": "g46-data-invariant",
+  "title": "不变量侦探",
+  "emoji": "🕵️",
+  "color": "#1f4e6b",
+  "band": "g46",
+  "thread": "data",
+  "template": "argue",
+  "tools": [
+    "construct",
+    "probe"
+  ],
+  "estimatedMinutes": 8,
+  "thinkingTarget": "用不变量说明 7×7 去角棋盘为什么铺不满",
+  "difficulty": {
+    "structure": 3,
+    "representation": 3,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  }
+}

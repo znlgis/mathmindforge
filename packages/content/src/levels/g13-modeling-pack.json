@@ -1,0 +1,23 @@
+{
+  "id": "g13-modeling-pack",
+  "title": "公平分装",
+  "emoji": "📦",
+  "color": "#b07d2b",
+  "band": "g13",
+  "thread": "modeling",
+  "template": "construct",
+  "tools": [
+    "construct"
+  ],
+  "estimatedMinutes": 6,
+  "thinkingTarget": "把三类玩具装进三个盒子，每盒一样多且至少两类",
+  "difficulty": {
+    "structure": 2,
+    "representation": 2,
+    "constraint": 3,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}

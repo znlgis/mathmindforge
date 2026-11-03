@@ -64,6 +64,11 @@ export const SHIPPED_LEVEL_IDS = [
   'g79-modeling-dispatch',
   'g1012-modeling-winrate',
   'g1012-structure-invariant',
+  'k-algorithm-train',
+  'g13-data-weather',
+  'g46-data-invariant',
+  'k-modeling-share',
+  'g13-modeling-pack',
 ] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 
