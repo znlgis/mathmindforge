@@ -23,4 +23,5 @@ export const registry: Record<ShippedLevelId, LevelLoader> = {
   'g79-structure-network': () => import('@mmf/game-forge/g79-structure-network'),
   'g1012-data-inference': () => import('@mmf/game-forge/g1012-data-inference'),
   'g79-algorithm-schedule': () => import('@mmf/game-forge/g79-algorithm-schedule'),
+  'g1012-algorithm-frontier': () => import('@mmf/game-forge/g1012-algorithm-frontier'),
 };

@@ -64,6 +64,7 @@ export type DistributionScript = z.infer<typeof distributionScriptSchema>;
 
 import { networkScriptSchema } from './network';
 import { scheduleScriptSchema } from './schedule';
+import { frontierScriptSchema } from './frontier';
 
 export const constructScriptSchema = z.discriminatedUnion('mode', [
   paymentScriptSchema,
@@ -71,6 +72,7 @@ export const constructScriptSchema = z.discriminatedUnion('mode', [
   distributionScriptSchema,
   networkScriptSchema,
   scheduleScriptSchema,
+  frontierScriptSchema,
 ]);
 export type ConstructScript = z.infer<typeof constructScriptSchema>;
 

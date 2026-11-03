@@ -35,7 +35,7 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
     kind: z.literal('construct'),
     ...ToolSpecBase,
     config: z.object({
-      mode: z.enum(['placement', 'payment', 'domino', 'distribution', 'network', 'schedule']).default('placement'),
+      mode: z.enum(['placement', 'payment', 'domino', 'distribution', 'network', 'schedule', 'frontier']).default('placement'),
       palette: z.array(z.object({
         id: z.string().min(1), label: z.string().min(1), shape: z.string().min(1),
         value: z.number().int().positive().optional(),

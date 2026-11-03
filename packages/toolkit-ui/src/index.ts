@@ -17,5 +17,6 @@ export { default as SamplingTool } from './SamplingTool.vue';
 export { default as NetworkTool } from './NetworkTool.vue';
 export { default as InferenceTool } from './InferenceTool.vue';
 export { default as ScheduleTool } from './ScheduleTool.vue';
+export { default as FrontierTool } from './FrontierTool.vue';
 import ToolDock from './ToolDock.vue';
 export default ToolDock;

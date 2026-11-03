@@ -1,0 +1,25 @@
+{
+  "id": "g1012-algorithm-frontier",
+  "title": "贪心边界",
+  "emoji": "🧭",
+  "color": "#1f4e6b",
+  "band": "g1012",
+  "thread": "algorithm",
+  "template": "construct",
+  "tools": [
+    "construct"
+  ],
+  "estimatedMinutes": 8,
+  "thinkingTarget": "给边赋代价，构造贪心不是最优的反例",
+  "difficulty": {
+    "structure": 3,
+    "representation": 4,
+    "constraint": 3,
+    "transfer": 4
+  },
+  "unlock": {
+    "after": []
+  },
+  "titleEn": "Greedy Frontier",
+  "thinkingTargetEn": "Assign edge costs to build a counterexample where greedy is not optimal."
+}

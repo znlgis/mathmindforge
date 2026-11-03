@@ -23,7 +23,8 @@
     "./g79-data-sampling": "./src/levels/g79-data-sampling.ts",
     "./g79-structure-network": "./src/levels/g79-structure-network.ts",
     "./g1012-data-inference": "./src/levels/g1012-data-inference.ts",
-    "./g79-algorithm-schedule": "./src/levels/g79-algorithm-schedule.ts"
+    "./g79-algorithm-schedule": "./src/levels/g79-algorithm-schedule.ts",
+    "./g1012-algorithm-frontier": "./src/levels/g1012-algorithm-frontier.ts"
   },
   "scripts": {
     "test": "vitest run",

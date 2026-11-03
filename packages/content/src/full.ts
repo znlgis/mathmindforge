@@ -22,6 +22,7 @@ import g79DataSamplingDetail from './details/g79-data-sampling.level.json';
 import g79StructureNetworkDetail from './details/g79-structure-network.level.json';
 import g1012DataInferenceDetail from './details/g1012-data-inference.level.json';
 import g79AlgorithmScheduleDetail from './details/g79-algorithm-schedule.level.json';
+import g1012AlgorithmFrontierDetail from './details/g1012-algorithm-frontier.level.json';
 import type { ShippedLevelId } from './ids';
 import type { LevelDetail } from './schema';
 
@@ -45,4 +46,5 @@ export const LEVEL_DETAILS: Record<ShippedLevelId, LevelDetail> = {
   'g79-structure-network': g79StructureNetworkDetail as LevelDetail,
   'g1012-data-inference': g1012DataInferenceDetail as LevelDetail,
   'g79-algorithm-schedule': g79AlgorithmScheduleDetail as LevelDetail,
+  'g1012-algorithm-frontier': g1012AlgorithmFrontierDetail as LevelDetail,
 };

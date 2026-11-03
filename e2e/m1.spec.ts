@@ -197,3 +197,15 @@ test('真实点击：课表编排师可以通关', async ({ page }) => {
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：贪心边界可以通关', async ({ page }) => {
+  await page.goto('/#/play/g1012-algorithm-frontier');
+  await expect(page.getByTestId('frontier-tool')).toBeVisible();
+
+  await page.getByTestId('frontier-cost-sa').selectOption('1');
+  await page.getByTestId('frontier-cost-sb').selectOption('2');
+  await page.getByTestId('frontier-cost-at').selectOption('9');
+  await page.getByTestId('frontier-cost-bt').selectOption('1');
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});

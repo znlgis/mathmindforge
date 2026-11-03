@@ -1,0 +1,300 @@
+{
+  "id": "g1012-algorithm-frontier",
+  "title": "贪心边界",
+  "band": "g1012",
+  "thread": "algorithm",
+  "template": "construct",
+  "thinkingTarget": "给边赋代价，构造贪心不是最优的反例",
+  "intro": "从起点到终点有两条路。贪心会在起点选更便宜的第一段——你能让它最后反而更贵吗？",
+  "prompt": "给四条边赋 1–10 的代价，让贪心走出的总代价严格大于最优路径。",
+  "done": "你构造了一个反例，说明“每步选最便宜”不保证全局最优。",
+  "retry": "先让起点两条边有差距，再让贪心选中的那条路在第二段更贵。",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "frontier"
+      ],
+      "config": {
+        "mode": "frontier",
+        "palette": [
+          {
+            "id": "edge",
+            "label": "边",
+            "shape": "edge"
+          }
+        ],
+        "maxPieces": 4
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "frontier"
+  ],
+  "levelScript": {
+    "mode": "frontier",
+    "nodes": [
+      {
+        "id": "S",
+        "label": "起点",
+        "x": 10,
+        "y": 40
+      },
+      {
+        "id": "A",
+        "label": "A 站",
+        "x": 40,
+        "y": 10
+      },
+      {
+        "id": "B",
+        "label": "B 站",
+        "x": 40,
+        "y": 70
+      },
+      {
+        "id": "T",
+        "label": "终点",
+        "x": 80,
+        "y": 40
+      }
+    ],
+    "edges": [
+      {
+        "id": "sa",
+        "from": "S",
+        "to": "A",
+        "min": 1,
+        "max": 10,
+        "default": 1
+      },
+      {
+        "id": "sb",
+        "from": "S",
+        "to": "B",
+        "min": 1,
+        "max": 10,
+        "default": 2
+      },
+      {
+        "id": "at",
+        "from": "A",
+        "to": "T",
+        "min": 1,
+        "max": 10,
+        "default": 9
+      },
+      {
+        "id": "bt",
+        "from": "B",
+        "to": "T",
+        "min": 1,
+        "max": 10,
+        "default": 9
+      }
+    ],
+    "start": "S",
+    "goal": "T"
+  },
+  "evidencePlan": [
+    {
+      "id": "set",
+      "phase": "construct",
+      "require": "set",
+      "descriptionKey": "给四条边都设好代价"
+    },
+    {
+      "id": "run",
+      "phase": "run",
+      "require": "run",
+      "descriptionKey": "让贪心走到终点"
+    },
+    {
+      "id": "counter",
+      "phase": "argue",
+      "require": "counter",
+      "descriptionKey": "构造出贪心更贵的反例"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-classic",
+      "artifact": {
+        "costs": {
+          "sa": 1,
+          "sb": 2,
+          "at": 9,
+          "bt": 1
+        }
+      }
+    },
+    {
+      "id": "s-alt",
+      "artifact": {
+        "costs": {
+          "sa": 2,
+          "sb": 3,
+          "at": 9,
+          "bt": 1
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-empty",
+      "expectFailure": "frontier-empty",
+      "artifact": {
+        "costs": {}
+      }
+    },
+    {
+      "id": "n-incomplete",
+      "expectFailure": "frontier-incomplete",
+      "artifact": {
+        "costs": {
+          "sa": 1,
+          "sb": 2,
+          "at": 9
+        }
+      }
+    },
+    {
+      "id": "n-range",
+      "expectFailure": "frontier-range",
+      "artifact": {
+        "costs": {
+          "sa": 0,
+          "sb": 2,
+          "at": 9,
+          "bt": 1
+        }
+      }
+    },
+    {
+      "id": "n-not-counter",
+      "expectFailure": "frontier-not-counter",
+      "artifact": {
+        "costs": {
+          "sa": 1,
+          "sb": 2,
+          "at": 1,
+          "bt": 2
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-labels",
+      "axis": "representation",
+      "patch": {
+        "nodes": [
+          {
+            "id": "S",
+            "label": "家",
+            "x": 10,
+            "y": 40
+          },
+          {
+            "id": "A",
+            "label": "甲",
+            "x": 40,
+            "y": 10
+          },
+          {
+            "id": "B",
+            "label": "乙",
+            "x": 40,
+            "y": 70
+          },
+          {
+            "id": "T",
+            "label": "学校",
+            "x": 80,
+            "y": 40
+          }
+        ]
+      }
+    },
+    {
+      "id": "v-default",
+      "axis": "representation",
+      "patch": {
+        "edges": [
+          {
+            "id": "sa",
+            "from": "S",
+            "to": "A",
+            "min": 1,
+            "max": 10,
+            "default": 5
+          },
+          {
+            "id": "sb",
+            "from": "S",
+            "to": "B",
+            "min": 1,
+            "max": 10,
+            "default": 5
+          },
+          {
+            "id": "at",
+            "from": "A",
+            "to": "T",
+            "min": 1,
+            "max": 10,
+            "default": 5
+          },
+          {
+            "id": "bt",
+            "from": "B",
+            "to": "T",
+            "min": 1,
+            "max": 10,
+            "default": 5
+          }
+        ]
+      }
+    }
+  ],
+  "feedback": {
+    "frontier-empty": {
+      "messageKey": "还没有给边设代价。",
+      "hintKey": "四条边都要有 1–10 的代价。",
+      "focus": "costs"
+    },
+    "frontier-incomplete": {
+      "messageKey": "还有边没有代价。",
+      "hintKey": "把四条边都设上数字。",
+      "focus": "costs"
+    },
+    "frontier-range": {
+      "messageKey": "代价超出 1–10。",
+      "hintKey": "把每条边调到 1 到 10 之间。",
+      "focus": "range"
+    },
+    "frontier-not-counter": {
+      "messageKey": "这组代价里贪心仍是最优的。",
+      "hintKey": "让贪心选中的第二段明显更贵。",
+      "focus": "counter"
+    }
+  },
+  "badges": [
+    "boundary-explorer"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.frontier.manualAudit"
+  },
+  "titleEn": "Greedy Frontier",
+  "thinkingTargetEn": "Assign edge costs to build a counterexample where greedy is not optimal.",
+  "introEn": "Two routes from start to goal. Greedy picks the cheaper first edge — can you make it lose in the end?",
+  "promptEn": "Assign each edge a cost from 1–10 so greedy’s total cost is strictly greater than the optimal route.",
+  "doneEn": "You built a counterexample showing “cheapest each step” does not guarantee the global optimum.",
+  "retryEn": "First make the two starting edges differ, then make the greedy route expensive on its second edge."
+}
