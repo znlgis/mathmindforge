@@ -173,14 +173,8 @@ describe('simulate · g79 城市调度', () => {
     expect(dataset?.n).toBe(1);
     expect(dataset?.groups?.['run-1']).toEqual([3, 1, 90, 0, 1, 16, 1, 17, 103, 1]);
 
-    // 只看指标不算看过：compare 证据还没到手
-    const first = await runtime.dispatch({ type: 'submit', payload: {} });
-    expect(first.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual(['compare']);
-
-    const focused = await runtime.dispatch({ type: 'probe/focus', payload: { id: 'metrics-table' } });
-    expect(focused.ok).toBe(true);
-    expect(runtime.snapshot().toolState.probe?.focusId).toBe('metrics-table');
-
+    // 运行之后指标就在同一块面板上：compare 由运行自动满足（不是玩家必须点的按钮）。
+    expect(snapshot.checkpoints.compare).toBe(true);
     const submitted = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(submitted.verdict?.passed).toBe(true);
   });

@@ -10,7 +10,6 @@ const manifest: LevelManifest = {
   // 与 levels/g46-data-invariant.json 的 estimatedMinutes 对齐。
   estimatedMinutes: 8,
   hasCanvas: false,
-  runEnabled: false,
 };
 
 export default defineArgueLevel(manifest);

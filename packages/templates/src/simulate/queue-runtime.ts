@@ -158,7 +158,8 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
       return {
         params: state.committed !== null && same(state.committed, state.params),
         run: state.lastRun !== null,
-        compare: state.compared,
+        // 运行之后指标表就在同一块面板上：对照是事实，不需要再点一次「查看排队指标」。
+        compare: state.compared || state.lastRun !== null,
       };
     },
     toolState(state): Partial<ToolStateMap> {

@@ -123,7 +123,8 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
     return {
       params: state.committed !== null && valuesEqual(state.committed, state.values),
       run: state.lastRun !== null,
-      compare: state.compared,
+      // 跑完指标就在面板上：对照自动成立，删掉「查看指标」死按钮（docs/12 T0-4）。
+      compare: state.compared || state.lastRun !== null,
     };
   }
 

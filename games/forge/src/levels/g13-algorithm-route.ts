@@ -9,7 +9,6 @@ const manifest: LevelManifest = {
   designSize: RULE_DESIGN,
   estimatedMinutes: 8,
   hasCanvas: true,
-  runEnabled: true,
 };
 
 export default defineRuleLevel(manifest);

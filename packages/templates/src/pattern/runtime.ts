@@ -335,28 +335,53 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         // 判定结果要干净：预览 ghost 不参与、也不该在结果画面上抢视线。
         state.preview = undefined;
         const missing = missingEvidence();
-        if (missing.length > 0) {
-          const verdict: Verdict = {
+        const artifact = artifactOf();
+        // 与 shared/runtime 同一条判定顺序：先结构校验，再报缺步骤（docs/12 P0-1）。
+        if (artifact === null) {
+          if (missing.length === 0) return fail('还差一个可以提交的结构。');
+          const pending: Verdict = {
             passed: false,
             stamps: [],
             missingEvidence: missing,
             artifacts: artifactSummaries(),
           };
-          state.verdict = verdict;
+          state.verdict = pending;
           state.phase = 'editing';
           emit({ phase: 'result', action: action.type, outcome: 'fail' });
           notify();
+          return { ok: true, verdict: pending, snapshot: snapshot() };
+        }
+        const verdict = validateArtifact(script, baseVariant, artifact);
+        if (!verdict.passed) {
+          verdict.missingEvidence = missing;
+          verdict.artifacts = artifactSummaries();
+          state.verdict = verdict;
+          state.stamps = verdict.stamps;
+          state.phase = 'failed';
+          state.revision += 1;
+          addRun('fail', verdict.failure?.class);
+          emit({
+            phase: 'result',
+            action: action.type,
+            outcome: 'fail',
+            failureClass: verdict.failure?.class,
+          });
+          notify();
           return { ok: true, verdict, snapshot: snapshot() };
         }
-        const artifact = artifactOf();
-        const verdict = artifact
-          ? validateArtifact(script, baseVariant, artifact)
-          : {
-              passed: false,
-              stamps: [] as StampId[],
-              missingEvidence: missingEvidence(),
-              artifacts: artifactSummaries(),
-            };
+        if (missing.length > 0) {
+          const pending: Verdict = {
+            passed: false,
+            stamps: [],
+            missingEvidence: missing,
+            artifacts: artifactSummaries(),
+          };
+          state.verdict = pending;
+          state.phase = 'editing';
+          emit({ phase: 'result', action: action.type, outcome: 'fail' });
+          notify();
+          return { ok: true, verdict: pending, snapshot: snapshot() };
+        }
         state.verdict = verdict;
         state.stamps = verdict.stamps;
         state.phase = verdict.passed ? 'passed' : 'failed';

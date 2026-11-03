@@ -116,12 +116,6 @@
       "phase": "construct",
       "require": "construct/commit >= 1",
       "descriptionKey": "把缺的三块补上"
-    },
-    {
-      "id": "run",
-      "phase": "run",
-      "require": "run >= 1",
-      "descriptionKey": "运行一次，看墙合不合"
     }
   ],
   "solutions": [

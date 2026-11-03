@@ -10,7 +10,6 @@ const manifest: LevelManifest = {
   designSize: DESIGN,
   estimatedMinutes: 6,
   hasCanvas: true,
-  runEnabled: true,
 };
 
 export default definePatternLevel(manifest);

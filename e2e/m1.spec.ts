@@ -118,7 +118,6 @@ test('真实点击：规则小火车可以通关', async ({ page }) => {
   await page.getByTestId('rule-add-forward').click();
   await page.getByTestId('rule-add-forward').click();
   await page.getByTestId('rule-commit').click();
-  await page.getByTestId('level-run').click();
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
@@ -141,7 +140,6 @@ test('真实点击：对称补墙可以通关', async ({ page }) => {
     await page.getByTestId('construct-place-' + token).click();
   }
 
-  await page.getByTestId('level-run').click();
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });

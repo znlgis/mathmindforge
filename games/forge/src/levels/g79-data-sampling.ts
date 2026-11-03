@@ -9,7 +9,6 @@ const manifest: LevelManifest = {
   designSize: { width: 0, height: 0 },
   estimatedMinutes: 7,
   hasCanvas: false,
-  runEnabled: false,
 };
 
 export default defineExperimentLevel(manifest);

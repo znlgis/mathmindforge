@@ -22,7 +22,6 @@ interface Manifest {
   template: string;
   estimatedMinutes: number;
   hasCanvas: boolean;
-  runEnabled: boolean;
 }
 
 function readManifest(id: string): Manifest {
@@ -52,8 +51,6 @@ function readManifest(id: string): Manifest {
     template: str('template'),
     estimatedMinutes: num('estimatedMinutes'),
     hasCanvas: bool('hasCanvas'),
-    // runEnabled 可省略，默认 true（见 game-kit 的 LevelManifest 注释）。
-    runEnabled: body.includes('runEnabled') ? bool('runEnabled') : true,
   };
 }
 
@@ -105,15 +102,13 @@ describe('games/forge 关卡入口', () => {
     expect(drift).toEqual([]);
   });
 
-  it('无画布关卡隐藏宿主的大"运行"按钮（由工具按钮自己运行）', () => {
-    const drift: string[] = [];
-    for (const { id, manifest } of manifests) {
-      const expectedRun = manifest.hasCanvas;
-      if (manifest.runEnabled !== expectedRun) {
-        drift.push(id + ' hasCanvas=' + manifest.hasCanvas + ' runEnabled=' + manifest.runEnabled);
-      }
+  it('宿主不再提供"运行"按钮：试一下与完成合并成一个动作', () => {
+    // 之前 pattern/rule 的宿主有独立的"运行"按钮，与"完成"走同一份校验且是硬检查点；
+    // 现在由运行时在 submit 内部先跑一遍判定，manifest 不再需要 runEnabled 开关。
+    for (const { id } of manifests) {
+      const source = readFileSync(LEVELS_DIR + id + '.ts', 'utf8');
+      expect(source.includes('runEnabled'), id + ' 不该再声明 runEnabled').toBe(false);
     }
-    expect(drift).toEqual([]);
   });
 
   it('package.json 的子路径导出覆盖全部已发布关卡，且没有多余条目', () => {

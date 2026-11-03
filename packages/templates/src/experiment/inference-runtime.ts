@@ -78,7 +78,9 @@ function createInferenceAdapter(script: InferenceScript): RuntimeAdapter<Inferen
     },
     checkpoints(state) {
       return {
-        compare: state.focused,
+        // 两组样本与区间由关卡直接给出、并且一直渲染在面板上：
+        // 「查看区间」按钮点了屏幕不变，是死按钮；对照这一步是事实记录，不是仪式（docs/12 T0-4）。
+        compare: true,
         claim: state.claim !== null,
       };
     },

@@ -151,7 +151,9 @@ export function createRuleAdapter(detail: LevelDetail): RuntimeAdapter<RuleState
     checkpoints(state: RuleState, ctx) {
       return {
         build: state.committed && state.program.length > 0,
-        run: ctx.runs > 0,
+        // 宿主不再有独立的"运行"按钮（docs/12 T0-3）：提交程序那一步已经真的执行过一遍，
+        // 把它当事实记录；保留 ctx.runs 兜底，autoplay/旧路径仍然满足。
+        run: state.committed || ctx.runs > 0,
       };
     },
     toolState(state: RuleState) {

@@ -10,7 +10,6 @@ const manifest: LevelManifest = {
   estimatedMinutes: 10,
   hasCanvas: false,
   // 丘验/模拟关由工具按钮运行，宿主隐藏大「运行」。
-  runEnabled: false,
 };
 
 export default defineSimulateLevel(manifest);

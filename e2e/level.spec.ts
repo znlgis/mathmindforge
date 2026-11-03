@@ -55,7 +55,6 @@ test('真实点击工具台可以通关（不靠 autoplay）', async ({ page }) 
     await page.getByTestId('construct-place-' + token).click();
   }
 
-  await page.getByTestId('level-run').click();
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
   await expect.poll(async () => {

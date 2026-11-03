@@ -123,12 +123,6 @@
       "phase": "construct",
       "require": "construct/commit >= 1",
       "descriptionKey": "level.pattern.repair"
-    },
-    {
-      "id": "run",
-      "phase": "run",
-      "require": "run >= 1",
-      "descriptionKey": "level.pattern.run"
     }
   ],
   "solutions": [

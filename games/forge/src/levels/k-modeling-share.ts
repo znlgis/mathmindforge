@@ -10,7 +10,6 @@ const manifest: LevelManifest = {
   // 与 levels/k-modeling-share.json 的 estimatedMinutes 对齐。
   estimatedMinutes: 5,
   hasCanvas: false,
-  runEnabled: false,
 };
 
 export default defineConstructLevel(manifest);

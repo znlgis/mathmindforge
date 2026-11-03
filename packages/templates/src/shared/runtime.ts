@@ -184,24 +184,45 @@ export function createRuntimeWithAdapter<S>(
 
   async function dispatch(action: LevelAction): Promise<ActionResult> {
     if (action.type === 'submit') {
+      const artifact = adapter.artifact(meta.state);
       const missing = missingEvidence();
-      if (missing.length > 0) {
-        const verdict: Verdict = {
-          passed: false,
-          stamps: [],
-          missingEvidence: missing,
-          artifacts: adapter.artifactSummaries(meta.state),
-        };
+      // 判定顺序（docs/01 §5.1 的修订版 + docs/12 P0-1）：
+      // 1) 一件产物都没有：给出缺失证据（audit A1 要求无工具提交必须被拒且带缺失证据）；
+      // 2) 有产物：先跑结构校验。真实错误必须优先于缺步骤提示，
+      //    以前 missingEvidence 在前，把 network/schedule/frontier 写好的失败反馈全顶掉了；
+      // 3) 结构正确但证据步骤没走完：仍然按缺失证据处理（守住 A8 与内容门禁）。
+      const missingVerdict = (items: Verdict['missingEvidence'], artifacts = adapter.artifactSummaries(meta.state)): Verdict => ({
+        passed: false,
+        stamps: [],
+        missingEvidence: items,
+        artifacts,
+      });
+      if (artifact === null) {
+        if (missing.length === 0) return fail('还差一个可以提交的结构。');
+        const verdict = missingVerdict(missing);
         applyVerdict(verdict);
         emit({ phase: 'result', action: 'submit', outcome: 'fail' });
         notify();
         return { ok: true, verdict, snapshot: snapshot() };
       }
-      const artifact = adapter.artifact(meta.state);
-      if (artifact === null) {
-        return fail('还差一个可以提交的结构。');
-      }
       const verdict = adapter.validate(detail, BASE_VARIANT, artifact);
+      if (!verdict.passed) {
+        // 缺证据作为补充信息一起返回：界面可以在结构错误下面再提示还差哪一步。
+        verdict.missingEvidence = missing;
+        verdict.artifacts = adapter.artifactSummaries(meta.state);
+        applyVerdict(verdict);
+        recordRun('fail', verdict.failure?.class);
+        emit({ phase: 'result', action: 'submit', outcome: 'fail', failureClass: verdict.failure?.class });
+        notify();
+        return { ok: true, verdict, snapshot: snapshot() };
+      }
+      if (missing.length > 0) {
+        const pending = missingVerdict(missing);
+        applyVerdict(pending);
+        emit({ phase: 'result', action: 'submit', outcome: 'fail' });
+        notify();
+        return { ok: true, verdict: pending, snapshot: snapshot() };
+      }
       const transfer = transferCheck(artifact);
       if (verdict.passed) {
         if (!transfer.passed) {

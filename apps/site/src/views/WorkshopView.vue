@@ -20,7 +20,6 @@ import { nextLevelId } from '../shell/progression';
 import { useI18n } from '../shell/useI18n';
 import { useProgress } from '../stores/progress';
 import { useSettings } from '../stores/settings';
-import GuideBubble from '../components/GuideBubble.vue';
 
 const props = defineProps<{ levelId: ShippedLevelId }>();
 
@@ -48,9 +47,8 @@ const liveSnapshot = shallowRef<RunSnapshot | null>(null);
 const newBadges = ref<{ id: string; title: string }[]>([]);
 /** 提交/运行那一刻的工具使用总数：之后只要玩家再动工具，旧横幅就作废（修"横幅粘住"）。 */
 const verdictUsageAt = ref<number | null>(null);
-/** 引导气泡当前步；dismissed 后这一轮不再出现。 */
-const guideStep = ref(0);
-const guideDismissed = ref(false);
+/** 上一次操作被运行时拒绝时的消息：以前只播一声"重试"，玩家看到"点了没反应"。 */
+const actionError = ref<string | null>(null);
 
 const display = computed(() => (detail.value ? localizedDetail(detail.value, locale.value) : null));
 /** 摘要里才有 emoji 与学段；标题栏用它把"这是哪个学段、什么主题"说清楚。 */
@@ -75,14 +73,6 @@ const ready = computed(() => (
 const progress = useProgress();
 const settings = useSettings();
 const { t, translator, locale } = useI18n();
-
-/** 证据检查点 = 关卡里的步骤；用于底部进度条与引导气泡。 */
-const steps = computed(() => (detail.value?.evidencePlan ?? []).map((item) => ({
-  id: item.id,
-  label: t(item.descriptionKey),
-  done: liveSnapshot.value?.checkpoints?.[item.id] === true,
-})));
-const doneSteps = computed(() => steps.value.filter((step) => step.done).length);
 
 /** 工具使用总数：变化即说明玩家刚动过工具。 */
 function usageTotal(snapshot: RunSnapshot | null): number {
@@ -113,17 +103,6 @@ const failureCopy = computed<{ message: string; hint: string | null } | null>(()
 });
 
 const nextId = computed(() => nextLevelId(progress.save, props.levelId));
-
-/** 只有还没走完的步骤才给引导；老玩家/已完成步骤不打扰。 */
-const guideVisible = computed(() => (
-  ready.value
-  && !completed.value
-  && !guideDismissed.value
-  && guideStep.value < steps.value.length
-  && !steps.value[guideStep.value]?.done
-));
-
-const guideText = computed(() => steps.value[guideStep.value]?.label ?? '');
 
 let disposed = false;
 let debugOptions: DebugOptions | undefined;
@@ -183,7 +162,6 @@ function clearExitTimer(): void {
 async function completeNow(stamps: StampId[], variantId: string): Promise<void> {
   if (completed.value) return;
   completed.value = true;
-  guideDismissed.value = true;
   const levelId = props.levelId;
   try {
     await progress.completeLevel({
@@ -242,6 +220,8 @@ async function submit(): Promise<void> {
     liveSnapshot.value = result.snapshot;
     verdictUsageAt.value = usageTotal(result.snapshot);
     setDebugSnapshot(result.snapshot);
+    // 运行时拒绝（例如答案还缺一块）时把原因显示出来，不能只播一声"重试"。
+    actionError.value = result.ok ? null : (result.message ? t(result.message) : t('level.failed'));
     const verdict = result.verdict;
     if (verdict?.passed) {
       platform.audio.play('complete');
@@ -252,24 +232,6 @@ async function submit(): Promise<void> {
     }
   } catch (cause) {
     recordDebugError('提交失败：' + String(cause));
-  } finally {
-    actionPending.value = false;
-  }
-}
-
-async function run(): Promise<void> {
-  const rt = runtime.value;
-  if (!rt || actionPending.value) return;
-  actionPending.value = true;
-  try {
-    const result = await rt.dispatch({ type: 'run', payload: {} });
-    liveSnapshot.value = result.snapshot;
-    verdictUsageAt.value = usageTotal(result.snapshot);
-    setDebugSnapshot(result.snapshot);
-    platform.audio.play(result.verdict?.passed ? 'correct' : 'retry');
-    recordDebugEvent(result.verdict?.passed ? 'run:pass' : 'run:fail:' + (result.verdict?.failure?.class ?? 'none'));
-  } catch (cause) {
-    recordDebugError('运行失败：' + String(cause));
   } finally {
     actionPending.value = false;
   }
@@ -415,8 +377,7 @@ async function replay(): Promise<void> {
   saveFailed.value = false;
   newBadges.value = [];
   verdictUsageAt.value = null;
-  guideDismissed.value = false;
-  guideStep.value = 0;
+  actionError.value = null;
   clearExitTimer();
   finalSnapshot.value = null;
   const rt = runtime.value;
@@ -431,19 +392,6 @@ async function replay(): Promise<void> {
   recordDebugEvent('level:replay');
 }
 
-/** 引导气泡：走一步、或整轮关掉。 */
-function advanceGuide(): void {
-  if (guideStep.value >= steps.value.length - 1) {
-    guideDismissed.value = true;
-    return;
-  }
-  guideStep.value += 1;
-}
-
-function dismissGuide(): void {
-  guideDismissed.value = true;
-}
-
 /**
  * 即时音效：不在每个工具组件里各调一次，而是统一听快照变化。
  * 好处是 toolkit-ui 保持"纯 UI 不依赖 platform"，新增工具也不用再接线。
@@ -451,6 +399,8 @@ function dismissGuide(): void {
 let lastUsageTotal = 0;
 let lastRunId: string | null = null;
 watch(liveSnapshot, (snapshot) => {
+  // 玩家一动手就撤掉上一次的"操作被拒"消息，避免它粘在屏幕上。
+  if (snapshot && actionError.value !== null) actionError.value = null;
   if (!snapshot || settings.muted) return;
   const total = usageTotal(snapshot);
   if (total > lastUsageTotal) platform.audio.play('tap');
@@ -537,56 +487,12 @@ watch(completed, async (value) => {
         class="relative min-h-[38vh] flex-1 min-w-0 border-b border-grid bg-paper lg:min-h-0 lg:border-b-0 lg:border-r"
       >
         <div ref="canvasHost" data-testid="level-canvas" class="game-host h-full w-full" />
-        <GuideBubble
-          v-if="guideVisible"
-          :title="t('level.hintTitle')"
-          :step="guideText"
-          :index="guideStep"
-          :total="steps.length"
-          :next-label="guideStep >= steps.length - 1 ? t('level.guideStart') : t('level.guideNext')"
-          :skip-label="t('level.guideSkip')"
-          @next="advanceGuide"
-          @dismiss="dismissGuide"
-        />
       </section>
 
       <aside
         class="flex min-h-0 w-full flex-col"
         :class="module?.manifest.hasCanvas ? 'lg:w-[420px] lg:flex-none' : ''"
       >
-        <!-- 进度条：把"还差几步"变成看得见的进度，替代清单式报错 -->
-        <div
-          v-if="steps.length > 0"
-          data-testid="level-progress"
-          class="flex shrink-0 items-center gap-2 border-b border-grid bg-paper px-3 py-1"
-        >
-          <p class="shrink-0 text-[11px] font-bold text-ink-soft">{{ t('level.progressDone', { done: doneSteps, total: steps.length }) }}</p>
-          <ol class="flex min-w-0 flex-1 gap-1">
-            <li
-              v-for="step in steps"
-              :key="step.id"
-              :data-testid="'level-step-' + step.id"
-              class="h-1.5 min-w-0 flex-1 rounded-full"
-              :class="step.done ? 'bg-teal' : 'bg-grid'"
-              :title="step.label"
-            />
-          </ol>
-          <p class="shrink-0 text-[11px] font-semibold text-teal">{{ t('level.progress', { n: Math.min(doneSteps + 1, steps.length), total: steps.length }) }}</p>
-        </div>
-
-        <GuideBubble
-          v-if="guideVisible && !module?.manifest.hasCanvas"
-          variant="inline"
-          :title="t('level.hintTitle')"
-          :step="guideText"
-          :index="guideStep"
-          :total="steps.length"
-          :next-label="guideStep >= steps.length - 1 ? t('level.guideStart') : t('level.guideNext')"
-          :skip-label="t('level.guideSkip')"
-          @next="advanceGuide"
-          @dismiss="dismissGuide"
-        />
-
         <!-- 失败提示：移出滚动容器，钉在工具面板上方，永远不会被滚出视野 -->
         <div
           v-if="failureCopy"
@@ -596,6 +502,16 @@ watch(completed, async (value) => {
         >
           <p class="text-sm font-bold text-red">{{ failureCopy.message }}</p>
           <p v-if="failureCopy.hint" class="mt-0.5 text-xs text-ink-soft">{{ failureCopy.hint }}</p>
+        </div>
+
+        <!-- 运行时拒绝操作时的消息：以前只播一声"重试"，玩家看不到原因（例如"还差一块"） -->
+        <div
+          v-else-if="actionError"
+          data-testid="action-error"
+          role="alert"
+          class="shrink-0 border-b border-red/40 bg-red/10 px-3 py-2"
+        >
+          <p class="text-sm font-bold text-red">{{ actionError }}</p>
         </div>
 
         <div ref="host" data-testid="level-dock" class="min-h-0 flex-1 overflow-y-auto p-2.5">
@@ -622,16 +538,6 @@ watch(completed, async (value) => {
             class="flex flex-wrap gap-2"
             :class="module?.manifest.hasCanvas ? '' : 'mx-auto w-full max-w-3xl'"
           >
-            <button
-              v-if="module?.manifest.runEnabled !== false"
-              type="button"
-              data-testid="level-run"
-              class="min-h-12 flex-1 whitespace-nowrap rounded-2xl bg-brass px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-50"
-              :disabled="actionPending || completed"
-              @click="run"
-            >
-              {{ t('level.run') }}
-            </button>
             <button
               type="button"
               data-testid="level-submit"

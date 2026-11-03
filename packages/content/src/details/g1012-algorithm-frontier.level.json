@@ -12,8 +12,8 @@
   "tools": [
     {
       "kind": "construct",
-      "titleKey": "tool.construct.title",
-      "descriptionKey": "tool.construct.desc",
+      "titleKey": "tool.construct.frontier.title",
+      "descriptionKey": "tool.construct.frontier.desc",
       "requiredArtifacts": [
         "frontier"
       ],

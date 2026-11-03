@@ -12,8 +12,8 @@
   "tools": [
     {
       "kind": "construct",
-      "titleKey": "tool.construct.title",
-      "descriptionKey": "tool.construct.desc",
+      "titleKey": "tool.construct.distribution.title",
+      "descriptionKey": "tool.construct.distribution.desc",
       "requiredArtifacts": [
         "distribution"
       ],
