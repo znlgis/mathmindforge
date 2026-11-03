@@ -85,13 +85,13 @@ describe('关卡内容引用的文案 key 在英文下可解析', () => {
 describe('createTranslator', () => {
   it('插值替换 {name} 形式的参数', () => {
     const t = createTranslator('zh-CN');
-    expect(t.t('pattern.inspected', { n: 3 })).toBe('已经观察 3 格');
-    expect(createTranslator('en').t('pattern.inspected', { n: 3 })).toBe('Inspected 3 cells');
+    expect(t.t('forge.group', { done: 3, total: 5 })).toBe('3 / 5 关');
+    expect(createTranslator('en').t('forge.group', { done: 3, total: 5 })).toBe('3 / 5 done');
   });
 
   it('缺少插值参数时保留占位符，不渲染成 undefined', () => {
-    expect(createTranslator('zh-CN').t('pattern.inspected')).toContain('{n}');
-    expect(createTranslator('en').t('pattern.inspected')).not.toContain('undefined');
+    expect(createTranslator('zh-CN').t('badges.progress')).toContain('{current}');
+    expect(createTranslator('en').t('badges.progress')).not.toContain('undefined');
   });
 
   it('未知 key 原样返回，不抛错也不白屏', () => {

@@ -117,6 +117,8 @@ export const zhSourceEn: Record<string, string> = {
   '不变量要在旋转后的棋盘上也成立。': 'The invariant must also hold on the rotated board.',
   '先真的铺一块试试': 'Actually place a tile first',
   '统计黑白格或总格数': 'Count black/white cells or total cells',
+  '在论证板上点一条依据': 'Pick one warrant on the argument board',
+  '点下面的「完成」': 'Press the Finish button below',
   '把证据挂到论证上': 'Attach the evidence to the argument',
   '提交论证证书': 'Submit the argument certificate',
 

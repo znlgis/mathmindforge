@@ -81,19 +81,19 @@
       "id": "counts",
       "phase": "observe",
       "require": "probe/sample >= 1",
-      "descriptionKey": "统计黑白格或总格数"
+      "descriptionKey": "在论证板上点一条依据"
     },
     {
       "id": "warrant",
       "phase": "argue",
       "require": "argue/setWarrant >= 1",
-      "descriptionKey": "把证据挂到论证上"
+      "descriptionKey": "在论证板上点一条依据"
     },
     {
       "id": "commit",
       "phase": "generalize",
       "require": "argue/commit >= 1",
-      "descriptionKey": "提交论证证书"
+      "descriptionKey": "点下面的「完成」"
     }
   ],
   "solutions": [
