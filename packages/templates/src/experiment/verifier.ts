@@ -1,5 +1,6 @@
 import type { LevelAction, LevelDetail, LevelRuntime, RuntimeOptions, Verdict } from '@mmf/game-kit';
 import type { RuntimeVariant } from '../shared/types';
+import { scriptForVariant } from '../shared/variant-script';
 import * as experiment from './logic';
 import { samplingScriptSchema, validateSamplingArtifact } from './sampling';
 import { createSamplingRuntime } from './sampling-runtime';
@@ -31,7 +32,10 @@ export const experimentVerifier = {
   },
   validateArtifact(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict {
     if (isSampling(detail)) {
-      const result = validateSamplingArtifact(samplingScriptSchema.parse(detail.levelScript), artifact);
+      const result = validateSamplingArtifact(
+        scriptForVariant(detail, variant, (input) => samplingScriptSchema.parse(input)),
+        artifact,
+      );
       return {
         passed: result.passed,
         stamps: result.passed ? (variant.id === 'base' ? ['constraint'] : ['constraint', 'transfer']) : [],
@@ -46,7 +50,10 @@ export const experimentVerifier = {
       };
     }
     if (isInference(detail)) {
-      const result = validateInferenceArtifact(inferenceScriptSchema.parse(detail.levelScript), artifact);
+      const result = validateInferenceArtifact(
+        scriptForVariant(detail, variant, (input) => inferenceScriptSchema.parse(input)),
+        artifact,
+      );
       return {
         passed: result.passed,
         stamps: result.passed ? (variant.id === 'base' ? ['argument'] : ['argument', 'transfer']) : [],

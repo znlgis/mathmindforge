@@ -25,7 +25,7 @@ async function sample(): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'probe/sample', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }

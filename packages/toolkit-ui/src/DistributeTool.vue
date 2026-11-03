@@ -69,7 +69,7 @@ async function add(containerIndex: number, itemId: string): Promise<void> {
       type: 'construct/place',
       payload: { piece: { id: 'dist-' + Date.now() + '-' + Math.random().toString(16).slice(2, 6), shape: itemId, x: containerIndex, y: 0 } },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -109,6 +109,7 @@ async function remove(containerIndex: number, itemId: string): Promise<void> {
               <button
                 type="button"
                 :data-testid="'dist-minus-' + index + '-' + item.id"
+                :aria-label="'从' + container.label + '拿掉一个' + item.label"
                 :disabled="busy || count(index, item.id) === 0"
                 class="h-8 w-8 rounded-lg bg-card text-sm font-black disabled:opacity-30"
                 @click="remove(index, item.id)"
@@ -119,6 +120,7 @@ async function remove(containerIndex: number, itemId: string): Promise<void> {
               <button
                 type="button"
                 :data-testid="'dist-plus-' + index + '-' + item.id"
+                :aria-label="'往' + container.label + '放一个' + item.label"
                 :disabled="busy"
                 class="h-8 w-8 rounded-lg bg-card text-sm font-black disabled:opacity-30"
                 @click="add(index, item.id)"

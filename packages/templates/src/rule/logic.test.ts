@@ -253,3 +253,28 @@ describe('rule verifier', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
+
+describe('shared runtime bookkeeping', () => {
+  it('keeps run ids unique after the 10-run window fills up', async () => {
+    const runtime = runtimeAt();
+    await runtime.autoplay();
+    const ids: string[] = [];
+    for (let index = 0; index < 12; index += 1) {
+      const result = await runtime.dispatch({ type: 'run', payload: {} });
+      expect(result.ok).toBe(true);
+      ids.push(runtime.snapshot().lastRun?.id ?? '');
+    }
+    // runs 只留最近 10 条；id 若按数组长度生成，第 11 次起会重复成 run-11。
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('keeps an old snapshot tool usage untouched by later actions', async () => {
+    const runtime = runtimeAt();
+    const before = runtime.snapshot();
+    expect(before.toolUsage.rule.used).toBe(0);
+    await runtime.dispatch({ type: 'rule/place', payload: { block: { id: 'a', op: 'forward' }, at: 0 } });
+    expect(runtime.snapshot().toolUsage.rule.used).toBe(1);
+    // 快照语义是浅拷贝：拿到的用量不能被后续动作改写。
+    expect(before.toolUsage.rule.used).toBe(0);
+  });
+});

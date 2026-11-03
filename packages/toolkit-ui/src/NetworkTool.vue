@@ -55,7 +55,7 @@ async function toggle(edgeId: string): Promise<void> {
     const result = selected.value.has(edgeId)
       ? await props.runtime.dispatch({ type: 'construct/remove', payload: { pieceId: edgeId } })
       : await props.runtime.dispatch({ type: 'construct/place', payload: { piece: { id: edgeId, shape: edgeId, x: 0, y: 0 } } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }

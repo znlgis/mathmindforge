@@ -1,6 +1,8 @@
-import type { BadgeId, EvidenceDraft, EvidenceEvent, SaveData, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
+import type {
+  BadgeId, EvidenceDraft, EvidenceEvent, SaveData, ShippedLevelId, StampId, ToolId,
+} from '@mmf/game-kit';
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { shallowRef } from 'vue';
 import { progressManager } from '../shell/progress';
 import { setDebugSave } from '../shell/debug';
 
@@ -15,10 +17,12 @@ export interface CompletionInput {
 }
 
 export const useProgress = defineStore('progress', () => {
-  const save = ref<SaveData | null>(null);
-  const ready = ref(false);
-  const evidence = ref<EvidenceEvent[]>([]);
-  const initError = ref<string | null>(null);
+  // 存档与证据是整棵替换的快照，不能放进深层 reactive（docs/02 §19-10）：
+  // 每次 sync 都会换新对象，shallowRef 就足够触发视图更新。
+  const save = shallowRef<SaveData | null>(null);
+  const ready = shallowRef(false);
+  const evidence = shallowRef<EvidenceEvent[]>([]);
+  const initError = shallowRef<string | null>(null);
   let inflight: Promise<void> | null = null;
 
   function sync(): void {

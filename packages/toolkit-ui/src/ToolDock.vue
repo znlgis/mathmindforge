@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
         :t="translator"
       />
       <PaymentTool
-        v-if="spec.kind === 'construct' && spec.config.mode === 'payment'"
+        v-else-if="spec.kind === 'construct' && spec.config.mode === 'payment'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"

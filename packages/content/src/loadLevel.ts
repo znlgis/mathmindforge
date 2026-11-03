@@ -29,6 +29,13 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'g1012-algorithm-frontier': () => import('./details/g1012-algorithm-frontier.level.json'),
 };
 
+/**
+ * 只对已发布关卡建 loader；未发布 / 未知 id 返回 null，调用方回星图，不白屏。
+ *
+ * locale 目前不影响返回值：详情里的英文是内联字段（titleEn / introEn / …），
+ * 由 localize.ts 的 localizedDetail 按 locale 取值。保留参数是为了将来真的改成
+ * "英文补丁单独 chunk"时，外壳不用改签名（docs/02 §7.3 的方案）。
+ */
 export async function loadLevel(
   id: ShippedLevelId,
   _locale: Locale = 'zh-CN',
@@ -38,7 +45,9 @@ export async function loadLevel(
   const loader = LOADERS[id];
   if (!loader) return null;
   const raw = (await loader()) as { default?: unknown } | unknown;
-  const detail = (raw && typeof raw === 'object' && 'default' in raw ? raw.default : raw) as LevelDetail;
+  const detail = (raw && typeof raw === 'object' && 'default' in raw ? raw.default : raw) as LevelDetail | null;
+  // 动态 import 正常不会给 null；真给了也要报清楚的错，而不是 TypeError: cannot read 'id' of null。
+  if (!detail) throw new Error('关卡详情为空：' + id);
   if (detail.id !== id) throw new Error('关卡详情 id 不一致：' + id);
   return detail;
 }

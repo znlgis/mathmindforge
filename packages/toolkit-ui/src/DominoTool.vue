@@ -7,6 +7,13 @@ type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
 type ConstructSpec = Extract<ToolSpecLike, { kind: 'construct' }>;
 
+/** 同一毫秒内连点两格时 Date.now() 会重复，两块骨牌共用一个 id，删一块会连坐另一块。 */
+let dominoSerial = 0;
+function nextDominoId(): string {
+  dominoSerial += 1;
+  return 'domino-' + dominoSerial;
+}
+
 interface BoardConfig {
   width: number;
   height: number;
@@ -64,6 +71,14 @@ function cellTestId(x: number, y: number): string {
   return 'domino-cell-' + x + '-' + y;
 }
 
+/** 格子按钮的内容只有空 / ▭ / ×，屏幕阅读器读不出坐标与状态，这里补可访问名。 */
+function cellLabel(cell: { x: number; y: number; removed: boolean; occupied: string | null }): string {
+  const position = '第 ' + (cell.y + 1) + ' 行第 ' + (cell.x + 1) + ' 列';
+  if (cell.removed) return position + '：缺口';
+  if (cell.occupied) return position + '：已有骨牌';
+  return position;
+}
+
 async function placeBetween(a: { x: number; y: number }, b: { x: number; y: number }): Promise<void> {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -79,9 +94,9 @@ async function placeBetween(a: { x: number; y: number }, b: { x: number; y: numb
     const y = Math.min(a.y, b.y);
     const result = await props.runtime.dispatch({
       type: 'construct/place',
-      payload: { piece: { id: 'domino-' + Date.now(), shape, x, y } },
+      payload: { piece: { id: nextDominoId(), shape, x, y } },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
     else selected.value = null;
   } finally {
     busy.value = false;
@@ -104,8 +119,10 @@ async function clickCell(x: number, y: number): Promise<void> {
 async function remove(id: string): Promise<void> {
   if (busy.value) return;
   busy.value = true;
+  error.value = null;
   try {
-    await props.runtime.dispatch({ type: 'construct/remove', payload: { pieceId: id } });
+    const result = await props.runtime.dispatch({ type: 'construct/remove', payload: { pieceId: id } });
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -122,6 +139,8 @@ async function remove(id: string): Promise<void> {
           :key="cell.x + '-' + cell.y"
           type="button"
           :data-testid="cellTestId(cell.x, cell.y)"
+          :aria-label="cellLabel(cell)"
+          :aria-pressed="cell.selected"
           :disabled="cell.removed || busy"
           class="h-10 w-10 rounded-lg border text-xs font-bold active:scale-95 disabled:opacity-30"
           :class="cell.removed

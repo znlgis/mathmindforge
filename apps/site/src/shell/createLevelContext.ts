@@ -6,7 +6,8 @@ import { recordDebugEvent } from './debug';
 
 export interface LevelHostHooks {
   onExit: (reason?: 'quit' | 'replay') => void;
-  onEvent: <K extends keyof LevelEventMap>(type: K, payload: LevelEventMap[K]) => void;
+  /** 宿主额外消费事件；调试桥的事件统一在下方 emit 里记录，避免同一条事件写两次。 */
+  onEvent?: <K extends keyof LevelEventMap>(type: K, payload: LevelEventMap[K]) => void;
 }
 
 export function readDebugOptions(): DebugOptions | undefined {
@@ -54,7 +55,7 @@ export function createLevelContext(input: {
     debug: input.debug,
     emit(type, payload) {
       recordDebugEvent(String(type));
-      input.hooks.onEvent(type, payload);
+      input.hooks.onEvent?.(type, payload);
     },
     requestExit(reason) {
       input.hooks.onExit(reason);

@@ -18,16 +18,16 @@ const titleOf = computed<Record<string, string>>(() => {
   return map;
 });
 
-const entries = computed(() => [...(progress.save?.journal ?? [])].reverse().slice(0, 20));
+/** 最近 120 条回放（docs/02 §10.1）；再往前的记录留在证据库里，不被日志页淹没。 */
+const entries = computed(() => [...(progress.save?.journal ?? [])].reverse().slice(0, 120));
 const trail = computed(() => localizeTrail(
   buildTrail(progress.save ?? emptySave(0), progress.evidence, LEVEL_SUMMARIES, 80),
   LEVEL_SUMMARIES,
   locale.value,
 ));
 
-
 function formatDate(at: number): string {
-  return new Date(at).toLocaleString('zh-CN', {
+  return new Date(at).toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
   });
 }
@@ -57,10 +57,25 @@ onMounted(async () => {
     <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div>
         <h2 class="text-lg font-bold">回放</h2>
-        <div v-if="entries.length === 0" class="mt-3 rounded-2xl border border-grid bg-card p-6 text-sm text-ink-soft">
+        <div
+          v-if="!progress.ready"
+          data-testid="journal-loading"
+          class="mt-3 rounded-2xl border border-grid bg-card p-6 text-sm text-ink-soft"
+          role="status"
+        >
+          正在读取本机记录…
+        </div>
+        <div
+          v-else-if="entries.length === 0"
+          data-testid="journal-empty"
+          class="mt-3 rounded-2xl border border-grid bg-card p-6 text-sm text-ink-soft"
+        >
           还没有日志。完成一关后，这里会出现你的"失败→修改→通过"回放。
         </div>
-        <ul v-else class="mt-3 flex flex-col gap-3">
+        <p v-if="progress.initError" data-testid="journal-save-error" role="alert" class="mt-3 text-xs font-bold text-red">
+          存档读取失败，本次显示的是空记录。
+        </p>
+        <ul v-else-if="entries.length > 0" class="mt-3 flex flex-col gap-3">
           <li
             v-for="entry in entries"
             :key="entry.id"

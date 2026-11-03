@@ -171,15 +171,16 @@ function createKvBackend(): KvBackend {
 
   return {
     async read(key: string): Promise<unknown> {
+      // 内存副本永远比 IndexedDB 新：本会话写过就以此为准，避免写盘失败后读回旧值。
+      if (memory.has(key)) return memory.get(key);
       const db = await openDb();
-      if (!db) return memory.has(key) ? memory.get(key) : null;
+      if (!db) return null;
       try {
         const tx = db.transaction(MMF_KV_STORE, 'readonly');
         const value = await requestAsPromise(tx.objectStore(MMF_KV_STORE).get(key));
-        if (value !== undefined) return value;
-        return memory.has(key) ? memory.get(key) : null;
+        return value === undefined ? null : value;
       } catch {
-        return memory.has(key) ? memory.get(key) : null;
+        return null;
       }
     },
 
@@ -222,6 +223,49 @@ function createProgressStore(kv: KvBackend): ProgressStore {
   };
 }
 
+/** 按时间升序稳定排序：同 at 的事件保持写入顺序。 */
+function sortByTime(events: EvidenceEvent[]): EvidenceEvent[] {
+  return events.sort((a, b) => a.at - b.at);
+}
+
+/**
+ * 把被裁掉的事件计数并入聚合（docs/02 §8.3、§8.4）：
+ * 清理日志只影响能回看的明细，不影响历史计数，报告/徽章不会倒退。
+ * 平台包不能依赖 evidence（依赖图见 docs/02 §3.1），所以这里保留一份最小实现。
+ */
+function accumulateAggregate(
+  base: EvidenceAggregate,
+  events: readonly EvidenceEvent[],
+): EvidenceAggregate {
+  const next: EvidenceAggregate = {
+    total: base.total,
+    byLevel: { ...base.byLevel },
+    byTool: { ...base.byTool },
+    byPhase: { ...base.byPhase },
+    byFailure: { ...base.byFailure },
+    lastAggregatedAt: base.lastAggregatedAt,
+  };
+  for (const event of events) {
+    next.total += 1;
+    if (typeof event.levelId === 'string' && event.levelId.length > 0) {
+      next.byLevel[event.levelId] = (next.byLevel[event.levelId] ?? 0) + 1;
+    }
+    if (typeof event.tool === 'string' && event.tool.length > 0) {
+      next.byTool[event.tool] = (next.byTool[event.tool] ?? 0) + 1;
+    }
+    if (typeof event.phase === 'string' && event.phase.length > 0) {
+      next.byPhase[event.phase] = (next.byPhase[event.phase] ?? 0) + 1;
+    }
+    if (typeof event.failureClass === 'string' && event.failureClass.length > 0) {
+      next.byFailure[event.failureClass] = (next.byFailure[event.failureClass] ?? 0) + 1;
+    }
+    if (Number.isFinite(event.at) && event.at > next.lastAggregatedAt) {
+      next.lastAggregatedAt = Math.trunc(event.at);
+    }
+  }
+  return next;
+}
+
 /** 证据库：append-only；裁剪到 3000 条；读写串行化，避免并发 append 丢更新。 */
 function createEvidenceStore(kv: KvBackend): EvidenceStore {
   let queue: Promise<unknown> = Promise.resolve();
@@ -239,15 +283,41 @@ function createEvidenceStore(kv: KvBackend): EvidenceStore {
     return normalizeRecord(await kv.read(EVIDENCE_KEY));
   }
 
+  function readAggregate(): Promise<EvidenceAggregate> {
+    return kv
+      .read(AGGREGATE_KEY)
+      .then((raw) => normalizeAggregate(raw) ?? emptyAggregate());
+  }
+
   return {
     append(events: EvidenceEvent[]): Promise<void> {
       if (events.length === 0) return Promise.resolve();
       return enqueue(async () => {
         const record = await readRecord();
-        const merged = [...(record?.events ?? []), ...events];
-        const trimmed = merged.slice(-MAX_EVIDENCE_EVENTS);
-        const next: EvidenceRecord = { version: 1, events: trimmed };
-        await kv.write(EVIDENCE_KEY, next);
+        const existing = record?.events ?? [];
+        // id 判重：失败重试（外层会把批次回灌队列）不会把仍在记录里的同一事件写两遍。
+        // 注意：已被裁剪掉的旧 id 不再留存，这里无法也没有必要再判重。
+        const known = new Set(existing.map((event) => event.id));
+        const fresh: EvidenceEvent[] = [];
+        for (const event of events) {
+          if (!isEvidenceEvent(event) || known.has(event.id)) continue;
+          known.add(event.id);
+          fresh.push(event);
+        }
+        if (fresh.length === 0) return;
+
+        // 先按时间排好再裁剪，时钟抖动导致的乱序写入也不会把"最新"当"最旧"删掉。
+        const merged = sortByTime([...existing, ...fresh]);
+        const overflow = Math.max(0, merged.length - MAX_EVIDENCE_EVENTS);
+        const removed = overflow > 0 ? merged.slice(0, overflow) : [];
+        const kept = overflow > 0 ? merged.slice(-MAX_EVIDENCE_EVENTS) : merged;
+        await kv.write(EVIDENCE_KEY, { version: 1, events: kept } satisfies EvidenceRecord);
+
+        if (removed.length > 0) {
+          // 先写明细再写聚合：万一中途掉电，最坏是丢计数，而不是重复计数。
+          const aggregate = await readAggregate();
+          await kv.write(AGGREGATE_KEY, accumulateAggregate(aggregate, removed));
+        }
       });
     },
 
@@ -257,7 +327,8 @@ function createEvidenceStore(kv: KvBackend): EvidenceStore {
       return enqueue(async () => {
         const record = await readRecord();
         const events = record?.events ?? [];
-        return events.slice(-cap).reverse();
+        // 兼容历史实现写入的乱序记录：按时间取最近 cap 条，最新在前。
+        return sortByTime([...events]).slice(-cap).reverse();
       });
     },
 
@@ -265,8 +336,9 @@ function createEvidenceStore(kv: KvBackend): EvidenceStore {
       return enqueue(readRecord);
     },
 
-    async loadAggregate(): Promise<EvidenceAggregate> {
-      return normalizeAggregate(await kv.read(AGGREGATE_KEY)) ?? emptyAggregate();
+    loadAggregate(): Promise<EvidenceAggregate> {
+      // 入队：等正在进行的 append/裁剪落定后再读，避免读到裁剪前的聚合。
+      return enqueue(readAggregate);
     },
 
     saveAggregate(aggregate: EvidenceAggregate): Promise<void> {

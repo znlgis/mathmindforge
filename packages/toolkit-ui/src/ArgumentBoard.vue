@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { Translator } from '@mmf/i18n';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
 type ArgueScriptView = {
@@ -26,6 +26,14 @@ const scope = ref('');
 const busy = ref(false);
 const error = ref<string | null>(null);
 
+// 重玩（runtime.reset）或提交后，快照里的论证是唯一事实来源：下拉跟着回填，
+// 否则重玩后还显示上一轮的选择，和运行时里的空论证对不上。
+watch(argument, (next) => {
+  claim.value = next?.claim ?? '';
+  warrant.value = next?.warrant ?? '';
+  scope.value = next?.scope ?? '';
+});
+
 const CLAIM_LABELS: Record<string, string> = {
   impossible: '不可能铺满',
   possible: '可以铺满',
@@ -48,16 +56,13 @@ async function dispatch(type: 'argue/setClaim' | 'argue/setWarrant' | 'argue/set
   busy.value = true;
   error.value = null;
   try {
-    if (type === 'argue/setClaim') {
-      claim.value = value;
-      await props.runtime.dispatch({ type, payload: { claim: value } });
-    } else if (type === 'argue/setWarrant') {
-      warrant.value = value;
-      await props.runtime.dispatch({ type, payload: { warrant: value } });
-    } else {
-      scope.value = value;
-      await props.runtime.dispatch({ type, payload: { scope: value } });
-    }
+    const result = type === 'argue/setClaim'
+      ? await props.runtime.dispatch({ type, payload: { claim: value } })
+      : type === 'argue/setWarrant'
+        ? await props.runtime.dispatch({ type, payload: { warrant: value } })
+        : await props.runtime.dispatch({ type, payload: { scope: value } });
+    // 下拉显示的值由快照回填（见下面的 watch）；失败必须报出来，不能悄悄留着旧选择。
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -69,7 +74,7 @@ async function attach(): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'argue/attachEvidence', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -81,7 +86,7 @@ async function commit(): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'argue/commit', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -98,6 +103,7 @@ async function commit(): Promise<void> {
         主张
         <select
           data-testid="argue-claim"
+          :disabled="busy"
           class="min-h-11 rounded-xl border border-grid bg-paper px-3 text-sm font-semibold"
           :value="claim || argument?.claim || ''"
           @change="dispatch('argue/setClaim', ($event.target as HTMLSelectElement).value)"
@@ -111,6 +117,7 @@ async function commit(): Promise<void> {
         依据
         <select
           data-testid="argue-warrant"
+          :disabled="busy"
           class="min-h-11 rounded-xl border border-grid bg-paper px-3 text-sm font-semibold"
           :value="warrant || argument?.warrant || ''"
           @change="dispatch('argue/setWarrant', ($event.target as HTMLSelectElement).value)"
@@ -144,6 +151,7 @@ async function commit(): Promise<void> {
         适用范围
         <select
           data-testid="argue-scope"
+          :disabled="busy"
           class="min-h-11 rounded-xl border border-grid bg-paper px-3 text-sm font-semibold"
           :value="scope || argument?.scope || ''"
           @change="dispatch('argue/setScope', ($event.target as HTMLSelectElement).value)"

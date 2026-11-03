@@ -50,7 +50,7 @@ async function assign(lessonId: string, slotId: string): Promise<void> {
       type: 'construct/place',
       payload: { piece: { id: lessonId, shape: lessonId, x: index, y: 0 } },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -74,6 +74,7 @@ async function assign(lessonId: string, slotId: string): Promise<void> {
           </div>
           <select
             :data-testid="'schedule-select-' + lesson.id"
+            :aria-label="'给「' + lesson.label + '」选时段'"
             class="min-h-10 rounded-xl border border-grid bg-card px-2 text-xs font-semibold"
             :value="slotOf(lesson.id)"
             @change="assign(lesson.id, ($event.target as HTMLSelectElement).value)"

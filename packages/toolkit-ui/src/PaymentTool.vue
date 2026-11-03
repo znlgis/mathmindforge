@@ -53,7 +53,7 @@ async function addCoin(entry: PaletteEntry): Promise<void> {
         },
       },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -68,7 +68,7 @@ async function removeCoin(piece: PiecePlacementInput): Promise<void> {
       type: 'construct/remove',
       payload: { pieceId: piece.id },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -85,7 +85,7 @@ async function clearCoins(): Promise<void> {
         payload: { pieceId: piece.id },
       });
       if (!result.ok) {
-        error.value = result.message ?? null;
+        error.value = result.message ? translate(result.message) : null;
         return;
       }
     }

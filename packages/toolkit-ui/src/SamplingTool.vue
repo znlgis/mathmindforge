@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ClaimInput, LevelAction, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { Translator } from '@mmf/i18n';
+import { wilsonInterval } from '@mmf/toolkit/shared';
 import { computed, ref } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
@@ -23,21 +24,12 @@ const sizes = computed(() => props.spec.config.sampleSizes ?? [20]);
 const busy = ref(false);
 const error = ref<string | null>(null);
 
-function wilson(successes: number, n: number): [number, number] {
-  if (n <= 0) return [0, 1];
-  const z = 1.96;
-  const p = successes / n;
-  const denominator = 1 + z * z / n;
-  const center = (p + z * z / (2 * n)) / denominator;
-  const margin = (z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / denominator;
-  return [Math.max(0, center - margin), Math.min(1, center + margin)];
-}
-
 const stats = computed(() => {
   if (total.value <= 0) return null;
   const p = red.value / total.value;
-  const [low, high] = wilson(red.value, total.value);
-  return { p, low, high };
+  // 与 SampleTool 共用 toolkit 的 Wilson 实现：各写一份，区间口径早晚会漂移。
+  const interval = wilsonInterval(red.value, total.value);
+  return { p, low: interval.low, high: interval.high };
 });
 
 function percent(value: number): string {
@@ -50,7 +42,7 @@ async function sample(n: number): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'probe/sample', payload: { n } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -59,8 +51,10 @@ async function sample(n: number): Promise<void> {
 async function clear(): Promise<void> {
   if (busy.value) return;
   busy.value = true;
+  error.value = null;
   try {
-    await props.runtime.dispatch({ type: 'probe/clear', payload: {} });
+    const result = await props.runtime.dispatch({ type: 'probe/clear', payload: {} });
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -81,7 +75,7 @@ async function submitClaim(): Promise<void> {
     };
     const action: LevelAction = { type: 'probe/claim', payload: { claim: claimInput } };
     const result = await props.runtime.dispatch(action);
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }

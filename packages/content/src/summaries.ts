@@ -1,4 +1,4 @@
-import type { Locale } from './ids';
+import type { Locale, ShippedLevelId } from './ids';
 import { SHIPPED_LEVEL_IDS } from './ids';
 import type { LevelSummary } from './schema';
 
@@ -24,10 +24,13 @@ import g79AlgorithmSchedule from './levels/g79-algorithm-schedule.json';
 import g1012AlgorithmFrontier from './levels/g1012-algorithm-frontier.json';
 
 /**
- * 摘要表：只静态加载已发布关卡。M0 只有一关；M1/M2 随 SHIPPED_LEVEL_IDS 增补。
+ * 摘要表：只静态加载已发布关卡，随 SHIPPED_LEVEL_IDS 增补。
  * 运行时不跑 zod（构建期由 content:check 校验），否则 zod 会进首屏。
+ *
+ * 键类型是 ShippedLevelId 而不是 string：少登记一关 typecheck 就报，
+ * 不用等到运行时才由下面的 throw 兜底。
  */
-const RAW: Record<string, unknown> = {
+const RAW: Record<ShippedLevelId, unknown> = {
   'k-structure-pattern-path': kPatternPath,
   'k-data-tally': kDataTally,
   'g13-algorithm-route': g13Route,
@@ -59,14 +62,27 @@ export const LEVEL_SUMMARIES: readonly LevelSummary[] = SHIPPED_LEVEL_IDS.map((i
 
 const byId = new Map<LevelSummary['id'], LevelSummary>(LEVEL_SUMMARIES.map((s) => [s.id, s]));
 
+/**
+ * 未发布 / 未知 id 一律返回 undefined（调用方回星图，不白屏）。
+ * 入参保留 string：路由参数是 string，这里做一次收窄即可，不必让调用方先断言。
+ *
+ * locale 目前不影响返回值：摘要的英文是内联字段（titleEn / thinkingTargetEn），
+ * 由 localize.ts 的 localizedSummary 按 locale 取值。保留参数是为了将来
+ * 真的改成"英文补丁单独 chunk"时，外壳不用改签名（docs/02 §7.2 的方案）。
+ */
 export function getLevelSummary(id: string, _locale: Locale = 'zh-CN'): LevelSummary | undefined {
   return byId.get(id as LevelSummary['id']);
 }
 
+/** 同上：locale 只影响 localize 取值，这里返回完整摘要让调用方自己本地化。 */
 export function levelSummaries(_locale: Locale = 'zh-CN'): readonly LevelSummary[] {
   return LEVEL_SUMMARIES;
 }
 
+/**
+ * 摘要随模块静态打包，没有异步要等的东西。
+ * 保留接口是为了外壳"先 await 内容再渲染"的纪律（docs/02 §12 第 2 条）。
+ */
 export async function ensureSummaries(_locale: Locale): Promise<void> {
-  // M0 只有中文内容；英文补丁在 v0.9 接入。保留接口，避免外壳改签名。
+  // 无操作：摘要已在模块加载时全部就位。
 }

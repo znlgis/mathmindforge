@@ -131,17 +131,21 @@ export function actionsFor(
   artifact: unknown,
 ): import('@mmf/game-kit').LevelAction[] {
   const candidate = artifact as {
-    patternRule: { tokens: string[]; period: number; transform: 'none' | 'mirror' | 'rotate' | 'shift' };
-    repair: { index: number; token: string }[];
-  };
+    patternRule?: { tokens?: unknown; period?: number; transform?: 'none' | 'mirror' | 'rotate' | 'shift' };
+    repair?: { index: number; token: string }[];
+  } | null;
+  // 产物缺失时给空动作表，交给 autoplay 统一报“还没有黄金解”，而不是在这里抛异常。
+  if (!candidate?.patternRule || !Array.isArray(candidate.patternRule.tokens)) return [];
+  const rule = candidate.patternRule as { tokens: string[]; period: number; transform: 'none' | 'mirror' | 'rotate' | 'shift' };
+  const repair = Array.isArray(candidate.repair) ? candidate.repair : [];
   const actions: import('@mmf/game-kit').LevelAction[] = [
     { type: 'pattern/inspect', payload: { index: 0 } },
     { type: 'pattern/inspect', payload: { index: 1 } },
     { type: 'pattern/inspect', payload: { index: 2 } },
-    { type: 'pattern/setCycle', payload: { cycle: candidate.patternRule.tokens, transform: candidate.patternRule.transform } },
+    { type: 'pattern/setCycle', payload: { cycle: rule.tokens, transform: rule.transform } },
     { type: 'pattern/commit', payload: {} },
   ];
-  for (const item of candidate.repair) {
+  for (const item of repair) {
     actions.push({
       type: 'construct/place',
       payload: {

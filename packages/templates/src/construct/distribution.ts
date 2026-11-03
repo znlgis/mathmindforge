@@ -73,18 +73,24 @@ export function validateArtifact(
   const containers = raw.distribution.containers;
   const totals: Record<string, number> = {};
   for (const item of script.items) totals[item.id] = 0;
+  // 容器里的件数按"本关登记的物品"重新数，不信任产物自报的 total：
+  // 否则多写一个未登记物品就能把 minKinds 凑够，或把 total 写小绕过容量上限。
+  const countedTotals: number[] = [];
   let any = false;
   for (const container of containers) {
-    any = any || container.total > 0;
-    if (container.total > script.constraints.maxPerContainer) {
-      return failure('distribution-overflow', MESSAGE['distribution-overflow'], container.id);
-    }
+    let counted = 0;
     for (const item of script.items) {
       const count = container.counts[item.id] ?? 0;
       totals[item.id] = (totals[item.id] ?? 0) + count;
+      counted += count;
+    }
+    countedTotals.push(counted);
+    any = any || counted > 0;
+    if (counted > script.constraints.maxPerContainer) {
+      return failure('distribution-overflow', MESSAGE['distribution-overflow'], container.id);
     }
     if (script.constraints.minKinds > 0) {
-      const kinds = Object.values(container.counts).filter((count) => count > 0).length;
+      const kinds = script.items.filter((item) => (container.counts[item.id] ?? 0) > 0).length;
       if (kinds < script.constraints.minKinds) {
         return failure('distribution-missing-kind', MESSAGE['distribution-missing-kind'], container.id);
       }
@@ -97,8 +103,8 @@ export function validateArtifact(
     }
   }
   if (script.constraints.equalCounts) {
-    const target = containers[0]?.total ?? 0;
-    if (containers.some((container) => container.total !== target)) {
+    const target = countedTotals[0] ?? 0;
+    if (countedTotals.some((total) => total !== target)) {
       return failure('distribution-unequal', MESSAGE['distribution-unequal']);
     }
   }

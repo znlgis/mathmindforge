@@ -65,7 +65,7 @@ async function focusMetrics(): Promise<void> {
   try {
     const action: LevelAction = { type: 'probe/focus', payload: { id: 'metrics-table' } };
     const result = await props.runtime.dispatch(action);
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }

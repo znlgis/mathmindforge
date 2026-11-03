@@ -21,6 +21,8 @@ interface RuntimeState {
   revision: number;
   phase: RunSnapshot['phase'];
   usage: Record<ToolId, ToolUsageState>;
+  /** 运行序号：runs 只保留最近 10 条，id 不能靠长度推（否则第 11 次起会重复）。 */
+  runSeq: number;
   startedAt: number;
 }
 
@@ -43,6 +45,7 @@ function initialState(now: number): RuntimeState {
     revision: 0,
     phase: 'idle',
     usage: emptyUsage(),
+    runSeq: 0,
     startedAt: now,
   };
 }
@@ -132,7 +135,10 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         },
         construct: { pieces },
       },
-      toolUsage: state.usage,
+      // 快照是浅拷贝：toolUsage 逐工具复制，避免监听方拿到的旧快照被后续动作改写。
+      toolUsage: Object.fromEntries(
+        Object.entries(state.usage).map(([tool, usage]) => [tool, { ...usage }]),
+      ) as Record<ToolId, ToolUsageState>,
       checkpoints: { ...state.checkpoints },
       runs: [...state.runs],
       lastRun: state.lastRun,
@@ -150,7 +156,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
 
   function addRun(outcome: 'pass' | 'fail', failureClass?: string): RunRecord {
     const record: RunRecord = {
-      id: 'run-' + (state.runs.length + 1),
+      id: 'run-' + (state.runSeq + 1),
       variantId: 'base',
       at: opts.now(),
       outcome,
@@ -158,6 +164,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
       artifactDigests: artifactSummaries().map((item) => item.digest),
       durationMs: Math.max(0, opts.now() - state.startedAt),
     };
+    state.runSeq += 1;
     state.runs = [...state.runs, record].slice(-10);
     state.lastRun = record;
     return record;

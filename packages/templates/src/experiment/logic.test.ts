@@ -261,4 +261,16 @@ describe('experiment template · duel', () => {
     expect(actions.some((action) => action.type === 'probe/sample')).toBe(true);
     expect(actions.at(-1)?.type).toBe('submit');
   });
+
+  it('rejects an out-of-range match count without re-running the whole simulation', () => {
+    // 旧实现只挡 n <= 0，1e9 这种产物会让重算卡死；超上限应直接按“没跑过”拒绝。
+    const artifact = {
+      params: { attack: 50, defense: 50, economy: 0 },
+      dataset: { n: 5001, wins: 5000, seed: 101 },
+      claim: { kind: 'stat', statistic: 'proportion', value: 0.85, n: 5001 },
+    };
+    const verdict = validateArtifact(winrateDetail, baseVariant, artifact);
+    expect(verdict.passed).toBe(false);
+    expect(verdict.failure?.class).toBe('exp-not-run');
+  });
 });

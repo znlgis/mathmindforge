@@ -38,6 +38,10 @@ function labelOf(id: string | undefined): string {
   return nodes.value.find((node) => node.id === id)?.label ?? id;
 }
 
+function edgeLabel(edge: { from: string; to: string }): string {
+  return labelOf(edge.from) + ' → ' + labelOf(edge.to);
+}
+
 async function setCost(edgeId: string, value: number): Promise<void> {
   if (busy.value) return;
   busy.value = true;
@@ -47,7 +51,7 @@ async function setCost(edgeId: string, value: number): Promise<void> {
       type: 'construct/place',
       payload: { piece: { id: edgeId, shape: edgeId, x: 0, y: value } },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -61,6 +65,7 @@ async function setCost(edgeId: string, value: number): Promise<void> {
       <p class="text-sm font-bold text-ink">{{ labelOf(edge.from) }} → {{ labelOf(edge.to) }}</p>
       <select
         :data-testid="'frontier-cost-' + edge.id"
+        :aria-label="edgeLabel(edge) + ' 的代价'"
         class="min-h-10 rounded-xl border border-grid bg-card px-2 text-xs font-semibold"
         :value="String(costs[edge.id] ?? edge.default)"
         @change="setCost(edge.id, Number(($event.target as HTMLSelectElement).value))"

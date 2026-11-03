@@ -6,7 +6,8 @@
   --color-card: #fffdf8;
   --color-cream: #efe4d2;
   --color-ink: #22303c;
-  --color-ink-soft: #5b6b78;
+  /* cream 上的对比度 4.91:1；旧值 #5b6b78 只有 4.37，AA 不达标 */
+  --color-ink-soft: #55636f;
   --color-blueprint: #1f4e6b;
   --color-brass: #b07d2b;
   --color-teal: #2f7d78;
@@ -59,7 +60,8 @@ button {
 
 
 @media print {
-  header,
+  /* 只藏外壳导航；报告页自己的 <header>（标题/署名/生成时间）要留在纸上 */
+  header.app-header,
   nav,
   .no-print {
     display: none !important;

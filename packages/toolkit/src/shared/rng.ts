@@ -20,6 +20,8 @@ export function hashString(input: string): number {
 }
 
 export function digest(value: unknown): string {
-  const text = JSON.stringify(value);
+  // JSON.stringify(undefined / 函数 / symbol) 返回 undefined 而不是字符串；
+  // 产物摘要来自玩家输入，缺字段是常态，这里退成空串，避免取 .length 时整次提交崩掉。
+  const text = JSON.stringify(value) ?? '';
   return hashString(text).toString(16).padStart(8, '0');
 }

@@ -13,13 +13,13 @@
 
 ---
 
-## 当前状态（M2b 进行中：argue + 结构不变量）
+## 当前状态（v1.0.0-rc.1：20/20 关可玩）
 
 **20 关可玩、6 个模板、6 件工具；证据 → 画像 → 徽章 → 日志/轨迹 → 报告已闭环**：
 
 - `k-structure-pattern-path` 模式修补匠（pattern）
 - `k-data-tally` 分类小站（experiment / tally）
-- `g13-algorithm-route` 规则工程师·路线（rule，无头自动通关；真实点击排期 M2b）
+- `g13-algorithm-route` 规则工程师·路线（rule）
 - `g46-algorithm-payment` 最少枚数支付（construct / payment + counter）
 - `g79-modeling-dispatch` 城市调度员（simulate + knob/probe）
 - `g1012-modeling-winrate` 胜率实验室（experiment / duel + knob/probe）
@@ -43,15 +43,20 @@
 ```bash
 pnpm install
 pnpm dev          # http://127.0.0.1:5192
-pnpm verify       # typecheck / lint / 120 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
+pnpm verify       # typecheck / lint / 322 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
 pnpm e2e          # 59 条：20 关 autoplay、20 关无工具失败、12 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
 ```
 
-实测（2026-11-03）：首屏 52.2 KB gzip，Phaser chunk 220.3 KB gzip，dist 1419.9 KB；`pnpm verify` 与 `pnpm e2e`（59 条）全绿。
+实测（2026-11-03，全面审查与收尾修复后）：首屏 65.5 KB gzip，Phaser chunk 220.3 KB gzip，dist 1467.1 KB；`pnpm verify`、`pnpm e2e`（59 条）与 `pnpm e2e:dist`（59 条，生产产物）全绿。
 
-已实现：workspace 基座、game-kit 契约、20 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、双语 UI、内容与证据/报告、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
+已实现：workspace 基座、game-kit 契约、20 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、双语 UI 与内容英文字段、证据/徽章/报告本地化、内容体检（含英文零中文与禁词分级）、反刷题审计（A1/A1b/A2–A6/A8 + autoplay 走通）、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
 
-**下一步**：原生壳与真实用户测试、原生壳（需 Rust 与 Android SDK）、真实用户测试。
+**尚未完成**（发布链路阻塞项，见 [发布检查清单](docs/09-发布检查清单.md)）：
+
+1. **原生壳**：仓库只有 Web 产物，`apps/desktop`（Tauri）与 `apps/mobile`（Capacitor）尚未创建——本机缺 Rust 与 Android SDK；
+2. **真实用户测试**：协议与观察表已写，但还没有真实用户数据；
+3. **英文缺口**：界面与关卡内容有英文，但模板里的失败反馈仍是中文句子直接当 key，英文界面会回退中文（`content:check` 目前对此记警告）；
+4. **发布流水线**：`release.yml` 的 tag 发布路径尚未实跑；签名与商店材料未建立。
 
 ---
 
@@ -66,7 +71,8 @@ pnpm e2e          # 59 条：20 关 autoplay、20 关无工具失败、12 关真
 7. [M1 实施规格](docs/06-M1实施规格.md) —— 四模板/六关的并行施工合同与内容数字；
 8. [M2a 实施规格](docs/07-M2a实施规格.md) —— 证据/画像/徽章/日志/报告接口与叙事 UI 合同；
 9. [用户测试协议](docs/08-用户测试协议.md) —— 知情同意、观察表、成功标准与隐私；
-10. [发布检查清单](docs/09-发布检查清单.md) —— 内容/工程/双语/原生壳/发布操作与阻断规则。
+10. [发布检查清单](docs/09-发布检查清单.md) —— 内容/工程/双语/原生壳/发布操作与阻断规则；
+11. [全面审查与优化记录](docs/10-全面审查与优化记录.md) —— 2026-11-03 的缺陷清单、修复方式、门禁加强与已知缺口。
 
 ## CI / 发布
 

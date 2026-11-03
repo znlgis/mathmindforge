@@ -7,7 +7,8 @@ const manifest: LevelManifest = {
   thread: 'modeling',
   template: 'construct',
   designSize: { width: 0, height: 0 },
-  estimatedMinutes: 6,
+  // 与 levels/k-modeling-share.json 的 estimatedMinutes 对齐。
+  estimatedMinutes: 5,
   hasCanvas: false,
   runEnabled: false,
 };

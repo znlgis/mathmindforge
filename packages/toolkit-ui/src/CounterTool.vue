@@ -75,7 +75,7 @@ async function dispatchEdit(): Promise<boolean> {
     },
   });
   if (!result.ok) {
-    error.value = result.message ?? null;
+    error.value = result.message ? props.t.t(result.message) : null;
     return false;
   }
   return true;
@@ -131,7 +131,7 @@ async function runTest(): Promise<void> {
   try {
     if (!(await dispatchEdit())) return;
     const result = await props.runtime.dispatch({ type: 'counter/test', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -148,7 +148,7 @@ async function onPremiseChange(event: Event): Promise<void> {
       type: 'counter/annotate',
       payload: { premiseId: value },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -171,7 +171,7 @@ async function commitCounter(): Promise<void> {
       }
     }
     const result = await props.runtime.dispatch({ type: 'counter/commit', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }

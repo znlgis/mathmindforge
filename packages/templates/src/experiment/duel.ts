@@ -1,5 +1,6 @@
 import type { ClaimInput, FailureCause } from '@mmf/game-kit';
 import { digest, mulberry32, wilsonInterval } from '@mmf/toolkit/shared';
+import { MAX_MATCHES } from './schema';
 import type { DuelCoefficients, DuelOpponent, DuelParams, DuelScript } from './schema';
 
 /**
@@ -219,12 +220,22 @@ export function checkDuelArtifact(script: DuelScript, input: DuelCheckInput): Du
       metrics,
     };
   }
-  const datasetN = input.dataset?.n ?? 0;
+  // 局数来自产物，必须先收敛到这一关允许的范围，否则 1e9 这种数字会把重算拖死。
+  const rawN = input.dataset?.n;
+  const datasetN = typeof rawN === 'number' && Number.isInteger(rawN) ? rawN : 0;
   if (datasetN <= 0) {
     return {
       passed: false,
       failureClass: 'exp-not-run',
       causes: [cause('sample', 'dataset', '先跑一次采样，拿到这一组参数的数据。')],
+      metrics,
+    };
+  }
+  if (datasetN > MAX_MATCHES) {
+    return {
+      passed: false,
+      failureClass: 'exp-not-run',
+      causes: [cause('sample', 'dataset', '采样局数超出这一关的上限。', { n: datasetN, max: MAX_MATCHES })],
       metrics,
     };
   }

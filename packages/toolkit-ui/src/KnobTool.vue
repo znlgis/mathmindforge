@@ -92,7 +92,7 @@ async function dispatchAction(action: LevelAction): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch(action);
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }

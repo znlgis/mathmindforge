@@ -95,6 +95,14 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
 ]);
 export type ToolSpec = z.infer<typeof ToolSpecSchema>;
 
+/**
+ * 摘要字段上限对齐 docs/02 §7.2：title ≤ 24 字、thinkingTarget ≤ 40 字、
+ * estimatedMinutes 3–15、难度四轴 1–5。schema 是构建期唯一闸门，
+ * 所以这里必须和文档同数，否则超长文案会一路混到星图卡片上。
+ *
+ * strict()：未知字段直接报错而不是被静默剥掉——内容 JSON 里写错字段名
+ * （例如 "thinking_target"）时，静默剥掉会变成"字段没生效但校验通过"。
+ */
 export const LevelSummarySchema = z.object({
   id: z.enum(LEVEL_IDS),
   title: z.string().min(1).max(24),
@@ -106,30 +114,30 @@ export const LevelSummarySchema = z.object({
   template: z.enum(TEMPLATE_IDS),
   tools: z.array(z.enum(TOOL_IDS)).min(1),
   estimatedMinutes: z.number().int().min(3).max(15),
-  thinkingTarget: z.string().min(1).max(60),
+  thinkingTarget: z.string().min(1).max(40),
   thinkingTargetEn: z.string().min(1).max(120).optional(),
   difficulty: z.object({
     structure: z.number().int().min(1).max(5),
     representation: z.number().int().min(1).max(5),
     constraint: z.number().int().min(1).max(5),
     transfer: z.number().int().min(1).max(5),
-  }),
-  unlock: z.object({ after: z.array(z.enum(LEVEL_IDS)).default([]) }).optional(),
-});
+  }).strict(),
+  unlock: z.object({ after: z.array(z.enum(LEVEL_IDS)).default([]) }).strict().optional(),
+}).strict();
 export type LevelSummary = z.infer<typeof LevelSummarySchema>;
 
 export const FeedbackCopySchema = z.object({
   messageKey: z.string().min(1),
   hintKey: z.string().min(1),
   focus: z.string().min(1),
-});
+}).strict();
 
 export const EvidenceCheckpointSchema = z.object({
   id: z.string().min(1),
   phase: z.enum(EVIDENCE_PHASES),
   require: z.string().min(1),
   descriptionKey: z.string().min(1),
-});
+}).strict();
 
 export const LevelSolutionSchema = z.object({
   id: z.string().min(1),
@@ -155,7 +163,7 @@ export const LevelDetailSchema = z.object({
   band: z.enum(BANDS),
   thread: z.enum(THREADS),
   template: z.enum(TEMPLATE_IDS),
-  thinkingTarget: z.string().min(1).max(60),
+  thinkingTarget: z.string().min(1).max(40),
   thinkingTargetEn: z.string().min(1).max(120).optional(),
   intro: z.string().min(1).max(120),
   introEn: z.string().min(1).max(220).optional(),
@@ -179,6 +187,6 @@ export const LevelDetailSchema = z.object({
     reviewer: z.string().min(1),
     reviewedAt: z.string().min(1),
     notesKey: z.string().optional(),
-  }).optional(),
-});
+  }).strict().optional(),
+}).strict();
 export type LevelDetail = z.infer<typeof LevelDetailSchema>;

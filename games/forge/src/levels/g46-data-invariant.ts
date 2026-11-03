@@ -7,7 +7,8 @@ const manifest: LevelManifest = {
   thread: 'data',
   template: 'argue',
   designSize: { width: 0, height: 0 },
-  estimatedMinutes: 6,
+  // 与 levels/g46-data-invariant.json 的 estimatedMinutes 对齐。
+  estimatedMinutes: 8,
   hasCanvas: false,
   runEnabled: false,
 };

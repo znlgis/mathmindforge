@@ -65,7 +65,7 @@ async function place(entry: PaletteEntry): Promise<void> {
       type: 'construct/place',
       payload: { piece: { id: 'repair-' + slot, shape: entry.id, x: slot, y: 0 } },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -81,7 +81,7 @@ async function remove(): Promise<void> {
       type: 'construct/remove',
       payload: { pieceId: piece.id },
     });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }

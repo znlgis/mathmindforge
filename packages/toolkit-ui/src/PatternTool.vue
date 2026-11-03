@@ -53,7 +53,7 @@ async function inspect(index: number): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'pattern/inspect', payload: { index } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -87,14 +87,14 @@ async function useCycle(mode: 'preview' | 'commit'): Promise<void> {
       payload: { cycle: [...cycle.value], transform: transform.value },
     });
     if (!selected.ok) {
-      error.value = selected.message ?? null;
+      error.value = selected.message ? translate(selected.message) : null;
       return;
     }
     const action: LevelAction = mode === 'preview'
       ? { type: 'pattern/preview', payload: {} }
       : { type: 'pattern/commit', payload: {} };
     const result = await props.runtime.dispatch(action);
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -105,7 +105,12 @@ watch(
   () => patternState.value?.cycle,
   (next, previous) => {
     if (!next) {
-      if (previous) cycle.value = [];
+      if (previous) {
+        cycle.value = [];
+        // 重来后运行时里已经没有规则了；本地变换也要回到初始值，
+        // 否则下一次提交会带着上一轮选的镜像/旋转，玩家看不出为什么判定变了。
+        transform.value = 'none';
+      }
       return;
     }
     cycle.value = [...next];

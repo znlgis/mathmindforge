@@ -1,3 +1,5 @@
+import { digest } from '../shared/rng';
+
 export type PatternTransform = 'none' | 'mirror' | 'rotate' | 'shift' | 'reflect';
 
 export interface PatternRule {
@@ -104,7 +106,10 @@ export function validatePattern(world: PatternWorld, artifact: unknown): Pattern
   }
 
   const repairMap = new Map<number, string>();
-  for (const item of candidate.repair ?? []) {
+  // artifact 来自玩家输入与内容负例，字段可能是任意 JSON：非数组的 repair（如 5 或对象）
+  // 必须当成"没填"，直接 for...of 会抛 TypeError，把"没补完"错报成运行时崩溃。
+  const repairs = Array.isArray(candidate.repair) ? candidate.repair : [];
+  for (const item of repairs) {
     if (!item || typeof item.index !== 'number' || typeof item.token !== 'string') continue;
     if (item.index < 0 || item.index >= world.length) continue;
     repairMap.set(item.index, item.token);
@@ -132,13 +137,7 @@ export function validatePattern(world: PatternWorld, artifact: unknown): Pattern
   return { passed: true };
 }
 
-/** 稳定指纹：用于证据去重，不是安全哈希。 */
+/** 稳定指纹：用于证据去重，不是安全哈希。实现与 shared/digest 一致，避免两处各改一半。 */
 export function patternDigest(value: unknown): string {
-  const text = JSON.stringify(value);
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return digest(value);
 }

@@ -6,7 +6,9 @@ import { createRuntimeWithAdapter } from '../shared/runtime';
 import type { AdapterResult, RuntimeAdapter } from '../shared/runtime';
 import { boardCells, boardCounts } from './engine';
 import type { BoardCounts } from './engine';
-import { parseScript, summarizeArgument, validateArtifact } from './logic';
+import {
+  actionsFor, parseScript, summarizeArgument, transferFailureClass, transferVariants, validateArtifact,
+} from './logic';
 import type { ArgueScript } from './schema';
 
 interface Domino {
@@ -224,30 +226,14 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
       return validateArtifact(detail, variant, artifact);
     },
 
-    actionsFor(_detail, _variant, _artifact) {
-      const actions: LevelAction[] = [
-        { type: 'construct/place', payload: { piece: { id: 'domino-0', shape: 'v', x: 0, y: 1 } } },
-        { type: 'probe/sample', payload: {} },
-        { type: 'argue/setClaim', payload: { claim: 'impossible' } },
-        { type: 'argue/setWarrant', payload: { warrant: 'coloring' } },
-        { type: 'argue/attachEvidence', payload: {} },
-        { type: 'argue/setScope', payload: { scope: 'domino-tiling' } },
-        { type: 'argue/commit', payload: {} },
-        { type: 'submit', payload: {} },
-      ];
-      return actions;
-    },
+    // 只留一个事实来源：黄金动作序列与迁移门都委托给 logic.ts。
+    // 之前这里另抄了一份（多米诺朝 v、坐标 (0,1)），和 logic 的 h@(removed+1) 不一致；
+    // 两份都能通关，但改判定时必然漂移。
+    actionsFor: (detail, variant, artifact) => actionsFor(detail, variant, artifact),
 
-    transferVariants(_detail) {
-      return [
-        { id: 'v-rotate-90', axis: 'structure', patch: { rotate: 90 } },
-        { id: 'v-rotate-180', axis: 'structure', patch: { rotate: 180 } },
-      ];
-    },
+    transferVariants: (detail) => transferVariants(detail),
 
-    transferFailureClass() {
-      return 'argue-not-general';
-    },
+    transferFailureClass: (detail) => transferFailureClass(detail),
   };
 }
 

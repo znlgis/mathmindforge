@@ -10,6 +10,7 @@ import { simulateDuel } from './duel';
 import {
   actionsFor, parseScript, summarizeArtifact, transferFailureClass, transferVariants, validateArtifact,
 } from './logic';
+import { MAX_MATCHES } from './schema';
 import type { DuelParams, DuelScript, ExperimentScript, TallyScript } from './schema';
 import { countsOf, normalizeCounts } from './tally';
 
@@ -271,7 +272,7 @@ function createAdapter(detail: LevelDetail): RuntimeAdapter<ExperimentState> {
         const n = typeof requested === 'number' && Number.isFinite(requested)
           ? Math.floor(requested)
           : script.matches;
-        if (n < 1 || n > 5000) return { state, error: '采样局数要在 1 到 5000 之间。' };
+        if (n < 1 || n > MAX_MATCHES) return { state, error: '采样局数要在 1 到 ' + MAX_MATCHES + ' 之间。' };
         const seed = script.seeds[script.seedIndex] ?? script.seeds[0] ?? 1;
         const result = simulateDuel(script, state.params, seed, n);
         const sample: DuelSample = {

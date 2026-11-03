@@ -21,6 +21,9 @@ export const tallyScriptSchema = z.object({
 });
 export type TallyScript = z.infer<typeof tallyScriptSchema>;
 
+/** 单次实验的局数上限：运行时、产物 schema 与校验共用同一个数，避免三处各写一个魔数。 */
+export const MAX_MATCHES = 5000;
+
 export const duelParamsSchema = z.object({
   attack: z.number().int().min(0).max(400),
   defense: z.number().int().min(0).max(400),
@@ -71,7 +74,7 @@ export const duelScriptSchema = z.object({
   resources: z.number().int().min(20).max(400),
   step: z.number().int().min(1).max(20).default(5),
   /** 样本量的默认值，同时也是校验要求的最小局数 */
-  matches: z.number().int().min(100).max(5000).default(1000),
+  matches: z.number().int().min(100).max(MAX_MATCHES).default(1000),
   seeds: z.array(z.number().int().min(1).max(1_000_000)).min(1).max(4),
   /** 当前实验用哪一个种子；迁移变体用 patch 改成 1 表示 B 种子 */
   seedIndex: z.number().int().min(0).max(3).default(0),
@@ -106,8 +109,8 @@ export type TallyArtifact = z.infer<typeof tallyArtifactSchema>;
 export const duelArtifactSchema = z.object({
   params: duelParamsSchema,
   dataset: z.object({
-    n: z.number().int().min(0).max(5000),
-    wins: z.number().min(0).max(5000),
+    n: z.number().int().min(0).max(MAX_MATCHES),
+    wins: z.number().min(0).max(MAX_MATCHES),
     seed: z.number().int().min(1).max(1_000_000).optional(),
     winRate: z.number().min(0).max(1).optional(),
     ci: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]).optional(),
@@ -116,7 +119,7 @@ export const duelArtifactSchema = z.object({
     kind: z.literal('stat'),
     statistic: z.literal('proportion'),
     value: z.number().min(0).max(1),
-    n: z.number().int().min(1).max(5000),
+    n: z.number().int().min(1).max(MAX_MATCHES),
     ci: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]).optional(),
   }),
 });

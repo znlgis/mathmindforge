@@ -41,6 +41,15 @@ function emptyUsage(): Record<ToolId, ToolUsageState> {
   return out;
 }
 
+function cloneUsage(source: Record<ToolId, ToolUsageState>): Record<ToolId, ToolUsageState> {
+  const out = {} as Record<ToolId, ToolUsageState>;
+  for (const tool of TOOL_IDS) {
+    const entry = source[tool];
+    out[tool] = entry ? { ...entry } : { used: 0 };
+  }
+  return out;
+}
+
 function toolOf(type: string): ToolId | null {
   const prefix = type.split('/')[0];
   return (TOOL_IDS as readonly string[]).includes(prefix) ? (prefix as ToolId) : null;
@@ -55,6 +64,8 @@ interface Meta<S> {
   revision: number;
   phase: RunSnapshot['phase'];
   usage: Record<ToolId, ToolUsageState>;
+  /** 运行序号：runs 只保留最近 10 条，id 不能靠长度推（否则第 11 次起会重复）。 */
+  runSeq: number;
   startedAt: number;
 }
 
@@ -70,6 +81,7 @@ export function createRuntimeWithAdapter<S>(
     revision: 0,
     phase: 'idle',
     usage: emptyUsage(),
+    runSeq: 0,
     startedAt: opts.now(),
   };
   const listeners = new Set<(snapshot: RunSnapshot) => void>();
@@ -93,7 +105,8 @@ export function createRuntimeWithAdapter<S>(
       phase: meta.phase,
       artifacts: adapter.artifactSummaries(meta.state),
       toolState: adapter.toolState(meta.state),
-      toolUsage: meta.usage,
+      // 快照是浅拷贝：toolUsage 逐工具复制，避免监听方拿到的旧快照被后续动作改写。
+      toolUsage: cloneUsage(meta.usage),
       checkpoints: checkpoints(),
       runs: [...meta.runs],
       lastRun: meta.lastRun,
@@ -132,7 +145,7 @@ export function createRuntimeWithAdapter<S>(
 
   function recordRun(outcome: 'pass' | 'fail', failureClass?: string): RunRecord {
     const record: RunRecord = {
-      id: 'run-' + (meta.runs.length + 1),
+      id: 'run-' + (meta.runSeq + 1),
       variantId: BASE_VARIANT.id,
       at: opts.now(),
       outcome,
@@ -140,6 +153,7 @@ export function createRuntimeWithAdapter<S>(
       artifactDigests: adapter.artifactSummaries(meta.state).map((item) => item.digest),
       durationMs: Math.max(0, opts.now() - meta.startedAt),
     };
+    meta.runSeq += 1;
     meta.runs = [...meta.runs, record].slice(-10);
     meta.lastRun = record;
     return record;
@@ -252,6 +266,7 @@ export function createRuntimeWithAdapter<S>(
         revision: 0,
         phase: 'idle',
         usage: emptyUsage(),
+        runSeq: 0,
         startedAt: opts.now(),
       };
       notify();
@@ -306,6 +321,7 @@ export function createRuntimeWithAdapter<S>(
         revision: 0,
         phase: 'idle',
         usage: emptyUsage(),
+        runSeq: 0,
         startedAt: opts.now(),
       };
       notify();

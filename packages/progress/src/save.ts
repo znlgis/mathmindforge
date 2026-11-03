@@ -37,6 +37,10 @@ export const DEFAULT_NICKNAME = '小工匠';
 export const DEFAULT_START_BAND: Band = 'k';
 /** 思维日志只保留最近 120 条（docs/02 §8.2）。 */
 export const MAX_JOURNAL_ENTRIES = 120;
+/** 昵称上限（docs/02 §8.2：≤ 12 字）。 */
+const MAX_NICKNAME_CHARS = 12;
+/** 日志里玩家补的一句话上限（docs/02 §8.2：≤ 80 字）。 */
+const MAX_JOURNAL_NOTE_CHARS = 80;
 /** 证据日志上限，超出时裁剪最旧事件（平台层 append 时使用）。 */
 export const MAX_EVIDENCE_EVENTS = 3000;
 
@@ -53,6 +57,12 @@ function isFiniteNumber(value: unknown): value is number {
 /** 非空字符串；空串/纯空白视为坏字段。 */
 function sanitizeString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+/** 按 Unicode 码点截断：避免把 emoji 劈成半个代理对，也防止坏档带进超长文本。 */
+export function truncateChars(value: string, max: number): string {
+  const chars = Array.from(value);
+  return chars.length <= max ? value : chars.slice(0, max).join('');
 }
 
 function sanitizeNonNegativeInt(value: unknown, fallback: number): number {
@@ -194,7 +204,9 @@ function sanitizeJournalEntry(raw: unknown, index: number): JournalEntry | null 
     failureClasses: sanitizeStringList(raw.failureClasses),
     revisionCount: sanitizeNonNegativeInt(raw.revisionCount, 0),
   };
-  const note = typeof raw.note === 'string' ? raw.note.trim().slice(0, 80) : '';
+  const note = typeof raw.note === 'string'
+    ? truncateChars(raw.note.trim(), MAX_JOURNAL_NOTE_CHARS)
+    : '';
   if (note.length > 0) entry.note = note;
   return entry;
 }
@@ -213,7 +225,11 @@ function sanitizeJournal(raw: unknown): JournalEntry[] {
 
 function sanitizeProfile(raw: unknown, now: number): SaveData['profile'] {
   const source = isRecord(raw) ? raw : {};
-  const nickname = sanitizeString(source.nickname)?.trim() ?? DEFAULT_NICKNAME;
+  // 昵称是可选自由文本：坏值只回退默认名，超长按码点截断（docs/02 §8.2）。
+  const nickname = truncateChars(
+    sanitizeString(source.nickname)?.trim() ?? DEFAULT_NICKNAME,
+    MAX_NICKNAME_CHARS,
+  );
   const band =
     typeof source.startBand === 'string' &&
     (BANDS as readonly string[]).includes(source.startBand)

@@ -49,7 +49,7 @@ async function sample(n: number): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'probe/sample', payload: { n } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -61,7 +61,7 @@ async function clear(): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'probe/clear', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -81,7 +81,7 @@ async function submitClaim(): Promise<void> {
       ci: [Math.round(current.low * 10000) / 10000, Math.round(current.high * 10000) / 10000],
     };
     const result = await props.runtime.dispatch({ type: 'probe/claim', payload: { claim } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }

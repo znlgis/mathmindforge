@@ -61,7 +61,7 @@ async function dispatchSample(): Promise<void> {
   error.value = null;
   try {
     const result = await props.runtime.dispatch({ type: 'probe/sample', payload: {} });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -77,7 +77,7 @@ async function step(id: string, delta: number): Promise<void> {
     const next = Math.max(0, (counts[id] ?? 0) + delta);
     counts[id] = next;
     const result = await props.runtime.dispatch({ type: 'probe/tally', payload: { counts } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -104,7 +104,7 @@ async function submitClaim(): Promise<void> {
       n: collected.value.length,
     };
     const result = await props.runtime.dispatch({ type: 'probe/claim', payload: { claim } });
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? translate(result.message) : null;
   } finally {
     busy.value = false;
   }

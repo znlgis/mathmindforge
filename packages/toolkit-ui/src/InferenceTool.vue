@@ -20,9 +20,10 @@ const claim = computed(() => props.snapshot.toolState.probe?.claim);
 const busy = ref(false);
 const error = ref<string | null>(null);
 
+/** 入参是 0–1 的比例；原先按 /100 处理，会把 85% 显示成 0.9%。 */
 function percent(value: number | undefined): string {
   if (value === undefined || Number.isNaN(value)) return '—';
-  return (value / 100).toFixed(1) + '%';
+  return (value * 100).toFixed(1) + '%';
 }
 
 const stats = computed(() => {
@@ -32,8 +33,9 @@ const stats = computed(() => {
     aN: c.aN, bN: c.bN, aSuccess: c.aSuccess ?? 0, bSuccess: c.bSuccess ?? 0,
     aRate: (c.aSuccess ?? 0) / c.aN,
     bRate: (c.bSuccess ?? 0) / c.bN,
-    aLow: c.aLow ?? 0, aHigh: c.aHigh ?? 0,
-    bLow: c.bLow ?? 0, bHigh: c.bHigh ?? 0,
+    // dataset.counts 的区间按「比例 × 10000」的整数存放（模板侧少存浮点），展示前先除回来。
+    aLow: (c.aLow ?? 0) / 10000, aHigh: (c.aHigh ?? 0) / 10000,
+    bLow: (c.bLow ?? 0) / 10000, bHigh: (c.bHigh ?? 0) / 10000,
     overlap: c.overlap === 1,
   };
 });
@@ -70,7 +72,7 @@ async function choose(direction: 1 | -1 | 0): Promise<void> {
       },
     };
     const result = await props.runtime.dispatch(action);
-    if (!result.ok) error.value = result.message ?? null;
+    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
   }
@@ -88,12 +90,12 @@ async function choose(direction: 1 | -1 | 0): Promise<void> {
     <div v-if="stats" class="grid gap-2 sm:grid-cols-2">
       <article class="rounded-2xl border border-grid bg-paper p-3">
         <p class="text-xs font-bold text-ink">A 组</p>
-        <p class="mt-1 text-lg font-black">{{ percent(stats.aRate * 100) }}</p>
+        <p class="mt-1 text-lg font-black">{{ percent(stats.aRate) }}</p>
         <p class="text-[11px] text-ink-soft">{{ stats.aSuccess }} / {{ stats.aN }} · 区间 {{ percent(stats.aLow) }}–{{ percent(stats.aHigh) }}</p>
       </article>
       <article class="rounded-2xl border border-grid bg-paper p-3">
         <p class="text-xs font-bold text-ink">B 组</p>
-        <p class="mt-1 text-lg font-black">{{ percent(stats.bRate * 100) }}</p>
+        <p class="mt-1 text-lg font-black">{{ percent(stats.bRate) }}</p>
         <p class="text-[11px] text-ink-soft">{{ stats.bSuccess }} / {{ stats.bN }} · 区间 {{ percent(stats.bLow) }}–{{ percent(stats.bHigh) }}</p>
       </article>
     </div>

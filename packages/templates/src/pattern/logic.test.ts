@@ -57,4 +57,34 @@ describe('pattern template', () => {
     expect(actions[0]?.type).toBe('pattern/inspect');
     expect(actions.some((a) => a.type === 'submit')).toBe(true);
   });
+
+  it('actionsFor returns no actions for a missing artifact instead of throwing', () => {
+    expect(actionsFor(script, base, undefined)).toEqual([]);
+    expect(actionsFor(script, base, { repair: [] })).toEqual([]);
+  });
+
+  it('keeps run ids unique after the 10-run window fills up', async () => {
+    const runtime = createPatternRuntime(detail, {
+      seed: 101, now: () => 1_700_000_000_000, locale: 'zh-CN', reducedMotion: true,
+    });
+    await runtime.autoplay();
+    const ids: string[] = [];
+    for (let index = 0; index < 12; index += 1) {
+      const result = await runtime.dispatch({ type: 'run', payload: {} });
+      expect(result.ok).toBe(true);
+      ids.push(runtime.snapshot().lastRun?.id ?? '');
+    }
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('keeps an old snapshot tool usage untouched by later actions', async () => {
+    const runtime = createPatternRuntime(detail, {
+      seed: 101, now: () => 1_700_000_000_000, locale: 'zh-CN', reducedMotion: true,
+    });
+    const before = runtime.snapshot();
+    expect(before.toolUsage.pattern.used).toBe(0);
+    await runtime.dispatch({ type: 'pattern/inspect', payload: { index: 0 } });
+    expect(runtime.snapshot().toolUsage.pattern.used).toBe(1);
+    expect(before.toolUsage.pattern.used).toBe(0);
+  });
 });

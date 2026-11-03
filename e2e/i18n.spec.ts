@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waitEvent } from './shared';
 
 test('界面可切英文，并在刷新后记住选择', async ({ page }) => {
   await page.goto('/#/');
@@ -27,7 +28,8 @@ test('界面可切英文，并在刷新后记住选择', async ({ page }) => {
 
 test('英文界面下证据与报告也是英文', async ({ page }) => {
   await page.goto('/#/play/k-structure-pattern-path?autoplay=1&instant=1');
-  await page.waitForTimeout(1200);
+  // 宿主要在落盘后才发 level:complete，等到它就说明存档与徽章都就位了
+  expect(await waitEvent(page, 'level:complete:k-structure-pattern-path')).toBe(true);
 
   await page.goto('/#/');
   await page.getByTestId('locale-toggle').click();
@@ -42,13 +44,11 @@ test('英文界面下证据与报告也是英文', async ({ page }) => {
 
   await page.goto('/#/report');
   await expect(page.getByTestId('adult-gate')).toBeVisible();
+  // 成人门走键盘长按：既去掉 3300ms 硬等待，又覆盖"长按的键盘替代"路径
   const hold = page.getByTestId('adult-hold');
-  const box = await hold.boundingBox();
-  if (!box) throw new Error('adult-hold 没有可点击区域');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(3300);
-  await page.mouse.up();
-  await expect(page.getByTestId('report-view')).toBeVisible();
+  await hold.focus();
+  await page.keyboard.down('Space');
+  await expect(page.getByTestId('report-view')).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.up('Space');
   await expect(page.getByText('All data stays on this device')).toBeVisible();
 });

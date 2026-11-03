@@ -41,6 +41,29 @@ if (!existsSync(join(DIST, 'index.html'))) {
 }
 const files = walk(DIST);
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+
+// ---- 产物结构体检（先做，避免"体积很小但整页白屏"的假绿）----
+// 背景：CSP 注入曾用正则替换 </head>，命中 index.html 注释里的同名字面量，
+// 结果 script 标签与被注入的 meta 一起进了注释，页面只有空 #app。
+// 这里把注释剥掉后再查关键标签，能在体积门禁这一步就暴露。
+const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
+const structural = [];
+if (!/<script[^>]+type="module"[^>]+src="[^"]+\.js"/.test(htmlWithoutComments)) {
+  structural.push('index.html 里没有可执行的 module script（可能被注释掉了）');
+}
+if (!/<meta[^>]+http-equiv="Content-Security-Policy"/.test(htmlWithoutComments)) {
+  structural.push('index.html 里没有 CSP meta（可能被注释掉了）');
+}
+if (/<!--[\s\S]*?<script/.test(html) && !/<!--[\s\S]*?-->[\s\S]*?<script/.test(html)) {
+  // 粗检：只要 script 出现在某个未闭合注释之后，就当作可疑。
+  structural.push('index.html 的 script 可能位于 HTML 注释内');
+}
+if (structural.length > 0) {
+  console.error('✗ 产物结构异常：');
+  for (const item of structural) console.error('  · ' + item);
+  process.exit(1);
+}
+
 const referenced = new Set(
   [...html.matchAll(/(?:src|href)="\.?\/?([^"]+\.(?:js|css))"/g)].map((match) =>
     join(DIST, match[1]).replace(/\\/g, '/'),

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { LevelDetailSchema } from '@mmf/content/full';
 import paymentDetailRaw from '../../../content/src/details/g46-algorithm-payment.level.json';
 import paymentSummaryRaw from '../../../content/src/levels/g46-algorithm-payment.json';
+import packDetailRaw from '../../../content/src/details/g13-modeling-pack.level.json';
+import { constructVerifier } from './verifier';
 import { greedyCoins, optimalCoins } from './engine';
 import { actionsFor, parseScript, reachableFailureClasses, validateArtifact } from './logic';
 import type { RuntimeVariant } from '../shared/types';
@@ -230,5 +232,42 @@ describe('construct/payment template', () => {
     expect(result.verdict?.passed).toBe(false);
     expect(result.verdict?.failure?.class).toBe('construct-not-optimal');
     expect(result.verdict?.failure?.causes[0]?.params?.count).toBe(3);
+  });
+});
+
+describe('construct/distribution validation', () => {
+  const packDetail = LevelDetailSchema.parse(packDetailRaw);
+
+  function artifactOf(containers: { id: string; counts: Record<string, number>; total: number }[]) {
+    return { distribution: { containers, totals: { block: 3, ball: 3, book: 3 } } };
+  }
+
+  it('accepts the golden solutions', () => {
+    for (const solution of packDetail.solutions) {
+      const verdict = constructVerifier.validateArtifact(packDetail, base, solution.artifact);
+      expect(verdict.passed, solution.id + ' ' + verdict.failure?.class).toBe(true);
+    }
+  });
+
+  it('ignores items this level does not define when counting kinds', () => {
+    // 每个盒子实际只有一种物品（minKinds=2 不满足）；旧实现把未登记的 zzz 也算一种。
+    const verdict = constructVerifier.validateArtifact(packDetail, base, artifactOf([
+      { id: 'box0', counts: { block: 3, zzz: 1 }, total: 3 },
+      { id: 'box1', counts: { ball: 3, zzz: 1 }, total: 3 },
+      { id: 'box2', counts: { book: 3, zzz: 1 }, total: 3 },
+    ]));
+    expect(verdict.passed).toBe(false);
+    expect(verdict.failure?.class).toBe('distribution-missing-kind');
+  });
+
+  it('counts container size from known items instead of the declared total', () => {
+    // 把 total 写小也盖不住真实件数：box0 装了 6 件，超过 maxPerContainer=4。
+    const verdict = constructVerifier.validateArtifact(packDetail, base, artifactOf([
+      { id: 'box0', counts: { block: 3, ball: 3 }, total: 1 },
+      { id: 'box1', counts: {}, total: 1 },
+      { id: 'box2', counts: {}, total: 1 },
+    ]));
+    expect(verdict.passed).toBe(false);
+    expect(verdict.failure?.class).toBe('distribution-overflow');
   });
 });

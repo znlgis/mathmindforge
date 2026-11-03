@@ -7,7 +7,8 @@ export const PALETTE = {
   paper: '#f7f1e6',
   card: '#fffdf8',
   ink: '#22303c',
-  inkSoft: '#5b6b78',
+  // cream 上的对比度 4.91:1（旧值 #5b6b78 只有 4.37，AA 不达标）
+  inkSoft: '#55636f',
   blueprint: '#1f4e6b',
   brass: '#b07d2b',
   teal: '#2f7d78',

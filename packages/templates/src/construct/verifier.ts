@@ -1,5 +1,6 @@
 import type { LevelAction, LevelDetail, LevelRuntime, RuntimeOptions, Verdict } from '@mmf/game-kit';
 import type { RuntimeVariant } from '../shared/types';
+import { scriptForVariant } from '../shared/variant-script';
 import * as payment from './logic';
 import * as distribution from './distribution';
 import { networkScriptSchema, validateNetworkArtifact } from './network';
@@ -32,7 +33,10 @@ export const constructVerifier = {
     const mode = modeOf(detail);
     if (mode === 'distribution') return distribution.validateArtifact(detail, variant, artifact);
     if (mode === 'frontier') {
-      const result = validateFrontierArtifact(frontierScriptSchema.parse(detail.levelScript), artifact);
+      const result = validateFrontierArtifact(
+        scriptForVariant(detail, variant, (input) => frontierScriptSchema.parse(input)),
+        artifact,
+      );
       return {
         passed: result.passed,
         stamps: result.passed ? (variant.id === 'base' ? ['argument'] : ['argument', 'transfer']) : [],
@@ -47,7 +51,10 @@ export const constructVerifier = {
       };
     }
     if (mode === 'schedule') {
-      const result = validateScheduleArtifact(scheduleScriptSchema.parse(detail.levelScript), artifact);
+      const result = validateScheduleArtifact(
+        scriptForVariant(detail, variant, (input) => scheduleScriptSchema.parse(input)),
+        artifact,
+      );
       return {
         passed: result.passed,
         stamps: result.passed ? (variant.id === 'base' ? ['constraint'] : ['constraint', 'transfer']) : [],
@@ -62,7 +69,10 @@ export const constructVerifier = {
       };
     }
     if (mode === 'network') {
-      const result = validateNetworkArtifact(networkScriptSchema.parse(detail.levelScript), artifact);
+      const result = validateNetworkArtifact(
+        scriptForVariant(detail, variant, (input) => networkScriptSchema.parse(input)),
+        artifact,
+      );
       return {
         passed: result.passed,
         stamps: result.passed ? (variant.id === 'base' ? ['constraint'] : ['constraint', 'transfer']) : [],

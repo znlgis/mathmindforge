@@ -80,11 +80,18 @@ export function validateArtifact(
   if (!argument.claim || !argument.warrant || !argument.scope) {
     return failure('argue-evidence-missing', '论证还缺主张、依据或适用范围。');
   }
+  // 选项表来自关卡脚本：模板不写死某一关的主张/依据/范围措辞，否则内容一换词就判定漂移。
+  if (!script.claims.includes(argument.claim)) {
+    return failure('argue-claim-unsupported', '这条主张不在这一关的选项里。');
+  }
   if (argument.claim !== 'impossible') {
     return failure('argue-claim-unsupported', '这个图形确实拼不出来；主张选错了。');
   }
   if (counts.black !== actual.black || counts.white !== actual.white || counts.cells !== actual.cells) {
     return failure('argue-invariant-false', '统计数字和图形对不上：先重新数一遍黑白格。');
+  }
+  if (!script.warrants.includes(argument.warrant as ArgueScript['warrants'][number])) {
+    return failure('argue-warrant-unsupported', '这条依据不在这一关的选项里。');
   }
   if (argument.warrant === 'coloring') {
     const evidence = argument.evidence ?? {};
@@ -105,8 +112,8 @@ export function validateArtifact(
   } else {
     return failure('argue-warrant-unsupported', '这条依据在这一关还检验不了，换一条能验证的。');
   }
-  if (argument.scope !== 'domino-tiling') {
-    return failure('argue-scope-wrong', '适用范围要写明：这是 1×2 多米诺铺砌。');
+  if (!script.scopes.includes(argument.scope)) {
+    return failure('argue-scope-wrong', '适用范围不在这一关的选项里：这是 1×2 多米诺铺砌。');
   }
   const stamps: Verdict['stamps'] = ['argument'];
   if (variant.id !== 'base') stamps.push('transfer');

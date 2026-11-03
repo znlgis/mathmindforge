@@ -1,5 +1,6 @@
 import type { LevelAction, LevelDetail, LevelRuntime, RuntimeOptions, Verdict } from '@mmf/game-kit';
 import type { RuntimeVariant } from '../shared/types';
+import { scriptForVariant } from '../shared/variant-script';
 import * as dispatch from './logic';
 import { queueScriptSchema, validateQueueArtifact } from './queue';
 import { createQueueRuntime } from './queue-runtime';
@@ -16,7 +17,10 @@ export const simulateVerifier = {
   },
   validateArtifact(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict {
     if (isQueue(detail)) {
-      const result = validateQueueArtifact(queueScriptSchema.parse(detail.levelScript), artifact);
+      const result = validateQueueArtifact(
+        scriptForVariant(detail, variant, (input) => queueScriptSchema.parse(input)),
+        artifact,
+      );
       return {
         passed: result.passed,
         stamps: result.passed ? (variant.id === 'base' ? ['constraint'] : ['constraint', 'transfer']) : [],
@@ -59,8 +63,12 @@ export const simulateVerifier = {
     return dispatch.applyVariant(detail, variant);
   },
   reachableFailureClasses(detail: LevelDetail): string[] {
+    // queue-unserved 在当前排队模型里不可达：服务台永远接客、没有接待上限，
+    // 所以 runQueue 的 served 恒等于到达人数。把它留在"可达类"里会让 A4 的
+    // "每个可达类都要有负例"变成假要求（内容只能写一个永远触发不了的负例）。
+    // 若以后给排队加"打烊后不再接待"或"队列上限"，先改 runQueue，再把类加回来。
     return isQueue(detail)
-      ? ['queue-not-run', 'queue-unserved', 'queue-wait', 'queue-overtime', 'queue-budget']
+      ? ['queue-not-run', 'queue-wait', 'queue-overtime', 'queue-budget']
       : dispatch.reachableFailureClasses(detail);
   },
 };

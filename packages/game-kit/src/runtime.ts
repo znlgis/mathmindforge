@@ -14,7 +14,7 @@ export interface LevelManifest {
   designSize: { width: number; height: number };
   estimatedMinutes: number;
   hasCanvas: boolean;
-  /** 默认 true；丘验/模拟/实验关由工具按钮运行，隐藏宿主的大"运行" */
+  /** 默认 true；论证/模拟/实验关由工具按钮运行，隐藏宿主的大"运行" */
   runEnabled?: boolean;
 }
 
