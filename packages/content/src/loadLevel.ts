@@ -25,6 +25,7 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'g79-data-sampling': () => import('./details/g79-data-sampling.level.json'),
   'g79-structure-network': () => import('./details/g79-structure-network.level.json'),
   'g1012-data-inference': () => import('./details/g1012-data-inference.level.json'),
+  'g79-algorithm-schedule': () => import('./details/g79-algorithm-schedule.level.json'),
 };
 
 export async function loadLevel(

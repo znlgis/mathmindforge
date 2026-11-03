@@ -4,12 +4,15 @@ import * as payment from './logic';
 import * as distribution from './distribution';
 import { networkScriptSchema, validateNetworkArtifact } from './network';
 import { createNetworkRuntime } from './network-runtime';
+import { scheduleScriptSchema, validateScheduleArtifact } from './schedule';
+import { createScheduleRuntime } from './schedule-runtime';
 import { createConstructRuntime as createPaymentRuntime } from './runtime';
 
-function modeOf(detail: LevelDetail): 'payment' | 'distribution' | 'network' {
+function modeOf(detail: LevelDetail): 'payment' | 'distribution' | 'network' | 'schedule' {
   const script = detail.levelScript as { mode?: string } | null;
   if (script?.mode === 'distribution') return 'distribution';
   if (script?.mode === 'network') return 'network';
+  if (script?.mode === 'schedule') return 'schedule';
   return 'payment';
 }
 
@@ -18,11 +21,27 @@ export const constructVerifier = {
     const script = input as { mode?: string } | null;
     if (script?.mode === 'distribution') return distribution.parseScript(input);
     if (script?.mode === 'network') return networkScriptSchema.parse(input);
+    if (script?.mode === 'schedule') return scheduleScriptSchema.parse(input);
     return payment.parseScript(input);
   },
   validateArtifact(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict {
     const mode = modeOf(detail);
     if (mode === 'distribution') return distribution.validateArtifact(detail, variant, artifact);
+    if (mode === 'schedule') {
+      const result = validateScheduleArtifact(scheduleScriptSchema.parse(detail.levelScript), artifact);
+      return {
+        passed: result.passed,
+        stamps: result.passed ? (variant.id === 'base' ? ['constraint'] : ['constraint', 'transfer']) : [],
+        failure: result.passed ? undefined : {
+          class: result.failures[0] ?? 'schedule-empty',
+          variantId: variant.id,
+          causes: [{ kind: 'constraint', ref: 'schedule', messageKey: '课表还没有满足全部约束。' }],
+        },
+        missingEvidence: [],
+        artifacts: [],
+        metrics: result.metrics,
+      };
+    }
     if (mode === 'network') {
       const result = validateNetworkArtifact(networkScriptSchema.parse(detail.levelScript), artifact);
       return {
@@ -43,6 +62,19 @@ export const constructVerifier = {
   actionsFor(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): LevelAction[] {
     const mode = modeOf(detail);
     if (mode === 'distribution') return distribution.actionsFor(detail, variant, artifact);
+    if (mode === 'schedule') {
+      const raw = artifact as { placements?: { lesson: string; slot: string }[] } | null;
+      const script = scheduleScriptSchema.parse(detail.levelScript);
+      const actions: LevelAction[] = (raw?.placements ?? []).flatMap((placement) => {
+        const slotIndex = script.slots.findIndex((slot) => slot.id === placement.slot);
+        return slotIndex < 0 ? [] : [{
+          type: 'construct/place' as const,
+          payload: { piece: { id: placement.lesson, shape: placement.lesson, x: slotIndex, y: 0 } },
+        }];
+      });
+      actions.push({ type: 'submit', payload: {} });
+      return actions;
+    }
     if (mode === 'network') {
       const raw = artifact as { edges?: string[] } | null;
       const actions: LevelAction[] = (raw?.edges ?? []).map((edgeId) => ({
@@ -58,6 +90,7 @@ export const constructVerifier = {
     const mode = modeOf(detail);
     if (mode === 'distribution') return distribution.applyVariant(distribution.parseScript(detail.levelScript), variant);
     if (mode === 'network') return networkScriptSchema.parse({ ...(detail.levelScript as object), ...(variant.patch ?? {}) });
+    if (mode === 'schedule') return scheduleScriptSchema.parse({ ...(detail.levelScript as object), ...(variant.patch ?? {}) });
     return payment.constructVerifier.applyVariant(detail, variant);
   },
   reachableFailureClasses(detail: LevelDetail): string[] {
@@ -66,6 +99,7 @@ export const constructVerifier = {
     if (mode === 'network') {
       return ['network-empty', 'network-disconnected', 'network-budget', 'network-too-many', 'network-key'];
     }
+    if (mode === 'schedule') return ['schedule-empty', 'schedule-incomplete', 'schedule-conflict', 'schedule-bonus', 'schedule-unknown'];
     return payment.reachableFailureClasses(detail);
   },
 };
@@ -74,5 +108,6 @@ export function createConstructRuntime(detail: LevelDetail, opts: RuntimeOptions
   const mode = modeOf(detail);
   if (mode === 'distribution') return distribution.createDistributionRuntime(detail, opts);
   if (mode === 'network') return createNetworkRuntime(detail, opts);
+  if (mode === 'schedule') return createScheduleRuntime(detail, opts);
   return createPaymentRuntime(detail, opts);
 }

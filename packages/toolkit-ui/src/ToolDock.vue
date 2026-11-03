@@ -14,6 +14,7 @@ import QueueMetricsTool from './QueueMetricsTool.vue';
 import SamplingTool from './SamplingTool.vue';
 import NetworkTool from './NetworkTool.vue';
 import InferenceTool from './InferenceTool.vue';
+import ScheduleTool from './ScheduleTool.vue';
 import PatternTool from './PatternTool.vue';
 import PaymentTool from './PaymentTool.vue';
 import RuleTool from './RuleTool.vue';
@@ -108,6 +109,14 @@ onBeforeUnmount(() => {
       />
       <DominoTool
         v-else-if="spec.kind === 'construct' && spec.config.mode === 'domino'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :detail="detail"
+        :t="translator"
+      />
+      <ScheduleTool
+        v-else-if="spec.kind === 'construct' && spec.config.mode === 'schedule'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"

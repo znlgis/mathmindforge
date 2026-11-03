@@ -1,0 +1,25 @@
+{
+  "id": "g79-algorithm-schedule",
+  "title": "课表编排师",
+  "emoji": "🗓️",
+  "color": "#1f4e6b",
+  "band": "g79",
+  "thread": "algorithm",
+  "template": "construct",
+  "tools": [
+    "construct"
+  ],
+  "estimatedMinutes": 7,
+  "thinkingTarget": "给四个课次选时段，避开老师/班级/教室冲突，并尽量满足偏好",
+  "difficulty": {
+    "structure": 2,
+    "representation": 3,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  },
+  "titleEn": "Timetable Planner",
+  "thinkingTargetEn": "Assign each lesson a slot while avoiding teacher, class and room conflicts, and meet preferences."
+}

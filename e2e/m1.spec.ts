@@ -185,3 +185,15 @@ test('真实点击：证据裁判可以通关', async ({ page }) => {
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：课表编排师可以通关', async ({ page }) => {
+  await page.goto('/#/play/g79-algorithm-schedule');
+  await expect(page.getByTestId('schedule-tool')).toBeVisible();
+
+  await page.getByTestId('schedule-select-l1').selectOption('s1');
+  await page.getByTestId('schedule-select-l2').selectOption('s2');
+  await page.getByTestId('schedule-select-l3').selectOption('s2');
+  await page.getByTestId('schedule-select-l4').selectOption('s3');
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});

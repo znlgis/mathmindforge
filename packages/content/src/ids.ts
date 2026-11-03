@@ -75,6 +75,7 @@ export const SHIPPED_LEVEL_IDS = [
   'g79-data-sampling',
   'g79-structure-network',
   'g1012-data-inference',
+  'g79-algorithm-schedule',
 ] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 

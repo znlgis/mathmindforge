@@ -16,5 +16,6 @@ export { default as QueueMetricsTool } from './QueueMetricsTool.vue';
 export { default as SamplingTool } from './SamplingTool.vue';
 export { default as NetworkTool } from './NetworkTool.vue';
 export { default as InferenceTool } from './InferenceTool.vue';
+export { default as ScheduleTool } from './ScheduleTool.vue';
 import ToolDock from './ToolDock.vue';
 export default ToolDock;
