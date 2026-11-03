@@ -19,5 +19,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Rule Train",
+  "thinkingTargetEn": "Use a sequence of commands to collect a star and reach the station."
 }

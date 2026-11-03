@@ -275,5 +275,11 @@
     "reviewedAt": "2026-11-03",
     "notesKey": "level.argue.manualAudit"
   },
-  "thinkingTarget": "用一个不随操作改变的量，说明某类铺砌为什么不可能"
+  "thinkingTarget": "用一个不随操作改变的量，说明某类铺砌为什么不可能",
+  "titleEn": "Structural Invariant",
+  "thinkingTargetEn": "Use an invariant to explain why a 5×5 board with two corners removed cannot be tiled.",
+  "introEn": "Two corners are gone. Place a few dominoes, then find a quantity that never changes.",
+  "promptEn": "Explain why 1×2 dominoes cannot cover it; claim, warrant, evidence and scope must hold.",
+  "doneEn": "Your invariant ruled out a whole family of tilings, not just one attempt.",
+  "retryEn": "Count black and white cells, then ask how each domino changes the counts."
 }

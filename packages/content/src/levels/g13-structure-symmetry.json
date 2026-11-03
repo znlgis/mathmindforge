@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Symmetry Wall",
+  "thinkingTargetEn": "Find the mirror rule and rebuild the missing half of the wall."
 }

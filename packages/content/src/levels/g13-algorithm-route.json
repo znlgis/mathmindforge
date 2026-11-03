@@ -19,5 +19,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Rule Engineer: Route",
+  "thinkingTargetEn": "Build a program that collects every star and reaches the goal."
 }

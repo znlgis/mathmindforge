@@ -19,5 +19,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Fair Packing",
+  "thinkingTargetEn": "Pack three kinds of toys into three boxes, equally and with at least two kinds per box."
 }

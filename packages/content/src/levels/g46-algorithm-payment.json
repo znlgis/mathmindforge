@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Fewest Coins",
+  "thinkingTargetEn": "Pay an exact amount with as few coins as possible, and find where greedy fails."
 }

@@ -391,5 +391,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.weather.manualAudit"
-  }
+  },
+  "titleEn": "Weather Station",
+  "thinkingTargetEn": "Record 14 days of weather and answer most/least with a tally.",
+  "introEn": "Fourteen days of weather are waiting. Record each day, then tally the kinds.",
+  "promptEn": "Collect all 14 days, fill the tally, then answer most and least.",
+  "doneEn": "Your answer came from a complete record and tally.",
+  "retryEn": "Collect both batches before editing the tally."
 }

@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Structural Invariant",
+  "thinkingTargetEn": "Use an invariant to explain why a 5×5 board with two corners removed cannot be tiled."
 }

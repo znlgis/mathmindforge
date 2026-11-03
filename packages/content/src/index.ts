@@ -7,3 +7,5 @@ export * from './ids';
 export type { LevelDetail, LevelSummary, ToolSpec } from './schema';
 export { LEVEL_SUMMARIES, getLevelSummary, levelSummaries, ensureSummaries } from './summaries';
 export { loadLevel } from './loadLevel';
+export { localizedDetail, localizedSummary } from './localize';
+export type { LocalizedDetail, LocalizedSummary } from './localize';

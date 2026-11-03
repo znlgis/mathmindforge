@@ -350,5 +350,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.symmetry.manualAudit"
-  }
+  },
+  "titleEn": "Symmetry Wall",
+  "thinkingTargetEn": "Find the mirror rule and rebuild the missing half of the wall.",
+  "introEn": "Half of the wall is missing. Look for the rule in the half that remains.",
+  "promptEn": "Decide whether it repeats or mirrors, then place the three missing blocks.",
+  "doneEn": "Your wall folds onto itself from the middle.",
+  "retryEn": "Fold the wall in the middle: the first and last visible cells should mirror."
 }

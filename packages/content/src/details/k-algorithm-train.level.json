@@ -243,5 +243,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.train.manualAudit"
-  }
+  },
+  "titleEn": "Rule Train",
+  "thinkingTargetEn": "Use a sequence of commands to collect a star and reach the station.",
+  "introEn": "The train needs to collect one star and stop at the goal. Build a sequence.",
+  "promptEn": "Collect the star, reach the goal, and keep the program valid on a rotated track.",
+  "doneEn": "Your sequence reached the station and survived a turn.",
+  "retryEn": "Check which way the train faces before choosing forward and turn."
 }

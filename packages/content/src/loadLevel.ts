@@ -20,6 +20,7 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'k-modeling-share': () => import('./details/k-modeling-share.level.json'),
   'g13-modeling-pack': () => import('./details/g13-modeling-pack.level.json'),
   'g13-structure-symmetry': () => import('./details/g13-structure-symmetry.level.json'),
+  'g46-structure-tiling': () => import('./details/g46-structure-tiling.level.json'),
 };
 
 export async function loadLevel(

@@ -1,0 +1,26 @@
+{
+  "id": "g46-structure-tiling",
+  "title": "铺砌边界",
+  "emoji": "🧩",
+  "color": "#2f7d78",
+  "band": "g46",
+  "thread": "structure",
+  "template": "argue",
+  "tools": [
+    "construct",
+    "probe"
+  ],
+  "estimatedMinutes": 8,
+  "thinkingTarget": "用染色/奇偶不变量判断 8×8 去角棋盘能否被多米诺铺满",
+  "difficulty": {
+    "structure": 3,
+    "representation": 3,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  },
+  "titleEn": "Tiling Boundary",
+  "thinkingTargetEn": "Use a coloring or parity invariant to decide whether a 7×7 board with two corners removed can be tiled."
+}

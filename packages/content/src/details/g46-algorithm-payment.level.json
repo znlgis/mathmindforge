@@ -430,5 +430,11 @@
     "reviewedAt": "2026-11-01",
     "notesKey": "level.payment.manualAudit"
   },
-  "thinkingTarget": "用最少枚数付清，并找到贪心失手的反例"
+  "thinkingTarget": "用最少枚数付清，并找到贪心失手的反例",
+  "titleEn": "Fewest Coins",
+  "thinkingTargetEn": "Pay an exact amount with as few coins as possible, and find where greedy fails.",
+  "introEn": "The counter needs exact payment. Fewer coins is better.",
+  "promptEn": "Pay 6 with the fewest coins, then build a counterexample to greedy.",
+  "doneEn": "You paid optimally and showed a case where greedy is not optimal.",
+  "retryEn": "Try the largest coin first, then see whether two smaller coins can replace it."
 }

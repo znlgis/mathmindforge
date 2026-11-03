@@ -19,5 +19,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Weather Station",
+  "thinkingTargetEn": "Record 14 days of weather and answer most/least with a tally."
 }

@@ -459,5 +459,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.pack.manualAudit"
-  }
+  },
+  "titleEn": "Fair Packing",
+  "thinkingTargetEn": "Pack three kinds of toys into three boxes, equally and with at least two kinds per box.",
+  "introEn": "Three boxes and nine toys. Each box needs the same count and at least two kinds.",
+  "promptEn": "Pack all 9 toys: 3 per box, at least two kinds per box.",
+  "doneEn": "You met both the count and the kind constraints.",
+  "retryEn": "Make every box 3 items first, then check the kinds."
 }

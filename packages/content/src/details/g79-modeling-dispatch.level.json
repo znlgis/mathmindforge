@@ -524,5 +524,11 @@
     "reviewer": "M1 simulate builder",
     "reviewedAt": "2026-11-01",
     "notesKey": "level.g79.sim.manualAudit"
-  }
+  },
+  "titleEn": "City Dispatcher",
+  "thinkingTargetEn": "Set buses and teams so cost and waiting time both meet the targets.",
+  "introEn": "A city block needs buses and repair teams. Run the day and read the metrics.",
+  "promptEn": "Tune buses, teams and minutes until cost and waiting time both pass.",
+  "doneEn": "You found a plan that meets both cost and waiting targets.",
+  "retryEn": "Change one knob at a time and compare the metrics."
 }

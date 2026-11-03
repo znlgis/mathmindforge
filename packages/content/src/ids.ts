@@ -70,6 +70,7 @@ export const SHIPPED_LEVEL_IDS = [
   'k-modeling-share',
   'g13-modeling-pack',
   'g13-structure-symmetry',
+  'g46-structure-tiling',
 ] as const;
 export type ShippedLevelId = (typeof SHIPPED_LEVEL_IDS)[number];
 

@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Win-rate Lab",
+  "thinkingTargetEn": "Allocate attack, defense and economy, then use a large sample and interval to support a win-rate claim."
 }

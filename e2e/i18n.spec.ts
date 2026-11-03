@@ -13,8 +13,10 @@ test('界面可切英文，并在刷新后记住选择', async ({ page }) => {
 
   await page.goto('/#/forge');
   await expect(page.getByRole('heading', { name: 'Thinking star map' })).toBeVisible();
+  await expect(page.getByTestId('level-card-k-structure-pattern-path')).toContainText('Pattern Tinkerer');
 
   await page.goto('/#/play/k-structure-pattern-path');
+  await expect(page.getByText('Pattern Tinkerer').first()).toBeVisible();
   await expect(page.getByTestId('level-submit')).toContainText('Check structure');
   await expect(page.getByTestId('level-run')).toContainText('Run');
 

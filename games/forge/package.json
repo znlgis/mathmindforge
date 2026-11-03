@@ -17,7 +17,8 @@
     "./g46-data-invariant": "./src/levels/g46-data-invariant.ts",
     "./k-modeling-share": "./src/levels/k-modeling-share.ts",
     "./g13-modeling-pack": "./src/levels/g13-modeling-pack.ts",
-    "./g13-structure-symmetry": "./src/levels/g13-structure-symmetry.ts"
+    "./g13-structure-symmetry": "./src/levels/g13-structure-symmetry.ts",
+    "./g46-structure-tiling": "./src/levels/g46-structure-tiling.ts"
   },
   "scripts": {
     "test": "vitest run",

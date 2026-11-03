@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { BAND_LABELS, THREAD_LABELS, TOOL_LABELS } from '@mmf/content/ids';
-import { LEVEL_SUMMARIES } from '@mmf/content';
+import { LEVEL_SUMMARIES, localizedSummary } from '@mmf/content';
 import { navigate } from '../router';
+import { computed } from 'vue';
 import { useI18n } from '../shell/useI18n';
 import { useProgress } from '../stores/progress';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const levels = computed(() => LEVEL_SUMMARIES.map((level) => ({
+  ...level,
+  ...localizedSummary(level, locale.value),
+})));
 const progress = useProgress();
 </script>
 
@@ -16,7 +21,7 @@ const progress = useProgress();
 
     <div class="mt-6 grid gap-4 md:grid-cols-2">
       <article
-        v-for="level in LEVEL_SUMMARIES"
+        v-for="level in levels"
         :key="level.id"
         class="flex flex-col rounded-3xl border border-grid bg-card p-6 shadow-sm"
         :data-testid="'level-card-' + level.id"

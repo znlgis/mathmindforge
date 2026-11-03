@@ -407,5 +407,11 @@
     "reviewer": "exp-builder · M1",
     "reviewedAt": "2026-11-01",
     "notesKey": "系数按 docs/06 固定；50/50/0 实测 A 0.851、B 0.847（1000 局各），目标 0.55 为封顶值。"
-  }
+  },
+  "titleEn": "Win-rate Lab",
+  "thinkingTargetEn": "Allocate attack, defense and economy, then use a large sample and interval to support a win-rate claim.",
+  "introEn": "Three stats, 100 resources. Run 1000 matches before you claim.",
+  "promptEn": "Reach the win-rate target, keep the interval lower bound, then survive seed B.",
+  "doneEn": "Your allocation cleared the target, the interval and the second seed.",
+  "retryEn": "Watch the interval, not just the point estimate."
 }

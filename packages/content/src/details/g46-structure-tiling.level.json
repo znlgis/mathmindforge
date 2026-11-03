@@ -1,0 +1,285 @@
+{
+  "id": "g46-structure-tiling",
+  "title": "铺砌边界",
+  "band": "g46",
+  "thread": "structure",
+  "template": "argue",
+  "thinkingTarget": "用染色/奇偶不变量判断 8×8 去角棋盘能否被多米诺铺满",
+  "intro": "7×7 棋盘少了两个同色角。先铺几块，再找那个不随摆放改变的量。",
+  "prompt": "判断它能否被 1×2 多米诺铺满，并写出可检验的论证证书。",
+  "done": "你用不变量排除了整类铺法，而不是只试了几种摆法。",
+  "retry": "数一数黑白格或总格数，看看每次铺一块这个量会怎么变。",
+  "tools": [
+    {
+      "kind": "construct",
+      "titleKey": "tool.construct.title",
+      "descriptionKey": "tool.construct.desc",
+      "requiredArtifacts": [
+        "domino-set"
+      ],
+      "config": {
+        "mode": "domino",
+        "palette": [
+          {
+            "id": "domino",
+            "label": "多米诺",
+            "shape": "domino"
+          }
+        ],
+        "maxPieces": 20
+      }
+    },
+    {
+      "kind": "probe",
+      "titleKey": "tool.probe.title",
+      "descriptionKey": "tool.probe.desc",
+      "requiredArtifacts": [
+        "counts"
+      ],
+      "config": {
+        "mode": "invariant",
+        "sampleSizes": [
+          63
+        ],
+        "chart": "invariant"
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "counts"
+  ],
+  "levelScript": {
+    "mode": "tiling",
+    "board": {
+      "width": 7,
+      "height": 7,
+      "removed": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 6
+        }
+      ]
+    },
+    "claims": [
+      "possible",
+      "impossible"
+    ],
+    "warrants": [
+      "coloring",
+      "parity",
+      "area"
+    ],
+    "scopes": [
+      "domino-tiling"
+    ]
+  },
+  "evidencePlan": [
+    {
+      "id": "attempt",
+      "phase": "construct",
+      "require": "construct/place >= 1",
+      "descriptionKey": "先真的铺一块试试"
+    },
+    {
+      "id": "counts",
+      "phase": "observe",
+      "require": "probe/sample >= 1",
+      "descriptionKey": "统计黑白格或总格数"
+    },
+    {
+      "id": "claim",
+      "phase": "argue",
+      "require": "argue/attachEvidence >= 1",
+      "descriptionKey": "把证据挂到论证上"
+    },
+    {
+      "id": "commit",
+      "phase": "generalize",
+      "require": "argue/commit >= 1",
+      "descriptionKey": "提交论证证书"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-coloring",
+      "artifact": {
+        "counts": {
+          "black": 23,
+          "white": 24,
+          "cells": 47
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "coloring",
+          "scope": "domino-tiling",
+          "evidence": {
+            "black": 23,
+            "white": 24,
+            "cells": 47
+          }
+        }
+      }
+    },
+    {
+      "id": "s-parity",
+      "artifact": {
+        "counts": {
+          "black": 23,
+          "white": 24,
+          "cells": 47
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "parity",
+          "scope": "domino-tiling",
+          "evidence": {
+            "cells": 47
+          }
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-possible",
+      "expectFailure": "argue-claim-unsupported",
+      "artifact": {
+        "counts": {
+          "black": 23,
+          "white": 24,
+          "cells": 47
+        },
+        "argument": {
+          "claim": "possible",
+          "warrant": "coloring",
+          "scope": "domino-tiling",
+          "evidence": {
+            "black": 23,
+            "white": 24,
+            "cells": 47
+          }
+        }
+      }
+    },
+    {
+      "id": "n-false",
+      "expectFailure": "argue-invariant-false",
+      "artifact": {
+        "counts": {
+          "black": 23,
+          "white": 24,
+          "cells": 47
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "coloring",
+          "scope": "domino-tiling",
+          "evidence": {
+            "black": 24,
+            "white": 23,
+            "cells": 47
+          }
+        }
+      }
+    },
+    {
+      "id": "n-scope",
+      "expectFailure": "argue-scope-wrong",
+      "artifact": {
+        "counts": {
+          "black": 23,
+          "white": 24,
+          "cells": 47
+        },
+        "argument": {
+          "claim": "impossible",
+          "warrant": "coloring",
+          "scope": "all-tilings",
+          "evidence": {
+            "black": 23,
+            "white": 24,
+            "cells": 47
+          }
+        }
+      }
+    },
+    {
+      "id": "n-missing",
+      "expectFailure": "argue-evidence-missing",
+      "artifact": {
+        "counts": {
+          "black": 23,
+          "white": 24,
+          "cells": 47
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-rotate-90",
+      "axis": "structure",
+      "patch": {
+        "rotate": 90
+      }
+    },
+    {
+      "id": "v-rotate-180",
+      "axis": "structure",
+      "patch": {
+        "rotate": 180
+      }
+    }
+  ],
+  "feedback": {
+    "argue-claim-unsupported": {
+      "messageKey": "这个棋盘确实铺不满；主张选错了。",
+      "hintKey": "先试几块，看看最后总会剩下什么。",
+      "focus": "claim"
+    },
+    "argue-warrant-unsupported": {
+      "messageKey": "这条依据在这一关还检验不了。",
+      "hintKey": "换一条能由黑白格或总格数验证的依据。",
+      "focus": "warrant"
+    },
+    "argue-invariant-false": {
+      "messageKey": "证据和图形对不上，或这个量不能排除铺满。",
+      "hintKey": "重新数一遍黑白格。",
+      "focus": "evidence"
+    },
+    "argue-evidence-missing": {
+      "messageKey": "论证还缺一块：主张、依据、证据或范围。",
+      "hintKey": "先统计，再把数据挂到论证上。",
+      "focus": "argument"
+    },
+    "argue-scope-wrong": {
+      "messageKey": "适用范围写错了。",
+      "hintKey": "这是 1×2 多米诺铺满。",
+      "focus": "scope"
+    },
+    "argue-not-general": {
+      "messageKey": "棋盘转过之后，你的论证没跟上。",
+      "hintKey": "不变量要在旋转后的棋盘上也成立。",
+      "focus": "variant"
+    }
+  },
+  "badges": [
+    "boundary-explorer"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.tiling.manualAudit"
+  },
+  "titleEn": "Tiling Boundary",
+  "thinkingTargetEn": "Use a coloring or parity invariant to decide whether a 7×7 board with two corners removed can be tiled.",
+  "introEn": "Two same-color corners are gone. Place a few dominoes, then find the invariant.",
+  "promptEn": "Decide whether 1×2 dominoes can cover it and submit a checkable certificate.",
+  "doneEn": "Your invariant ruled out the whole tiling family.",
+  "retryEn": "Count black and white cells or the total cell count."
+}

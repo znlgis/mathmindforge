@@ -337,5 +337,11 @@
     "reviewedAt": "2026-10-31",
     "notesKey": "level.pattern.manualAudit"
   },
-  "thinkingTarget": "先找出重复单元，再用它预测下一块"
+  "thinkingTarget": "先找出重复单元，再用它预测下一块",
+  "titleEn": "Pattern Tinkerer",
+  "thinkingTargetEn": "Find the repeating unit and repair the broken path.",
+  "introEn": "The path is missing a few pieces. Watch how the colors repeat.",
+  "promptEn": "Commit a pattern rule, fill the gaps, then run the path.",
+  "doneEn": "You read the repeat, filled the gaps, and the path ran end to end.",
+  "retryEn": "Inspect a few cells and compare positions two or three steps apart."
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { EvidenceDraft, LevelModule, LevelRuntime, RunSnapshot, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
-import { loadLevel } from '@mmf/content';
+import { loadLevel, localizedDetail } from '@mmf/content';
 import type { LevelDetail } from '@mmf/content';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import ToolDock, { ArgumentBoard } from '@mmf/toolkit-ui';
@@ -30,6 +30,7 @@ const finalSnapshot = ref<RunSnapshot | null>(null);
 const liveSnapshot = ref<RunSnapshot | null>(null);
 const exitTimer = ref<number | null>(null);
 
+const display = computed(() => (detail.value ? localizedDetail(detail.value, locale.value) : null));
 const usedTools = computed(() => {
   const usage = finalSnapshot.value?.toolUsage;
   if (!usage) return 0;
@@ -44,7 +45,7 @@ const passedCheckpoints = computed(() => {
 
 const progress = useProgress();
 const settings = useSettings();
-const { t, translator } = useI18n();
+const { t, translator, locale } = useI18n();
 
 let disposed = false;
 let offPause: (() => void) | null = null;
@@ -267,7 +268,7 @@ onBeforeUnmount(async () => {
         ← {{ t('level.back') }}
       </button>
       <div class="min-w-0 text-center">
-        <p class="truncate text-base font-black">{{ detail?.title ?? t('level.loading') }}</p>
+        <p class="truncate text-base font-black">{{ display?.title ?? t('level.loading') }}</p>
         <p class="truncate text-[11px] text-ink-soft">{{ detail?.thinkingTarget ?? '' }}</p>
       </div>
       <button

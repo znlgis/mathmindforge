@@ -447,5 +447,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.share.manualAudit"
-  }
+  },
+  "titleEn": "Fair Share",
+  "thinkingTargetEn": "Split cookies and apples across four plates, equally and with nothing left.",
+  "introEn": "Four plates, eight cookies and four apples. Each plate must get the same number.",
+  "promptEn": "Use all 12 items and put 3 on each plate.",
+  "doneEn": "You counted the total first, then filled each plate equally.",
+  "retryEn": "Count all items, then divide by the number of plates."
 }

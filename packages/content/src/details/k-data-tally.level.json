@@ -451,5 +451,11 @@
     "reviewer": "exp-builder · M1",
     "reviewedAt": "2026-11-01",
     "notesKey": "四类 20 个图形、采集批次 5；统计条与结论的失败类已逐条走查。"
-  }
+  },
+  "titleEn": "Sorting Station",
+  "thinkingTargetEn": "Sort a basket of shapes and answer most/least with a tally.",
+  "introEn": "A basket of shapes is waiting. Collect them and record each kind.",
+  "promptEn": "Collect all 20 shapes, fill the tally, then answer most and least.",
+  "doneEn": "You counted every kind and your claim came from the tally.",
+  "retryEn": "Collect the whole basket before filling the tally."
 }

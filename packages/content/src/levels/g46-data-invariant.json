@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Invariant Detective",
+  "thinkingTargetEn": "Use an invariant to explain why a 7×7 board with two same-color corners removed cannot be tiled."
 }

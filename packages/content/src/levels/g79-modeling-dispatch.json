@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "City Dispatcher",
+  "thinkingTargetEn": "Set buses and teams so cost and waiting time both meet the targets."
 }

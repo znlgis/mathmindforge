@@ -15,6 +15,7 @@ import g46DataInvariant from './levels/g46-data-invariant.json';
 import kModelingShare from './levels/k-modeling-share.json';
 import g13ModelingPack from './levels/g13-modeling-pack.json';
 import g13StructureSymmetry from './levels/g13-structure-symmetry.json';
+import g46StructureTiling from './levels/g46-structure-tiling.json';
 
 /**
  * 摘要表：只静态加载已发布关卡。M0 只有一关；M1/M2 随 SHIPPED_LEVEL_IDS 增补。
@@ -34,6 +35,7 @@ const RAW: Record<string, unknown> = {
   'k-modeling-share': kModelingShare,
   'g13-modeling-pack': g13ModelingPack,
   'g13-structure-symmetry': g13StructureSymmetry,
+  'g46-structure-tiling': g46StructureTiling,
 };
 
 export const LEVEL_SUMMARIES: readonly LevelSummary[] = SHIPPED_LEVEL_IDS.map((id) => {

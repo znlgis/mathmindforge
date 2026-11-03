@@ -463,5 +463,11 @@
     "reviewer": "M1 rule builder",
     "reviewedAt": "2026-11-01",
     "notesKey": "level.rule.manualAudit"
-  }
+  },
+  "titleEn": "Rule Engineer: Route",
+  "thinkingTargetEn": "Build a program that collects every star and reaches the goal.",
+  "introEn": "The route has one star and a goal. Build a program that does both.",
+  "promptEn": "Run the program, then make it work on a rotated map.",
+  "doneEn": "Your program followed the route and survived a rotation.",
+  "retryEn": "Count the steps to the goal before adding turns."
 }

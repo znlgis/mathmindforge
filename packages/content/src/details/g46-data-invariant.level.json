@@ -275,5 +275,11 @@
     "reviewer": "M2b 内容走查",
     "reviewedAt": "2026-11-03",
     "notesKey": "level.invariant.manualAudit"
-  }
+  },
+  "titleEn": "Invariant Detective",
+  "thinkingTargetEn": "Use an invariant to explain why a 7×7 board with two same-color corners removed cannot be tiled.",
+  "introEn": "Two same-color corners are gone. Place a few dominoes, then find the invariant.",
+  "promptEn": "Prove it cannot be covered by 1×2 dominoes; claim, warrant, evidence and scope must hold.",
+  "doneEn": "Your invariant ruled out every tiling, not just the one you tried.",
+  "retryEn": "Recount black and white cells after placing a domino."
 }

@@ -20,5 +20,7 @@
   },
   "unlock": {
     "after": []
-  }
+  },
+  "titleEn": "Pattern Tinkerer",
+  "thinkingTargetEn": "Find the repeating unit and repair the broken path."
 }
