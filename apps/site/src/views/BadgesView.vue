@@ -5,13 +5,16 @@ import { computed, onMounted } from 'vue';
 import BadgeGrid from '../components/BadgeGrid.vue';
 import { emptySave } from '@mmf/progress';
 import { useProgress } from '../stores/progress';
+import { useI18n } from '../shell/useI18n';
 
 const progress = useProgress();
+const { locale } = useI18n();
 
 const badges = computed(() => evaluateBadges(
   progress.save ?? emptySave(0),
   progress.evidence,
   LEVEL_SUMMARIES,
+  locale.value,
 ));
 const earned = computed(() => badges.value.filter((badge) => badge.earned).length);
 

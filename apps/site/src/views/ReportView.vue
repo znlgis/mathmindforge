@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { LEVEL_SUMMARIES } from '@mmf/content';
 import { TOOL_LABELS } from '@mmf/content/ids';
-import { buildReport, parseReportPack, toReportPack } from '@mmf/evidence';
+import { buildReport, localizeReport, parseReportPack, toReportPack } from '@mmf/evidence';
 import type { ReportModel, ReportPack } from '@mmf/evidence';
 import { onMounted, ref } from 'vue';
 import AdultGate from '../components/AdultGate.vue';
 import { platform } from '../shell/platform';
 import { useProgress } from '../stores/progress';
+import { useI18n } from '../shell/useI18n';
 
 const progress = useProgress();
+const { locale } = useI18n();
 const unlocked = ref(false);
 const report = ref<ReportModel | null>(null);
 const imported = ref<ReportPack | null>(null);
@@ -27,7 +29,11 @@ async function unlock(): Promise<void> {
   await progress.loadEvidence(500);
   await progress.refreshBadges();
   if (!progress.save) return;
-  report.value = buildReport(progress.save, progress.evidence, LEVEL_SUMMARIES, platform.now());
+  report.value = localizeReport(
+    buildReport(progress.save, progress.evidence, LEVEL_SUMMARIES, platform.now()),
+    LEVEL_SUMMARIES,
+    locale.value,
+  );
   unlocked.value = true;
 }
 

@@ -38,14 +38,14 @@
 pnpm install
 pnpm dev          # http://127.0.0.1:5192
 pnpm verify       # typecheck / lint / 120 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
-pnpm e2e          # 41 条：14 关 autoplay、14 关无工具失败、7 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
+pnpm e2e          # 42 条：14 关 autoplay、14 关无工具失败、7 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
 ```
 
-实测（2026-11-03）：首屏 51.3 KB gzip，Phaser chunk 220.3 KB gzip，dist 1341.3 KB；`pnpm verify` 与 `pnpm e2e`（41 条）全绿。
+实测（2026-11-03）：首屏 51.2 KB gzip，Phaser chunk 220.3 KB gzip，dist 1345.8 KB；`pnpm verify` 与 `pnpm e2e`（42 条）全绿。
 
-已实现：workspace 基座、game-kit 契约、14 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、双语 UI 与内容标题/正文、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
+已实现：workspace 基座、game-kit 契约、14 关内容、6 个模板、6 件工具 UI + 论证板、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出/只读导入）、变体通行证、双语 UI、内容与证据/报告、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a/M2b 实现记录](docs/05-M0实现记录.md)。
 
-**M2b 下一步**：其余 6 关、证据/报告本地化、原生壳（需 Rust 与 Android SDK）、真实用户测试。
+**M2b 下一步**：其余 6 关（需 queue/network/schedule/sampling/inference 新模式）、原生壳（需 Rust 与 Android SDK）、真实用户测试。
 
 ---
 

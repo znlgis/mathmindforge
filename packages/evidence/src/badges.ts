@@ -7,6 +7,7 @@
 import type { BadgeId, LevelId } from '@mmf/content/ids';
 import { BADGE_IDS } from '@mmf/content/ids';
 import type { LevelSummary } from '@mmf/content';
+import type { Locale } from '@mmf/content/ids';
 import type { EvidenceEvent, LevelProgress, SaveData } from '@mmf/game-kit';
 import type { BadgeView } from './types';
 
@@ -20,6 +21,30 @@ const LEVEL_BADGES: Partial<Record<BadgeId, LevelId>> = {
   builder: 'g46-algorithm-payment',
   modeler: 'g79-modeling-dispatch',
   experimenter: 'g1012-modeling-winrate',
+};
+
+const TITLES_EN: Record<BadgeId, string> = {
+  observer: 'Observer',
+  'pattern-spotter': 'Pattern Spotter',
+  'rule-designer': 'Rule Designer',
+  builder: 'Builder',
+  modeler: 'Modeler',
+  experimenter: 'Experimenter',
+  'boundary-explorer': 'Boundary Explorer',
+  reviser: 'Reviser',
+  transferer: 'Transferer',
+};
+
+const CRITERIA_EN: Record<BadgeId, string> = {
+  observer: 'Leave observation records in at least 2 levels.',
+  'pattern-spotter': 'Complete the pattern main level.',
+  'rule-designer': 'Complete the rule main level.',
+  builder: 'Complete the payment level with the fewest materials.',
+  modeler: 'Complete the simulation level with both metrics passing.',
+  experimenter: 'Complete the experiment level and support the claim with data.',
+  'boundary-explorer': 'Find a counterexample where the method fails.',
+  reviser: 'Revise after a failure and complete a level.',
+  transferer: 'Earn transfer stamps in 2 completed levels.',
 };
 
 const TITLES: Record<BadgeId, string> = {
@@ -123,6 +148,7 @@ export function evaluateBadges(
   save: SaveData,
   events: EvidenceEvent[],
   summaries: readonly LevelSummary[],
+  locale: Locale = 'zh-CN',
 ): BadgeView[] {
   const metrics = collectMetrics(save, events);
   const awards = save && save.badges ? save.badges : {};
@@ -132,11 +158,20 @@ export function evaluateBadges(
     const progress = progressFor(id, metrics);
     const award = awards[id];
     const levelId = LEVEL_BADGES[id];
+    const localizedTitle = locale === 'en' ? TITLES_EN[id] : TITLES[id];
+    const localizedCriteria = locale === 'en' ? CRITERIA_EN[id] : CRITERIA[id];
+    const levelTitle = levelId
+      ? (locale === 'en'
+        ? (summaries.find((summary) => summary.id === levelId)?.titleEn ?? titleFor(summaries, levelId))
+        : titleFor(summaries, levelId))
+      : null;
     const view: BadgeView = {
       id,
       earned: Boolean(award) || progress.current >= progress.target,
-      title: TITLES[id],
-      criteria: levelId ? '完成「' + titleFor(summaries, levelId) + '」' : CRITERIA[id],
+      title: localizedTitle,
+      criteria: levelTitle
+        ? (locale === 'en' ? 'Complete "' + levelTitle + '"' : '完成「' + levelTitle + '」')
+        : localizedCriteria,
       progress,
     };
     if (award && typeof award.awardedAt === 'number' && Number.isFinite(award.awardedAt)) {

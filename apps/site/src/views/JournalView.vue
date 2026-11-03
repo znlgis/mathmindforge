@@ -2,13 +2,15 @@
 import { LEVEL_SUMMARIES } from '@mmf/content';
 import { TOOL_LABELS } from '@mmf/content/ids';
 import type { ToolId } from '@mmf/content/ids';
-import { buildTrail } from '@mmf/evidence';
+import { buildTrail, localizeTrail } from '@mmf/evidence';
 import { computed, onMounted } from 'vue';
 import TrailList from '../components/TrailList.vue';
 import { emptySave } from '@mmf/progress';
 import { useProgress } from '../stores/progress';
+import { useI18n } from '../shell/useI18n';
 
 const progress = useProgress();
+const { locale } = useI18n();
 
 const titleOf = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {};
@@ -17,11 +19,10 @@ const titleOf = computed<Record<string, string>>(() => {
 });
 
 const entries = computed(() => [...(progress.save?.journal ?? [])].reverse().slice(0, 20));
-const trail = computed(() => buildTrail(
-  progress.save ?? emptySave(0),
-  progress.evidence,
+const trail = computed(() => localizeTrail(
+  buildTrail(progress.save ?? emptySave(0), progress.evidence, LEVEL_SUMMARIES, 80),
   LEVEL_SUMMARIES,
-  80,
+  locale.value,
 ));
 
 
