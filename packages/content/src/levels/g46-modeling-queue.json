@@ -1,0 +1,24 @@
+{
+  "id": "g46-modeling-queue",
+  "title": "排队规划师",
+  "emoji": "⏱️",
+  "color": "#b07d2b",
+  "band": "g46",
+  "thread": "modeling",
+  "template": "simulate",
+  "tools": [
+    "knob",
+    "probe"
+  ],
+  "estimatedMinutes": 7,
+  "thinkingTarget": "调服务台数量、服务时长和营业时长，让等待与加班都达标",
+  "difficulty": {
+    "structure": 2,
+    "representation": 2,
+    "constraint": 3,
+    "transfer": 2
+  },
+  "unlock": {
+    "after": []
+  }
+}

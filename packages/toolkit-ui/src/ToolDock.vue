@@ -10,6 +10,7 @@ import DominoTool from './DominoTool.vue';
 import InvariantProbeTool from './InvariantProbeTool.vue';
 import KnobTool from './KnobTool.vue';
 import MetricsTool from './MetricsTool.vue';
+import QueueMetricsTool from './QueueMetricsTool.vue';
 import PatternTool from './PatternTool.vue';
 import PaymentTool from './PaymentTool.vue';
 import RuleTool from './RuleTool.vue';
@@ -148,6 +149,13 @@ onBeforeUnmount(() => {
       />
       <InvariantProbeTool
         v-else-if="spec.kind === 'probe' && spec.config.mode === 'invariant'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <QueueMetricsTool
+        v-else-if="spec.kind === 'probe' && spec.config.mode === 'queue'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"

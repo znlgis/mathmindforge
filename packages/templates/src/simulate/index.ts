@@ -6,9 +6,9 @@ import type {
   LevelRuntime,
   RuntimeOptions,
 } from '@mmf/game-kit';
-import { createSimulateRuntime } from './runtime';
+import { createSimulateRuntime } from './verifier';
 
-export { createSimulateRuntime } from './runtime';
+export { createSimulateRuntime } from './verifier';
 export { simulateVerifier, FAILURE_CLASSES } from './logic';
 export type { SimulateScript, SimulateArtifact } from './schema';
 export { simulateScriptSchema, simulateArtifactSchema } from './schema';

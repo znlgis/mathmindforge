@@ -11,7 +11,7 @@ import {
 } from './pattern/logic';
 import { ruleVerifier } from './rule/logic';
 import { constructVerifier } from './construct/verifier';
-import { simulateVerifier } from './simulate/logic';
+import { simulateVerifier } from './simulate/verifier';
 import { argueVerifier } from './argue/logic';
 import {
   actionsFor as experimentActions,
@@ -25,7 +25,7 @@ import {
 import { createPatternRuntime } from './pattern/runtime';
 import { createRuleRuntime } from './rule/runtime';
 import { createConstructRuntime } from './construct/verifier';
-import { createSimulateRuntime } from './simulate/runtime';
+import { createSimulateRuntime } from './simulate/verifier';
 import { createExperimentRuntime } from './experiment/runtime';
 import { createArgueRuntime } from './argue/runtime';
 

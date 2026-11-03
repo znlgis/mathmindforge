@@ -28,7 +28,8 @@
     "./verifiers": "./src/verifiers.ts",
     "./argue": "./src/argue/index.ts",
     "./argue.logic": "./src/argue/logic.ts",
-    "./argue.runtime": "./src/argue/runtime.ts"
+    "./argue.runtime": "./src/argue/runtime.ts",
+    "./simulate.queue": "./src/simulate/queue.ts"
   },
   "scripts": {
     "test": "vitest run",

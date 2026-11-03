@@ -18,7 +18,8 @@
     "./k-modeling-share": "./src/levels/k-modeling-share.ts",
     "./g13-modeling-pack": "./src/levels/g13-modeling-pack.ts",
     "./g13-structure-symmetry": "./src/levels/g13-structure-symmetry.ts",
-    "./g46-structure-tiling": "./src/levels/g46-structure-tiling.ts"
+    "./g46-structure-tiling": "./src/levels/g46-structure-tiling.ts",
+    "./g46-modeling-queue": "./src/levels/g46-modeling-queue.ts"
   },
   "scripts": {
     "test": "vitest run",
