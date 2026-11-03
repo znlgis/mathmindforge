@@ -68,6 +68,12 @@ pnpm e2e          # 59 条：20 关 autoplay、20 关无工具失败、12 关真
 9. [用户测试协议](docs/08-用户测试协议.md) —— 知情同意、观察表、成功标准与隐私；
 10. [发布检查清单](docs/09-发布检查清单.md) —— 内容/工程/双语/原生壳/发布操作与阻断规则。
 
+## CI / 发布
+
+- `ci.yml`：verify、e2e、preview（生产产物 `e2e:dist`），Playwright 缓存与失败截图/轨迹；
+- `release.yml`：push `v*` tag 时创建 GitHub Release，附 Web 静态 zip；`workflow_dispatch` 只出产物；
+- 原生 EXE/APK 任务未纳入：仓库尚无 Tauri/Capacitor 工程，构建环境也缺 Rust/Android SDK。
+
 ## 范围与默认决策
 
 按 2026-10-31 确认的推荐默认执行：5 学段全做（v1.0 20 关）、双语内容 v1.0、三端发布、多档案 schema 先行 UI v1.1、编辑器 v1.1、v1.0 20 关 + 变体。完整 10 项见 [04 文档第 9 节](docs/04-落地路线与验收.md)。
