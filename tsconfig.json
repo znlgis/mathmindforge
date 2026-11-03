@@ -5,6 +5,9 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
+    // vite.config.ts 要显式写 .ts 扩展名：Vite 的 native config loader 将成为默认，
+    // 它不支持无扩展名的相对导入（现在启动时会打警告）。只放行不强制，其余相对导入保持原样。
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,

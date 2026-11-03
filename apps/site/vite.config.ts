@@ -3,7 +3,8 @@ import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
-import { CSP_TAG } from './src/shell/csp';
+// 显式带 .ts：Vite 8 的 native config loader 不支持无扩展名相对导入（dev 启动时会警告）。
+import { CSP_TAG } from './src/shell/csp.ts';
 
 const phaserTrim = fileURLToPath(
   new URL('../../packages/canvas-kit/vendor/phaser-trim.esm.js', import.meta.url),
