@@ -72,7 +72,7 @@ export const ToolSpecSchema = z.discriminatedUnion('kind', [
     kind: z.literal('probe'),
     ...ToolSpecBase,
     config: z.object({
-      mode: z.enum(['sample', 'tally', 'metrics', 'invariant', 'queue', 'sampling']).default('sample'),
+      mode: z.enum(['sample', 'tally', 'metrics', 'invariant', 'queue', 'sampling', 'inference']).default('sample'),
       sampleSizes: z.array(z.number().int().positive()).min(1),
       chart: z.string().max(40).optional(),
       categories: z.array(z.object({

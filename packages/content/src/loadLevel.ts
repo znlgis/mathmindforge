@@ -24,6 +24,7 @@ const LOADERS: Record<ShippedLevelId, () => Promise<unknown>> = {
   'g46-modeling-queue': () => import('./details/g46-modeling-queue.level.json'),
   'g79-data-sampling': () => import('./details/g79-data-sampling.level.json'),
   'g79-structure-network': () => import('./details/g79-structure-network.level.json'),
+  'g1012-data-inference': () => import('./details/g1012-data-inference.level.json'),
 };
 
 export async function loadLevel(

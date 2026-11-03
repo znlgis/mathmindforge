@@ -1,0 +1,25 @@
+{
+  "id": "g1012-data-inference",
+  "title": "证据裁判",
+  "emoji": "⚖️",
+  "color": "#2f7d78",
+  "band": "g1012",
+  "thread": "data",
+  "template": "experiment",
+  "tools": [
+    "probe"
+  ],
+  "estimatedMinutes": 8,
+  "thinkingTarget": "比较两组样本比例和区间，判断差异是否站得住",
+  "difficulty": {
+    "structure": 2,
+    "representation": 3,
+    "constraint": 3,
+    "transfer": 3
+  },
+  "unlock": {
+    "after": []
+  },
+  "titleEn": "Evidence Judge",
+  "thinkingTargetEn": "Compare two sample proportions and intervals to decide whether the difference holds."
+}

@@ -19,6 +19,7 @@ import g46StructureTiling from './levels/g46-structure-tiling.json';
 import g46ModelingQueue from './levels/g46-modeling-queue.json';
 import g79DataSampling from './levels/g79-data-sampling.json';
 import g79StructureNetwork from './levels/g79-structure-network.json';
+import g1012DataInference from './levels/g1012-data-inference.json';
 
 /**
  * 摘要表：只静态加载已发布关卡。M0 只有一关；M1/M2 随 SHIPPED_LEVEL_IDS 增补。
@@ -42,6 +43,7 @@ const RAW: Record<string, unknown> = {
   'g46-modeling-queue': g46ModelingQueue,
   'g79-data-sampling': g79DataSampling,
   'g79-structure-network': g79StructureNetwork,
+  'g1012-data-inference': g1012DataInference,
 };
 
 export const LEVEL_SUMMARIES: readonly LevelSummary[] = SHIPPED_LEVEL_IDS.map((id) => {

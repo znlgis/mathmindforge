@@ -21,4 +21,5 @@ export const registry: Record<ShippedLevelId, LevelLoader> = {
   'g46-modeling-queue': () => import('@mmf/game-forge/g46-modeling-queue'),
   'g79-data-sampling': () => import('@mmf/game-forge/g79-data-sampling'),
   'g79-structure-network': () => import('@mmf/game-forge/g79-structure-network'),
+  'g1012-data-inference': () => import('@mmf/game-forge/g1012-data-inference'),
 };

@@ -1,0 +1,356 @@
+{
+  "id": "g1012-data-inference",
+  "title": "证据裁判",
+  "band": "g1012",
+  "thread": "data",
+  "template": "experiment",
+  "thinkingTarget": "比较两组样本比例和区间，判断差异是否站得住",
+  "intro": "两组各 50 个样本，一组成功 35 次，另一组 15 次。差异是真的吗？",
+  "prompt": "比较两组的样本比例与 95% 区间，判断哪一组更高（或差异不明确）。",
+  "done": "你用区间是否重叠来判断差异，而不是只比两个点。",
+  "retry": "先看两组区间有没有重叠，再决定结论。",
+  "tools": [
+    {
+      "kind": "probe",
+      "titleKey": "tool.probe.title",
+      "descriptionKey": "tool.probe.desc",
+      "requiredArtifacts": [
+        "dataset",
+        "claim"
+      ],
+      "config": {
+        "mode": "inference",
+        "sampleSizes": [
+          50
+        ],
+        "chart": "inference"
+      }
+    }
+  ],
+  "requiredToolArtifacts": [
+    "dataset",
+    "claim"
+  ],
+  "levelScript": {
+    "mode": "inference",
+    "groups": {
+      "a": {
+        "label": "A 组",
+        "n": 50,
+        "successes": 35
+      },
+      "b": {
+        "label": "B 组",
+        "n": 50,
+        "successes": 15
+      }
+    },
+    "minN": 30,
+    "overlapTolerance": 0.02,
+    "claimOptions": [
+      "a-higher",
+      "b-higher",
+      "no-clear"
+    ]
+  },
+  "evidencePlan": [
+    {
+      "id": "compare",
+      "phase": "observe",
+      "require": "probe/focus >= 1",
+      "descriptionKey": "先看两组比例与区间"
+    },
+    {
+      "id": "claim",
+      "phase": "result",
+      "require": "probe/claim >= 1",
+      "descriptionKey": "记录哪组更高"
+    }
+  ],
+  "solutions": [
+    {
+      "id": "s-computed",
+      "artifact": {
+        "stats": {
+          "a": {
+            "n": 50,
+            "successes": 35,
+            "proportion": 0.7,
+            "ci": [
+              0.562,
+              0.808
+            ]
+          },
+          "b": {
+            "n": 50,
+            "successes": 15,
+            "proportion": 0.3,
+            "ci": [
+              0.191,
+              0.438
+            ]
+          }
+        },
+        "claim": {
+          "kind": "difference",
+          "delta": 0.4,
+          "ci": [
+            0.12,
+            0.68
+          ],
+          "n": 100
+        }
+      }
+    },
+    {
+      "id": "s-conservative",
+      "artifact": {
+        "stats": {
+          "a": {
+            "n": 50,
+            "successes": 35,
+            "proportion": 0.7,
+            "ci": [
+              0.562,
+              0.808
+            ]
+          },
+          "b": {
+            "n": 50,
+            "successes": 15,
+            "proportion": 0.3,
+            "ci": [
+              0.191,
+              0.438
+            ]
+          }
+        },
+        "claim": {
+          "kind": "difference",
+          "delta": 0.4,
+          "ci": [
+            0.15,
+            0.65
+          ],
+          "n": 100
+        }
+      }
+    }
+  ],
+  "negativeSamples": [
+    {
+      "id": "n-small",
+      "expectFailure": "inference-too-small",
+      "artifact": {
+        "stats": {
+          "a": {
+            "n": 20,
+            "successes": 14,
+            "proportion": 0.7,
+            "ci": [
+              0.481,
+              0.858
+            ]
+          },
+          "b": {
+            "n": 20,
+            "successes": 6,
+            "proportion": 0.3,
+            "ci": [
+              0.146,
+              0.519
+            ]
+          }
+        },
+        "claim": {
+          "kind": "difference",
+          "delta": 0.4,
+          "ci": [
+            0.05,
+            0.75
+          ],
+          "n": 40
+        }
+      }
+    },
+    {
+      "id": "n-mismatch",
+      "expectFailure": "inference-sample-mismatch",
+      "artifact": {
+        "stats": {
+          "a": {
+            "n": 40,
+            "successes": 28,
+            "proportion": 0.7,
+            "ci": [
+              0.549,
+              0.819
+            ]
+          },
+          "b": {
+            "n": 40,
+            "successes": 12,
+            "proportion": 0.3,
+            "ci": [
+              0.181,
+              0.457
+            ]
+          }
+        },
+        "claim": {
+          "kind": "difference",
+          "delta": 0.4,
+          "ci": [
+            0.15,
+            0.65
+          ],
+          "n": 80
+        }
+      }
+    },
+    {
+      "id": "n-wrong",
+      "expectFailure": "inference-claim-wrong",
+      "artifact": {
+        "stats": {
+          "a": {
+            "n": 50,
+            "successes": 35,
+            "proportion": 0.7,
+            "ci": [
+              0.562,
+              0.808
+            ]
+          },
+          "b": {
+            "n": 50,
+            "successes": 15,
+            "proportion": 0.3,
+            "ci": [
+              0.191,
+              0.438
+            ]
+          }
+        },
+        "claim": {
+          "kind": "difference",
+          "delta": -0.4,
+          "ci": [
+            0.12,
+            0.68
+          ],
+          "n": 100
+        }
+      }
+    },
+    {
+      "id": "n-zero",
+      "expectFailure": "inference-ci-includes-zero",
+      "artifact": {
+        "stats": {
+          "a": {
+            "n": 50,
+            "successes": 35,
+            "proportion": 0.7,
+            "ci": [
+              0.562,
+              0.808
+            ]
+          },
+          "b": {
+            "n": 50,
+            "successes": 15,
+            "proportion": 0.3,
+            "ci": [
+              0.191,
+              0.438
+            ]
+          }
+        },
+        "claim": {
+          "kind": "difference",
+          "delta": 0.4,
+          "ci": [
+            -0.02,
+            0.62
+          ],
+          "n": 100
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "v-labels",
+      "axis": "representation",
+      "patch": {
+        "groups": {
+          "a": {
+            "label": "甲组",
+            "n": 50,
+            "successes": 35
+          },
+          "b": {
+            "label": "乙组",
+            "n": 50,
+            "successes": 15
+          }
+        }
+      }
+    },
+    {
+      "id": "v-tolerance",
+      "axis": "representation",
+      "patch": {
+        "overlapTolerance": 0.01
+      }
+    }
+  ],
+  "feedback": {
+    "inference-no-sample": {
+      "messageKey": "还没有两组样本。",
+      "hintKey": "先看两组比例和区间。",
+      "focus": "stats"
+    },
+    "inference-too-small": {
+      "messageKey": "样本量太小，区间太宽。",
+      "hintKey": "每组至少 30 个样本。",
+      "focus": "n"
+    },
+    "inference-sample-mismatch": {
+      "messageKey": "报告里的样本量和题目对不上。",
+      "hintKey": "使用题目给的两组 50 个样本。",
+      "focus": "n"
+    },
+    "inference-no-claim": {
+      "messageKey": "还差一句差值结论。",
+      "hintKey": "写下差值、区间与样本量。",
+      "focus": "claim"
+    },
+    "inference-claim-wrong": {
+      "messageKey": "结论方向和区间不一致。",
+      "hintKey": "区间整体在 0 上方，才说明 A 更高。",
+      "focus": "direction"
+    },
+    "inference-ci-includes-zero": {
+      "messageKey": "区间包含 0，差异还不明确。",
+      "hintKey": "区间跨过 0 时不能下“某组更高”的结论。",
+      "focus": "ci"
+    }
+  },
+  "badges": [
+    "experimenter"
+  ],
+  "manualAudit": {
+    "reviewed": true,
+    "reviewer": "M2b 内容走查",
+    "reviewedAt": "2026-11-03",
+    "notesKey": "level.inference.manualAudit"
+  },
+  "titleEn": "Evidence Judge",
+  "thinkingTargetEn": "Compare two sample proportions and intervals to decide whether the difference holds.",
+  "introEn": "Two groups of 50: one succeeds 35 times, the other 15. Is the difference real?",
+  "promptEn": "Compare both proportions and 95% intervals, then decide which group is higher (or that the difference is unclear).",
+  "doneEn": "You used interval overlap, not just two point estimates.",
+  "retryEn": "Check whether the intervals overlap before choosing a conclusion."
+}

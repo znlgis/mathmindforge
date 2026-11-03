@@ -13,6 +13,7 @@ import MetricsTool from './MetricsTool.vue';
 import QueueMetricsTool from './QueueMetricsTool.vue';
 import SamplingTool from './SamplingTool.vue';
 import NetworkTool from './NetworkTool.vue';
+import InferenceTool from './InferenceTool.vue';
 import PatternTool from './PatternTool.vue';
 import PaymentTool from './PaymentTool.vue';
 import RuleTool from './RuleTool.vue';
@@ -180,6 +181,13 @@ onBeforeUnmount(() => {
       />
       <TallyTool
         v-else-if="spec.kind === 'probe' && spec.config.mode === 'tally'"
+        :spec="spec"
+        :runtime="runtime"
+        :snapshot="snapshot"
+        :t="translator"
+      />
+      <InferenceTool
+        v-else-if="spec.kind === 'probe' && spec.config.mode === 'inference'"
         :spec="spec"
         :runtime="runtime"
         :snapshot="snapshot"

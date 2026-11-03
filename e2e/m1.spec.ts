@@ -176,3 +176,12 @@ test('真实点击：路网规划师可以通关', async ({ page }) => {
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
+
+test('真实点击：证据裁判可以通关', async ({ page }) => {
+  await page.goto('/#/play/g1012-data-inference');
+  await expect(page.getByTestId('inference-tool')).toBeVisible();
+  await page.getByTestId('inference-focus').click();
+  await page.getByTestId('inference-a-higher').click();
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+});
