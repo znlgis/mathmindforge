@@ -13,13 +13,13 @@
 
 ---
 
-## 当前状态（M1 已完成）
+## 当前状态（M2a 已完成：思维叙事层）
 
-**6 关可玩，5 个模板、6 件工具全部接通**：
+**6 关可玩、5 个模板、6 件工具；证据 → 画像 → 徽章 → 日志/轨迹 → 报告已闭环**：
 
 - `k-structure-pattern-path` 模式修补匠（pattern）
 - `k-data-tally` 分类小站（experiment / tally）
-- `g13-algorithm-route` 规则工程师·路线（rule，无头自动通关 + 真实点击在 M2）
+- `g13-algorithm-route` 规则工程师·路线（rule，无头自动通关；真实点击排期 M2b）
 - `g46-algorithm-payment` 最少枚数支付（construct / payment + counter）
 - `g79-modeling-dispatch` 城市调度员（simulate + knob/probe）
 - `g1012-modeling-winrate` 胜率实验室（experiment / duel + knob/probe）
@@ -29,15 +29,15 @@
 ```bash
 pnpm install
 pnpm dev          # http://127.0.0.1:5192
-pnpm verify       # typecheck / lint / 89 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
-pnpm e2e          # 18 条：6 关 autoplay、6 关无工具失败、3 关真实点击、断网/零外网、刷新保留
+pnpm verify       # typecheck / lint / 113 单测 / 内容体检 / 关卡审计 / 打包体检 / build / size
+pnpm e2e          # 19 条：6 关 autoplay、6 关无工具失败、3 关真实点击、日志/徽章/报告、断网/零外网、刷新保留
 ```
 
-实测（2026-11-01）：首屏 42.4 KB gzip，Phaser chunk 220.3 KB gzip，dist 1227.2 KB；`pnpm verify` 与 `pnpm e2e`（18 条）全绿。
+实测（2026-11-03）：首屏 46.0 KB gzip，Phaser chunk 220.3 KB gzip，dist 1257.4 KB；`pnpm verify` 与 `pnpm e2e`（19 条）全绿。
 
-已实现：workspace 基座、game-kit 契约、内容 schema 与 6 关、5 个模板（pattern/rule/construct/simulate/experiment）、6 件工具 UI、Phaser 画布（pattern/rule）、无画布 ToolDock、IndexedDB 存档与证据、进度管理、调试桥、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0 实现记录](docs/05-M0实现记录.md)（含 M1 章节）。
+已实现：workspace 基座、game-kit 契约、6 关内容、5 个模板、6 件工具 UI、Phaser 画布、无画布 ToolDock、IndexedDB 存档与批量证据、四维画像、9 枚徽章、思维日志/轨迹、长按解锁的家长/教师报告（打印 + JSON 导出）、内容体检、反刷题审计、体积门禁、CI。详细记录见 [M0/M1/M2a 实现记录](docs/05-M0实现记录.md)。
 
-**M2 下一步**：思维轨迹面板、家长/教师报告、证据批量写入、规则关真实点击 e2e、变体通行证 UI、内容 i18n 化、用户测试。
+**M2b 下一步**：argue 模板 + 其余 12 关、报告导入/教师视图、变体通行证 UI、内容 i18n 化、原生壳与用户测试。
 
 ---
 
@@ -48,8 +48,9 @@ pnpm e2e          # 18 条：6 关 autoplay、6 关无工具失败、3 关真实
 3. [技术架构](docs/02-技术架构.md) —— 包结构、契约、运行时、存档、证据、平台、构建、测试、打包；
 4. [关卡设计规格](docs/03-关卡设计规格.md) —— 20 关矩阵、MVP 6 关详规、JSON 示例、作者检查表；
 5. [落地路线与验收](docs/04-落地路线与验收.md) —— M0–M5、任务分解、验收门禁、用户测试、风险与待确认决策；
-6. [M0/M1 实现记录](docs/05-M0实现记录.md) —— M0/M1 实际实现、实测数字、偏差与 M2 待办；
-7. [M1 实施规格](docs/06-M1实施规格.md) —— 四模板/六关的并行施工合同与内容数字。
+6. [M0/M1/M2a 实现记录](docs/05-M0实现记录.md) —— 各阶段实际实现、实测数字、偏差与下一步；
+7. [M1 实施规格](docs/06-M1实施规格.md) —— 四模板/六关的并行施工合同与内容数字；
+8. [M2a 实施规格](docs/07-M2a实施规格.md) —— 证据/画像/徽章/日志/报告接口与叙事 UI 合同。
 
 ## 范围与默认决策
 

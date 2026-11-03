@@ -68,6 +68,9 @@ importers:
       '@mmf/content':
         specifier: workspace:*
         version: link:../../packages/content
+      '@mmf/evidence':
+        specifier: workspace:*
+        version: link:../../packages/evidence
       '@mmf/game-forge':
         specifier: workspace:*
         version: link:../../games/forge

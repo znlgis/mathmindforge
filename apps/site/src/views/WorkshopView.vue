@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LevelModule, LevelRuntime, RunSnapshot, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
+import type { EvidenceDraft, LevelModule, LevelRuntime, RunSnapshot, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
 import { loadLevel } from '@mmf/content';
 import type { LevelDetail } from '@mmf/content';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
@@ -47,6 +47,33 @@ const { t } = useI18n();
 let disposed = false;
 let offPause: (() => void) | null = null;
 let offResume: (() => void) | null = null;
+let evidenceQueue: EvidenceDraft[] = [];
+let evidenceTimer: number | null = null;
+
+function scheduleEvidenceFlush(): void {
+  if (evidenceTimer !== null) return;
+  evidenceTimer = window.setTimeout(() => {
+    evidenceTimer = null;
+    void flushEvidence();
+  }, 2000);
+}
+
+/** 证据每 2 秒批量落盘；提交/退出前强制 flush，避免"失败→修正"缺前半段。 */
+async function flushEvidence(): Promise<void> {
+  if (evidenceTimer !== null) {
+    window.clearTimeout(evidenceTimer);
+    evidenceTimer = null;
+  }
+  if (evidenceQueue.length === 0) return;
+  const batch = evidenceQueue;
+  evidenceQueue = [];
+  try {
+    await progress.recordEvidence(props.levelId, batch);
+  } catch (cause) {
+    evidenceQueue = [...batch, ...evidenceQueue];
+    console.warn('[mmf] 证据写入失败，稍后重试', cause);
+  }
+}
 
 function clearExitTimer(): void {
   if (exitTimer.value !== null) {
@@ -71,14 +98,17 @@ async function completeNow(stamps: StampId[], variantId: string): Promise<void> 
     levelId,
     variantId,
     stamps,
-    failureClassesSeen: [],
-    revisionCount: 0,
+    failureClassesSeen: (finalSnapshot.value?.runs ?? [])
+      .map((run) => run.failureClass)
+      .filter((value): value is string => Boolean(value)),
+    revisionCount: finalSnapshot.value?.revision ?? 0,
     toolIds: (detail.value?.tools.map((tool) => tool.kind) ?? []) as ToolId[],
-    durationMs: 0,
+    durationMs: finalSnapshot.value?.lastRun?.durationMs ?? 0,
   });
   if (!progress.save?.levels[levelId]?.completed) {
     console.warn('[mmf] 完成状态没有写进存档');
   }
+  await progress.refreshBadges();
   if (!readDebugOptions()?.instant) scheduleExit();
   else navigate('/forge');
 }
@@ -87,6 +117,7 @@ async function submit(): Promise<void> {
   const rt = runtime.value;
   if (!rt) return;
   const result = await rt.dispatch({ type: 'submit', payload: {} });
+  await flushEvidence();
   finalSnapshot.value = result.snapshot;
   setDebugSnapshot(result.snapshot);
   const verdict = result.verdict;
@@ -128,7 +159,8 @@ async function start(): Promise<void> {
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       autoplay: debug?.autoplay,
       onEvidence: (draft) => {
-        void progress.recordEvidence(props.levelId, [draft]);
+        evidenceQueue.push(draft);
+        scheduleEvidenceFlush();
       },
     });
     runtime.value = runtimeRef;
@@ -159,6 +191,7 @@ async function start(): Promise<void> {
     registerSubmit(submit);
     if (debug?.autoplay) {
       const result = await runtimeRef.autoplay();
+      await flushEvidence();
       finalSnapshot.value = result.snapshot;
       setDebugSnapshot(result.snapshot);
       if (result.verdict?.passed) await completeNow(result.verdict.stamps, result.snapshot.variantId);
@@ -209,6 +242,7 @@ onBeforeUnmount(async () => {
   offPause = null;
   offResume = null;
   platform.audio.stopSpeech();
+  await flushEvidence();
   await module.value?.unmount();
   module.value = null;
   runtime.value = null;

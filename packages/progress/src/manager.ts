@@ -7,6 +7,7 @@
 import type { LevelId, StampId, ToolId } from '@mmf/content/ids';
 import { STAMP_IDS, TOOL_IDS } from '@mmf/content/ids';
 import type {
+  BadgeId,
   EvidenceDraft,
   EvidenceEvent,
   EvidenceStore,
@@ -16,6 +17,8 @@ import type {
   SaveData,
   ToolUsage,
 } from '@mmf/game-kit';
+import { evaluateBadges } from '@mmf/evidence';
+import { LEVEL_SUMMARIES } from '@mmf/content';
 import {
   MAX_JOURNAL_ENTRIES,
   PROFILE_ID,
@@ -216,6 +219,35 @@ export class ProgressManager {
       revision,
     }));
     await this.evidence.append(events);
+  }
+
+  /** 最近证据（倒序由 EvidenceStore 负责，这里原样返回）。 */
+  async recentEvidence(limit = 300): Promise<EvidenceEvent[]> {
+    await this.init();
+    return this.evidence.recent(limit);
+  }
+
+  /**
+   * 按证据规则重算徽章，把新达成的写入存档。
+   * 徽章不是"通关次数"：规则在 evidence 包，纯函数、可重算。
+   */
+  async refreshBadges(now = this.clock()): Promise<BadgeId[]> {
+    await this.init();
+    const events = await this.evidence.recent(2000);
+    const views = evaluateBadges(this.current, events, LEVEL_SUMMARIES);
+    const badges = { ...this.current.badges };
+    const newly: BadgeId[] = [];
+    const evidenceRefs = events.slice(-20).map((event) => event.id);
+    for (const view of views) {
+      if (!view.earned || badges[view.id]) continue;
+      badges[view.id] = { awardedAt: now, evidenceRefs };
+      newly.push(view.id);
+    }
+    if (newly.length > 0) {
+      this.current = { ...this.current, updatedAt: now, badges };
+      await this.store.save(this.current);
+    }
+    return newly;
   }
 
   /** 清档：存档回空档、证据与聚合一并清空。 */

@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import type { Ref } from 'vue';
 
 export interface Route {
-  name: 'home' | 'forge' | 'play';
+  name: 'home' | 'forge' | 'play' | 'journal' | 'badges' | 'report';
   levelId?: ShippedLevelId;
 }
 
@@ -26,6 +26,9 @@ export function parseRoute(hash: string): Route {
     return levelId ? { name: 'play', levelId } : { name: 'forge' };
   }
   if (head === 'forge') return { name: 'forge' };
+  if (head === 'journal') return { name: 'journal' };
+  if (head === 'badges') return { name: 'badges' };
+  if (head === 'report') return { name: 'report' };
   return { name: 'home' };
 }
 

@@ -1,4 +1,4 @@
-import type { EvidenceDraft, SaveData, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
+import type { BadgeId, EvidenceDraft, EvidenceEvent, SaveData, ShippedLevelId, StampId, ToolId } from '@mmf/game-kit';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { progressManager } from '../shell/progress';
@@ -17,6 +17,7 @@ export interface CompletionInput {
 export const useProgress = defineStore('progress', () => {
   const save = ref<SaveData | null>(null);
   const ready = ref(false);
+  const evidence = ref<EvidenceEvent[]>([]);
   const initError = ref<string | null>(null);
   let inflight: Promise<void> | null = null;
 
@@ -47,7 +48,18 @@ export const useProgress = defineStore('progress', () => {
   }
 
   async function recordEvidence(levelId: ShippedLevelId, drafts: EvidenceDraft[]): Promise<void> {
+    if (drafts.length === 0) return;
     await progressManager.recordEvidence(levelId, drafts);
+  }
+
+  async function loadEvidence(limit = 300): Promise<void> {
+    evidence.value = await progressManager.recentEvidence(limit);
+  }
+
+  async function refreshBadges(): Promise<BadgeId[]> {
+    const newly = await progressManager.refreshBadges();
+    sync();
+    return newly;
   }
 
   function completedBefore(levelId: ShippedLevelId): boolean {
@@ -59,5 +71,8 @@ export const useProgress = defineStore('progress', () => {
     sync();
   }
 
-  return { save, ready, initError, init, completeLevel, recordEvidence, completedBefore, clear, sync };
+  return {
+    save, ready, evidence, initError, init, completeLevel, recordEvidence, loadEvidence,
+    refreshBadges, completedBefore, clear, sync,
+  };
 });

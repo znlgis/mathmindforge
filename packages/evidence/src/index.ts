@@ -1,5 +1,6 @@
 /**
- * 证据纯函数层：只做聚合，不碰 DOM / 存储 / 时钟。
+ * 证据纯函数层：聚合 + 画像 / 徽章 / 轨迹 / 报告。
+ * 只做计算，不碰 DOM / 存储 / 时钟；时间与输入由外壳注入。
  * 运行时只产出 EvidenceDraft；id / profileId / at 由外壳（ProgressManager）补齐后成为 EvidenceEvent。
  */
 import type { EvidencePhase, ToolId } from '@mmf/content/ids';
@@ -14,6 +15,24 @@ export type {
   EvidenceRecord,
 } from '@mmf/game-kit';
 export type { EvidencePhase, ToolId } from '@mmf/content/ids';
+export type {
+  BadgeView,
+  DimensionSignal,
+  DimensionView,
+  EvidenceBuildInput,
+  EvidenceDimensionId,
+  EvidenceProfile,
+  Recommendation,
+  ReportLevelRow,
+  ReportModel,
+  ReportPack,
+  TrailItem,
+} from './types';
+
+export { buildEvidenceProfile } from './profile';
+export { evaluateBadges } from './badges';
+export { buildTrail } from './trail';
+export { buildReport, toReportPack } from './report';
 
 /** 空聚合：6 件工具的计数全部归零，便于 UI 直接读 byTool[tool]。 */
 export function emptyAggregate(): EvidenceAggregate {

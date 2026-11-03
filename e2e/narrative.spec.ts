@@ -1,0 +1,41 @@
+import { expect, test } from '@playwright/test';
+import { waitEvent } from './shared';
+
+test('完成两关后日志、徽章与报告可用', async ({ page }) => {
+  await page.goto('/#/play/k-structure-pattern-path?autoplay=1&instant=1');
+  expect(await waitEvent(page, 'level:complete:k-structure-pattern-path')).toBe(true);
+
+  const second = await page.context().newPage();
+  await second.goto('/#/play/g46-algorithm-payment?autoplay=1&instant=1');
+  expect(await waitEvent(second, 'level:complete:g46-algorithm-payment')).toBe(true);
+  await second.close();
+  // 第二个页面写入了 IndexedDB；原页面 Pinia 快照还是旧的，刷新重新读档。
+  await page.reload();
+
+  await page.goto('/#/journal');
+  await expect(page.getByTestId('journal-view')).toBeVisible();
+  await expect(page.getByTestId('journal-entry').first()).toBeVisible();
+
+  await page.goto('/#/badges');
+  await expect(page.getByTestId('badges-view')).toBeVisible();
+  await expect(page.getByTestId('badge-pattern-spotter')).toBeVisible();
+  await expect(page.getByTestId('badge-earned-pattern-spotter')).toBeVisible();
+  await expect(page.getByTestId('badge-earned-builder')).toBeVisible();
+
+  await page.goto('/#/report');
+  await expect(page.getByTestId('adult-gate')).toBeVisible();
+  const hold = page.getByTestId('adult-hold');
+  const box = await hold.boundingBox();
+  if (!box) throw new Error('adult-hold 没有可点击区域');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(3300);
+  await page.mouse.up();
+  await expect(page.getByTestId('report-view')).toBeVisible();
+  await expect(page.getByText('数据只在本机')).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByTestId('report-export').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('mmf-report.json');
+});

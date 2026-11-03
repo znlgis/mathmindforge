@@ -9,6 +9,9 @@ import HomeView from './views/HomeView.vue';
 import ForgeView from './views/ForgeView.vue';
 
 const WorkshopView = defineAsyncComponent(() => import('./views/WorkshopView.vue'));
+const JournalView = defineAsyncComponent(() => import('./views/JournalView.vue'));
+const BadgesView = defineAsyncComponent(() => import('./views/BadgesView.vue'));
+const ReportView = defineAsyncComponent(() => import('./views/ReportView.vue'));
 
 const route = useRoute();
 const progress = useProgress();
@@ -39,7 +42,7 @@ function goHome(): void {
           <span class="block text-xs text-ink-soft">{{ t('app.subtitle') }}</span>
         </span>
       </button>
-      <nav class="flex items-center gap-2 text-sm font-semibold">
+      <nav class="flex flex-wrap items-center justify-end gap-1.5 text-sm font-semibold">
         <button
           type="button"
           class="rounded-full px-4 py-2"
@@ -56,6 +59,22 @@ function goHome(): void {
         >
           {{ t('nav.forge') }}
         </button>
+        <button
+          type="button"
+          class="rounded-full px-4 py-2"
+          :class="route.name === 'journal' ? 'bg-blueprint text-white' : 'bg-card text-ink'"
+          @click="navigate('/journal')"
+        >
+          {{ t('nav.journal') }}
+        </button>
+        <button
+          type="button"
+          class="rounded-full px-4 py-2"
+          :class="route.name === 'badges' ? 'bg-blueprint text-white' : 'bg-card text-ink'"
+          @click="navigate('/badges')"
+        >
+          {{ t('nav.badges') }}
+        </button>
       </nav>
     </header>
 
@@ -63,6 +82,9 @@ function goHome(): void {
       <HomeView v-if="route.name === 'home'" />
       <ForgeView v-else-if="route.name === 'forge'" />
       <WorkshopView v-else-if="route.name === 'play' && route.levelId" :level-id="route.levelId" />
+      <JournalView v-else-if="route.name === 'journal'" />
+      <BadgesView v-else-if="route.name === 'badges'" />
+      <ReportView v-else-if="route.name === 'report'" />
     </main>
   </div>
 </template>

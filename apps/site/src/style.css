@@ -56,3 +56,31 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+@media print {
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #app {
+    height: auto;
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  main {
+    overflow: visible !important;
+  }
+
+  .report-page {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}

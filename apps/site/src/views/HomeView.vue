@@ -35,6 +35,39 @@ const tools: { id: ToolId; key: string }[] = [
     </div>
 
     <div>
+      <h2 class="text-xl font-bold">{{ t('home.archive') }}</h2>
+      <div class="mt-4 grid gap-3 sm:grid-cols-3">
+        <button
+          type="button"
+          data-testid="home-journal"
+          class="rounded-2xl border border-grid bg-card p-5 text-left active:scale-95"
+          @click="navigate('/journal')"
+        >
+          <p class="text-sm font-bold text-teal">{{ t('nav.journal') }}</p>
+          <p class="mt-2 text-sm leading-6 text-ink-soft">{{ t('home.archive.journal') }}</p>
+        </button>
+        <button
+          type="button"
+          data-testid="home-badges"
+          class="rounded-2xl border border-grid bg-card p-5 text-left active:scale-95"
+          @click="navigate('/badges')"
+        >
+          <p class="text-sm font-bold text-brass">{{ t('nav.badges') }}</p>
+          <p class="mt-2 text-sm leading-6 text-ink-soft">{{ t('home.archive.badges') }}</p>
+        </button>
+        <button
+          type="button"
+          data-testid="home-report"
+          class="rounded-2xl border border-grid bg-card p-5 text-left active:scale-95"
+          @click="navigate('/report')"
+        >
+          <p class="text-sm font-bold text-blueprint">{{ t('nav.report') }}</p>
+          <p class="mt-2 text-sm leading-6 text-ink-soft">{{ t('home.archive.report') }}</p>
+        </button>
+      </div>
+    </div>
+
+    <div>
       <h2 class="text-xl font-bold">{{ t('home.tools') }}</h2>
       <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <article v-for="tool in tools" :key="tool.id" class="rounded-2xl border border-grid bg-card p-5">
