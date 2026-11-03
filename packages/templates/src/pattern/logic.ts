@@ -41,6 +41,106 @@ export function patternRuleKey(rule: Pick<PatternRule, 'tokens' | 'transform'>):
   return rule.tokens.join('') + ':' + rule.transform;
 }
 
+/** 候选规律：只由带子上可见的格子推出，供工具面板「一键候选」与 repair-only 校验共用。 */
+export function candidateRules(
+  script: PatternScript,
+  transforms: ReadonlyArray<PatternRule['transform']> = script.pattern.allowedTransforms,
+): PatternRule[] {
+  const visible = script.scenario.visible;
+  const length = Math.max(script.scenario.length, visible.length);
+  const candidates: PatternRule[] = [];
+  for (const period of script.pattern.allowedPeriods) {
+    if (period < 2 || period > length) continue;
+    const tokens: string[] = [];
+    let complete = true;
+    for (let index = 0; index < period; index += 1) {
+      const token = visible[index];
+      if (token === null || token === undefined) {
+        complete = false;
+        break;
+      }
+      tokens.push(token);
+    }
+    // 周期里本身有空格时，这条规则不是从观察推出来的：不参与候选，也不参与只填判定。
+    if (!complete) continue;
+    for (const transform of transforms) {
+      const rule: PatternRule = { tokens: [...tokens], period, transform };
+      if (!explainsVisible(rule, visible, length)) continue;
+      if (!candidates.some((item) => patternRuleKey(item) === patternRuleKey(rule))) {
+        candidates.push(rule);
+      }
+    }
+  }
+  return candidates;
+}
+
+function explainsVisible(rule: PatternRule, visible: readonly (string | null)[], length: number): boolean {
+  for (let index = 0; index < length; index += 1) {
+    const token = visible[index];
+    if (token === null || token === undefined) continue;
+    if (tokenAt(rule, index) !== token) return false;
+  }
+  return true;
+}
+
+/** 从任意 JSON 里读出维修格（越界/非整数/空 token 一律忽略），repair-only 校验读它。 */
+function readRepairMap(repair: unknown, length: number): Map<number, string> {
+  const map = new Map<number, string>();
+  if (!Array.isArray(repair)) return map;
+  for (const item of repair) {
+    if (!item || typeof item !== 'object') continue;
+    const { index, token } = item as { index?: unknown; token?: unknown };
+    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= length) continue;
+    if (typeof token !== 'string' || token.length === 0) continue;
+    map.set(index, token);
+  }
+  return map;
+}
+
+/**
+ * 「只填不声明」：没有 patternRule 时，用可见格推出的候选规律检验补的块。
+ * 判据和带规律的判法同源：填法必须能被本关允许的某条规律完整解释，
+ * 所以它不是放宽判定，而是允许玩家把「声明」省掉。
+ */
+export function validateRepairOnly(script: PatternScript, repair: unknown): {
+  passed: boolean;
+  rule?: PatternRule;
+  failureClass?: string;
+  missingIndices?: number[];
+  mismatchIndices?: number[];
+} {
+  const world = toWorld(script);
+  const length = world.length;
+  const repairs = readRepairMap(repair, length);
+  const missing: number[] = [];
+  for (let index = 0; index < length; index += 1) {
+    if (world.visible[index] !== null && world.visible[index] !== undefined) continue;
+    if (!repairs.has(index)) missing.push(index);
+  }
+  if (missing.length > 0) {
+    return { passed: false, failureClass: 'pattern-repair-incomplete', missingIndices: missing };
+  }
+
+  let best: { mismatch: number[] } | null = null;
+  for (const rule of candidateRules(script)) {
+    const mismatch: number[] = [];
+    for (const [index, token] of repairs) {
+      if (tokenAt(rule, index) !== token) mismatch.push(index);
+    }
+    if (mismatch.length === 0) return { passed: true, rule };
+    if (!best || mismatch.length < best.mismatch.length) best = { mismatch };
+  }
+  if (best) {
+    return {
+      passed: false,
+      failureClass: 'pattern-mismatch',
+      mismatchIndices: [...best.mismatch].sort((a, b) => a - b),
+    };
+  }
+  // 带子的可见部分推不出任何合法规律：按「规则和带子对不上」报，别退化成空判定。
+  return { passed: false, failureClass: 'pattern-cycle-wrong' };
+}
+
 /** 规则对整条带子的预测；长度取 scenario 与 visible 的较大值，和画布上画出的格数一致。 */
 export function previewCells(script: PatternScript, rule: PatternRule): PatternPreviewCell[] {
   const length = Math.max(script.scenario.length, script.scenario.visible.length);
@@ -63,6 +163,25 @@ export function buildPreview(
 
 export function patternStateOf(snapshot: RunSnapshot): PatternToolStateView | undefined {
   return snapshot.toolState.pattern as PatternToolStateView | undefined;
+}
+
+/**
+ * 画布点击一个空格时的落子字母（一次点击 = 一次输入）：
+ * - 还没填过：在规律预测的字母上开始（没有规律就从循环表的第一个字母起，即「照这样做」）；
+ * - 已经填过：换循环表里的下一个字母，点几次换几次。
+ */
+export function nextFillToken(
+  order: readonly string[],
+  current: string | undefined,
+  predicted: string,
+): string {
+  if (current === undefined) {
+    if (predicted.length > 0 && order.includes(predicted)) return predicted;
+    return order[0] ?? predicted;
+  }
+  const index = order.indexOf(current);
+  if (index < 0) return order[0] ?? current;
+  return order[(index + 1) % order.length] ?? current;
 }
 
 /**
@@ -174,8 +293,31 @@ export function validateArtifact(
 ): Verdict {
   const applied = applyVariant(script, variant);
   const world = toWorld(applied);
-  const result = validatePattern(world, artifact);
   const artifacts = summarizeArtifact(artifact);
+  const candidate = artifact as { patternRule?: { tokens?: unknown }; repair?: unknown } | null | undefined;
+  const hasRule = Boolean(candidate?.patternRule && Array.isArray(candidate.patternRule.tokens));
+  const hasRepair = Array.isArray(candidate?.repair);
+  // 既没声明规律、也没补块：这是"空产物"，要报明确的结构失败类（A1b），不能走缺证据分支。
+  if (!hasRule && !hasRepair) {
+    return {
+      passed: false,
+      stamps: [],
+      failure: { class: 'pattern-rule-invalid', variantId: variant.id, causes: [] },
+      missingEvidence: [],
+      artifacts,
+    };
+  }
+  // 有 patternRule 走原判定；只有 repair 时按「只填不声明」用可见格推出来的候选规律校验，
+  // 绝不返回「既无 failure 也无 missingEvidence」的空判决（docs/12 §T1-pattern 的坑）。
+  const result: {
+    passed: boolean;
+    failureClass?: string;
+    conflictIndex?: number;
+    missingIndices?: number[];
+    mismatchIndices?: number[];
+  } = hasRule
+    ? validatePattern(world, artifact)
+    : validateRepairOnly(applied, candidate?.repair);
   if (result.passed) {
     const stamps: Verdict['stamps'] = ['constraint'];
     if (variant.id !== 'base') stamps.push('transfer');
@@ -215,25 +357,37 @@ export function validateArtifact(
 }
 
 export function actionsFor(
-  _script: PatternScript,
+  script: PatternScript,
   _variant: PatternVariant,
   artifact: unknown,
 ): import('@mmf/game-kit').LevelAction[] {
   const candidate = artifact as {
-    patternRule?: { tokens?: unknown; period?: number; transform?: 'none' | 'mirror' | 'rotate' | 'shift' };
+    patternRule?: { tokens?: unknown; period?: number; transform?: PatternRule['transform'] };
     repair?: { index: number; token: string }[];
   } | null;
-  // 产物缺失时给空动作表，交给 autoplay 统一报“还没有黄金解”，而不是在这里抛异常。
-  if (!candidate?.patternRule || !Array.isArray(candidate.patternRule.tokens)) return [];
-  const rule = candidate.patternRule as { tokens: string[]; period: number; transform: 'none' | 'mirror' | 'rotate' | 'shift' };
-  const repair = Array.isArray(candidate.repair) ? candidate.repair : [];
-  const actions: import('@mmf/game-kit').LevelAction[] = [
-    { type: 'pattern/inspect', payload: { index: 0 } },
-    { type: 'pattern/inspect', payload: { index: 1 } },
-    { type: 'pattern/inspect', payload: { index: 2 } },
-    { type: 'pattern/setCycle', payload: { cycle: rule.tokens, transform: rule.transform } },
-    { type: 'pattern/commit', payload: {} },
-  ];
+  const repair = Array.isArray(candidate?.repair) ? candidate.repair : [];
+  const tokens = Array.isArray(candidate?.patternRule?.tokens) ? candidate.patternRule.tokens : null;
+  const actions: import('@mmf/game-kit').LevelAction[] = [];
+  if (tokens && tokens.every((token): token is string => typeof token === 'string')) {
+    actions.push({
+      type: 'pattern/setCycle',
+      payload: { cycle: [...tokens], transform: candidate?.patternRule?.transform ?? 'none' },
+    });
+    actions.push({ type: 'pattern/commit', payload: {} });
+  } else {
+    // 产物缺失时给空动作表，交给 autoplay 统一报“还没有黄金解”，而不是在这里抛异常。
+    if (repair.length === 0) return [];
+    // 只填不声明：先点一下面板上的「候选规律」条（和玩家点候选 chip 是同一个动作），再逐格补。
+    const derived = candidateRules(script).find((rule) => (
+      repair.every((item) => tokenAt(rule, item.index) === item.token)
+    ));
+    if (derived) {
+      actions.push({
+        type: 'pattern/setCycle',
+        payload: { cycle: [...derived.tokens], transform: derived.transform },
+      });
+    }
+  }
   for (const item of repair) {
     actions.push({
       type: 'construct/place',
@@ -247,7 +401,6 @@ export function actionsFor(
       },
     });
   }
-  actions.push({ type: 'run', payload: {} });
   actions.push({ type: 'submit', payload: {} });
   return actions;
 }

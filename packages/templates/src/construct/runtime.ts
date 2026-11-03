@@ -68,6 +68,8 @@ function createAdapter(script: PaymentScript): RuntimeAdapter<ConstructState> {
         total: coins.reduce((sum, coin) => sum + coin, 0),
         count: coins.length,
       },
+      // 产物只留可重算的判定输入：测没测过、提没提交由运行时状态负责，
+      // 不再写进 artifact（编辑即自动测，选择前提即最终作答）。
       counterexample: counter
         ? {
             target: counter.target,
@@ -75,8 +77,6 @@ function createAdapter(script: PaymentScript): RuntimeAdapter<ConstructState> {
             greedyCoins: evaluation?.greedy ? evaluation.greedy.count : undefined,
             optimalCoins: evaluation?.optimalCount ?? undefined,
             isCounterexample: evaluation?.isCounterexample ?? false,
-            tested: counter.tested,
-            committed: counter.committed,
             failedPremise: counter.premiseId,
           }
         : null,
@@ -172,7 +172,8 @@ function createAdapter(script: PaymentScript): RuntimeAdapter<ConstructState> {
     if (typeof premiseId !== 'string' || !script.counter.premises.includes(premiseId)) {
       return { state, error: '这个前提不在这一关的选项里。' };
     }
-    const next: CounterDraft = { ...draft, premiseId, committed: false };
+    // 指出失效前提就是最终作答：不需要再点提交反例（编辑即自动测，选前提即提交）。
+    const next: CounterDraft = { ...draft, premiseId, committed: true };
     const marked = mark({ ...state, counter: next }, 'annotate');
     return {
       state: {
@@ -297,7 +298,12 @@ function createAdapter(script: PaymentScript): RuntimeAdapter<ConstructState> {
     artifact: artifactOf,
     artifactSummaries,
     checkpoints(state: ConstructState): Record<string, boolean> {
-      return { ...state.checkpoints };
+      // 证据检查点 = 答案状态的事实记录（不靠点过某个仪式按钮）：
+      // payment：柜台上真的放了硬币；counter：反例已指出失效前提（annotate 即提交）。
+      return {
+        payment: state.pieces.length > 0,
+        counter: state.counter !== null && state.counter.committed,
+      };
     },
     toolState,
     validate(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict {

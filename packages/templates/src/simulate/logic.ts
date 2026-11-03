@@ -357,7 +357,10 @@ export function validateArtifact(input: ScriptSource, variant: SimVariant, artif
   };
 }
 
-/** 自动演示/审计用：只用公开动作，先摆参数、再跑两个种子、锁定、看指标、提交。 */
+/**
+ * 自动演示/审计用：只用公开动作，先摆参数、再跑一次（运行即锁定，指标同卡）、提交。
+ * 「锁定参数」与「查看指标」两个仪式动作已经删掉：run 就是锁定，指标跑完就同屏。
+ */
 export function actionsFor(input: ScriptSource, _variant: SimVariant, artifact: unknown): LevelAction[] {
   const script = scriptOf(input);
   const parsed = simulateArtifactSchema.safeParse(artifact);
@@ -370,8 +373,6 @@ export function actionsFor(input: ScriptSource, _variant: SimVariant, artifact: 
     { type: 'knob/set', payload: { key: 'shift', value: params.shift } },
     { type: 'knob/set', payload: { key: 'route', value: routeIndexOf(script, params.route) } },
     { type: 'knob/run', payload: {} },
-    { type: 'knob/commit', payload: {} },
-    { type: 'probe/focus', payload: { id: 'metrics-table' } },
     { type: 'submit', payload: {} },
   ];
 }

@@ -7,12 +7,42 @@ type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
 type ConstructSpec = Extract<ToolSpecLike, { kind: 'construct' }>;
 
+interface NetworkNodeView {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  key?: boolean;
+}
+interface NetworkEdgeView {
+  id: string;
+  a: string;
+  b: string;
+  cost: number;
+}
 interface NetworkScriptView {
-  nodes?: { id: string; label: string; x: number; y: number; key?: boolean }[];
-  edges?: { id: string; a: string; b: string; cost: number }[];
+  nodes?: NetworkNodeView[];
+  edges?: NetworkEdgeView[];
   budget?: number;
   maxEdges?: number;
   minKeyEdges?: number;
+}
+
+interface LayoutNode extends NetworkNodeView {
+  sx: number;
+  sy: number;
+}
+interface LayoutEdge {
+  id: string;
+  cost: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  /** 成本数字热区（图上可点的那一个点）。 */
+  bx: number;
+  by: number;
+  selected: boolean;
 }
 
 const props = defineProps<{
@@ -30,31 +60,121 @@ const selected = computed(() => new Set((props.snapshot.toolState.construct?.pie
 const busy = ref(false);
 const error = ref<string | null>(null);
 
-const cost = computed(() => edges.value.filter((edge) => selected.value.has(edge.id)).reduce((sum, edge) => sum + edge.cost, 0));
-const keyEdges = computed(() => {
-  let count = 0;
-  for (const edge of edges.value) {
-    if (!selected.value.has(edge.id)) continue;
-    if (nodes.value.find((node) => node.id === edge.a)?.key) count += 1;
-    if (nodes.value.find((node) => node.id === edge.b)?.key) count += 1;
+const VIEW_WIDTH = 100;
+const VIEW_HEIGHT = 56;
+const PAD_X = 10;
+const NODE_MIN_Y = 8;
+const NODE_SPAN_Y = 32;
+
+function pickBadgeSpot(
+  a: LayoutNode,
+  b: LayoutNode,
+  index: number,
+  taken: { x: number; y: number }[],
+): { x: number; y: number } {
+  const dx = b.sx - a.sx;
+  const dy = b.sy - a.sy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const sides = index % 2 === 0 ? [1, -1] : [-1, 1];
+  for (const t of [0.5, 0.62, 0.38, 0.74, 0.26]) {
+    for (const side of sides) {
+      const cx = a.sx + dx * t + px * 5 * side;
+      const cy = a.sy + dy * t + py * 5 * side;
+      if (cx < 6 || cx > 94 || cy < 5 || cy > VIEW_HEIGHT - 5) continue;
+      if (taken.some((point) => Math.hypot(point.x - cx, point.y - cy) < 9.5)) continue;
+      return { x: cx, y: cy };
+    }
   }
-  return count;
+  return { x: (a.sx + b.sx) / 2, y: (a.sy + b.sy) / 2 };
+}
+
+const layout = computed(() => {
+  const list = nodes.value;
+  if (list.length === 0) return { nodes: [] as LayoutNode[], edges: [] as LayoutEdge[] };
+  const xs = list.map((node) => node.x);
+  const ys = list.map((node) => node.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const spanX = Math.max(maxX - minX, 1);
+  const spanY = Math.max(maxY - minY, 1);
+  const sxOf = (x: number): number => PAD_X + ((x - minX) / spanX) * (VIEW_WIDTH - PAD_X * 2);
+  const syOf = (y: number): number => NODE_MIN_Y + ((y - minY) / spanY) * NODE_SPAN_Y;
+  const byId = new Map<string, LayoutNode>();
+  const layoutNodes = list.map((node) => {
+    const mapped: LayoutNode = { ...node, sx: sxOf(node.x), sy: syOf(node.y) };
+    byId.set(node.id, mapped);
+    return mapped;
+  });
+  const taken: { x: number; y: number }[] = [];
+  const layoutEdges: LayoutEdge[] = [];
+  edges.value.forEach((edge, index) => {
+    const a = byId.get(edge.a);
+    const b = byId.get(edge.b);
+    if (!a || !b) return;
+    const spot = pickBadgeSpot(a, b, index, taken);
+    taken.push(spot);
+    layoutEdges.push({
+      id: edge.id,
+      cost: edge.cost,
+      x1: a.sx,
+      y1: a.sy,
+      x2: b.sx,
+      y2: b.sy,
+      bx: spot.x,
+      by: spot.y,
+      selected: selected.value.has(edge.id),
+    });
+  });
+  return { nodes: layoutNodes, edges: layoutEdges };
 });
 
-function edgeLabel(edge: { a: string; b: string }): string {
-  const a = nodes.value.find((node) => node.id === edge.a)?.label ?? edge.a;
-  const b = nodes.value.find((node) => node.id === edge.b)?.label ?? edge.b;
-  return a + ' — ' + b;
-}
+/** 实时约束灯：连通块 / 成本 / 关键站点 / 边数。 */
+const stats = computed(() => {
+  const ids = nodes.value.map((node) => node.id);
+  const parent = new Map<string, string>(ids.map((id) => [id, id]));
+  const find = (id: string): string => {
+    let current = id;
+    while (parent.get(current) !== current) current = parent.get(current) as string;
+    return current;
+  };
+  const union = (a: string, b: string): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  const nodeById = new Map(nodes.value.map((node) => [node.id, node]));
+  let cost = 0;
+  let keys = 0;
+  for (const edge of edges.value) {
+    if (!selected.value.has(edge.id)) continue;
+    cost += edge.cost;
+    union(edge.a, edge.b);
+    if (nodeById.get(edge.a)?.key) keys += 1;
+    if (nodeById.get(edge.b)?.key) keys += 1;
+  }
+  const components = new Set(ids.map((id) => find(id))).size;
+  return { components, cost, keys, count: selected.value.size };
+});
+
+const budget = computed(() => script.value.budget ?? 0);
+const maxEdges = computed(() => script.value.maxEdges ?? edges.value.length);
+const minKey = computed(() => script.value.minKeyEdges ?? 0);
+const connected = computed(() => stats.value.components === 1);
 
 async function toggle(edgeId: string): Promise<void> {
   if (busy.value) return;
   busy.value = true;
   error.value = null;
   try {
-    const result = selected.value.has(edgeId)
-      ? await props.runtime.dispatch({ type: 'construct/remove', payload: { pieceId: edgeId } })
-      : await props.runtime.dispatch({ type: 'construct/place', payload: { piece: { id: edgeId, shape: edgeId, x: 0, y: 0 } } });
+    const result = await props.runtime.dispatch(selected.value.has(edgeId)
+      ? { type: 'construct/remove', payload: { pieceId: edgeId } }
+      : { type: 'construct/place', payload: { piece: { id: edgeId, shape: edgeId, x: 0, y: 0 } } });
     if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
@@ -65,45 +185,107 @@ async function toggle(edgeId: string): Promise<void> {
 <template>
   <section data-testid="network-tool" class="mt-3 flex flex-col gap-3">
     <p class="text-xs text-ink-soft">
-      选边把站点连成一张网；至少连到关键站点 {{ script.minKeyEdges ?? 0 }} 次，成本 ≤ {{ script.budget ?? '—' }}。
+      点一条候选道路选中或取消。把站点连成一整块，成本不超过 {{ budget }}，并且连到关键站点。
     </p>
-    <div class="grid gap-2 sm:grid-cols-2">
-      <article
-        v-for="node in nodes"
-        :key="node.id"
-        class="rounded-2xl border border-grid bg-paper p-3"
-        :class="node.key ? 'border-brass' : ''"
-        :data-testid="'network-node-' + node.id"
+
+    <div class="rounded-2xl border border-grid bg-paper p-2">
+      <svg
+        :viewBox="'0 0 ' + VIEW_WIDTH + ' ' + VIEW_HEIGHT"
+        class="w-full"
+        role="img"
+        aria-label="候选道路与站点的示意图"
       >
-        <p class="text-sm font-bold text-ink">
-          {{ node.label }}
-          <span v-if="node.key" class="ml-1 rounded-full bg-brass/20 px-2 py-0.5 text-[10px] text-brass">关键</span>
-        </p>
-      </article>
-    </div>
-    <div class="rounded-2xl border border-grid bg-paper p-3">
-      <p class="text-xs font-bold text-ink">候选边</p>
-      <div class="mt-2 flex flex-col gap-1.5">
-        <button
-          v-for="edge in edges"
+        <line
+          v-for="edge in layout.edges"
+          :key="'line-' + edge.id"
+          :x1="edge.x1"
+          :y1="edge.y1"
+          :x2="edge.x2"
+          :y2="edge.y2"
+          :stroke="edge.selected ? '#2f7d78' : '#c3cfd8'"
+          :stroke-width="edge.selected ? 1.4 : 0.7"
+          stroke-linecap="round"
+          class="cursor-pointer"
+          @click="toggle(edge.id)"
+        />
+        <g
+          v-for="edge in layout.edges"
           :key="edge.id"
-          type="button"
           :data-testid="'network-edge-' + edge.id"
-          :disabled="busy"
-          class="flex min-h-10 items-center justify-between rounded-xl px-3 text-left text-xs font-semibold active:scale-95 disabled:opacity-40"
-          :class="selected.has(edge.id) ? 'bg-mint text-teal' : 'bg-card text-ink'"
+          role="button"
+          tabindex="0"
+          :aria-label="'切换道路 ' + edge.id + '，成本 ' + edge.cost"
+          class="cursor-pointer"
           @click="toggle(edge.id)"
         >
-          <span>{{ edgeLabel(edge) }}</span>
-          <span>{{ selected.has(edge.id) ? '已选' : '选' }} · {{ edge.cost }}</span>
-        </button>
-      </div>
+          <circle
+            :cx="edge.bx"
+            :cy="edge.by"
+            r="3.4"
+            :fill="edge.selected ? '#cfe6d4' : '#fffdf8'"
+            :stroke="edge.selected ? '#2f7d78' : '#d8e2e8'"
+            stroke-width="0.5"
+          />
+          <text
+            :x="edge.bx"
+            :y="edge.by + 1.1"
+            text-anchor="middle"
+            font-size="3.1"
+            font-weight="700"
+            :fill="edge.selected ? '#2f7d78' : '#55636f'"
+          >
+            {{ edge.cost }}
+          </text>
+        </g>
+        <g v-for="node in layout.nodes" :key="node.id" :data-testid="'network-node-' + node.id">
+          <circle
+            :cx="node.sx"
+            :cy="node.sy"
+            r="3.6"
+            fill="#fffdf8"
+            :stroke="node.key ? '#b07d2b' : '#55636f'"
+            :stroke-width="node.key ? 1.3 : 0.8"
+          />
+          <text
+            :x="node.sx"
+            :y="node.sy + 1"
+            text-anchor="middle"
+            font-size="2.4"
+            font-weight="700"
+            :fill="node.key ? '#b07d2b' : '#22303c'"
+          >
+            {{ node.label }}
+          </text>
+          <text
+            v-if="node.key"
+            :x="node.sx"
+            :y="node.sy - 4.6"
+            text-anchor="middle"
+            font-size="2.4"
+            font-weight="700"
+            fill="#b07d2b"
+          >
+            ★
+          </text>
+        </g>
+      </svg>
     </div>
-    <div class="flex flex-wrap gap-2 text-[11px] font-semibold text-ink-soft">
-      <span data-testid="network-cost">成本 {{ cost }} / {{ script.budget ?? '—' }}</span>
-      <span>选边 {{ selected.size }} / {{ script.maxEdges ?? '—' }}</span>
-      <span>关键连接 {{ keyEdges }} / {{ script.minKeyEdges ?? 0 }}</span>
+
+    <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold">
+      <span data-testid="network-components" :class="connected ? 'text-teal' : 'text-ink-soft'">
+        连通块 {{ stats.components }}/1
+      </span>
+      <span data-testid="network-cost" :class="stats.cost > budget ? 'text-red' : 'text-ink-soft'">
+        成本 {{ stats.cost }} / {{ budget }}
+      </span>
+      <span data-testid="network-keys" :class="stats.keys >= minKey ? 'text-teal' : 'text-ink-soft'">
+        关键站点 {{ stats.keys }}/{{ minKey }}
+      </span>
+      <span data-testid="network-edges" :class="stats.count > maxEdges ? 'text-red' : 'text-ink-soft'">
+        边 {{ stats.count }}/{{ maxEdges }}
+      </span>
     </div>
+
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>
   </section>
 </template>

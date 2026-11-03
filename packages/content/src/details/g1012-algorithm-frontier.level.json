@@ -68,7 +68,7 @@
         "to": "A",
         "min": 1,
         "max": 10,
-        "default": 1
+        "default": 5
       },
       {
         "id": "sb",
@@ -76,7 +76,7 @@
         "to": "B",
         "min": 1,
         "max": 10,
-        "default": 2
+        "default": 5
       },
       {
         "id": "at",
@@ -84,7 +84,7 @@
         "to": "T",
         "min": 1,
         "max": 10,
-        "default": 9
+        "default": 5
       },
       {
         "id": "bt",
@@ -92,7 +92,7 @@
         "to": "T",
         "min": 1,
         "max": 10,
-        "default": 9
+        "default": 5
       }
     ],
     "start": "S",
@@ -100,16 +100,10 @@
   },
   "evidencePlan": [
     {
-      "id": "set",
+      "id": "edited",
       "phase": "construct",
-      "require": "set",
-      "descriptionKey": "给四条边都设好代价"
-    },
-    {
-      "id": "run",
-      "phase": "run",
-      "require": "run",
-      "descriptionKey": "让贪心走到终点"
+      "require": "construct/place >= 1",
+      "descriptionKey": "tool.construct.frontier.desc"
     },
     {
       "id": "counter",
@@ -230,7 +224,7 @@
             "to": "A",
             "min": 1,
             "max": 10,
-            "default": 5
+            "default": 6
           },
           {
             "id": "sb",
@@ -238,7 +232,7 @@
             "to": "B",
             "min": 1,
             "max": 10,
-            "default": 5
+            "default": 6
           },
           {
             "id": "at",
@@ -246,7 +240,7 @@
             "to": "T",
             "min": 1,
             "max": 10,
-            "default": 5
+            "default": 6
           },
           {
             "id": "bt",
@@ -254,7 +248,7 @@
             "to": "T",
             "min": 1,
             "max": 10,
-            "default": 5
+            "default": 6
           }
         ]
       }

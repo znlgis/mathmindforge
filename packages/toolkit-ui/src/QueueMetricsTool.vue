@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { LevelAction, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
+import type { LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { Translator } from '@mmf/i18n';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
@@ -42,33 +42,11 @@ const rows = computed<QueueRow[]>(() => {
     passed: values[7] === 1,
   }));
 });
-const busy = ref(false);
-
-async function focus(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  try {
-    const action: LevelAction = { type: 'probe/focus', payload: { id: 'queue-metrics' } };
-    await props.runtime.dispatch(action);
-  } finally {
-    busy.value = false;
-  }
-}
 </script>
 
 <template>
   <section data-testid="queue-metrics-tool" class="mt-3 flex flex-col gap-3">
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-bold text-ink">排队指标</p>
-      <button
-        type="button"
-        data-testid="queue-focus"
-        class="min-h-11 rounded-xl bg-blueprint px-4 text-xs font-bold text-white active:scale-95"
-        @click="focus"
-      >
-        查看排队指标
-      </button>
-    </div>
+    <p class="text-sm font-bold text-ink">排队指标</p>
     <div v-if="rows.length === 0" class="rounded-2xl border border-grid bg-paper p-3 text-xs text-ink-soft">
       还没有运行记录。回旋钮面板跑一次，这里会列出等待、加班与成本。
     </div>

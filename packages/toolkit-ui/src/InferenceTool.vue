@@ -40,16 +40,6 @@ const stats = computed(() => {
   };
 });
 
-async function focus(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  try {
-    await props.runtime.dispatch({ type: 'probe/focus', payload: { id: 'inference-table' } });
-  } finally {
-    busy.value = false;
-  }
-}
-
 async function choose(direction: 1 | -1 | 0): Promise<void> {
   const current = stats.value;
   if (busy.value || !current) return;
@@ -81,12 +71,7 @@ async function choose(direction: 1 | -1 | 0): Promise<void> {
 
 <template>
   <section data-testid="inference-tool" class="mt-3 flex flex-col gap-3">
-    <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-bold text-ink">两组比较</p>
-      <button type="button" data-testid="inference-focus" class="min-h-10 rounded-xl bg-blueprint px-3 text-xs font-bold text-white" @click="focus">
-        查看区间
-      </button>
-    </div>
+    <p class="text-sm font-bold text-ink">两组比较</p>
     <div v-if="stats" class="grid gap-2 sm:grid-cols-2">
       <article class="rounded-2xl border border-grid bg-paper p-3">
         <p class="text-xs font-bold text-ink">A 组</p>
@@ -100,9 +85,6 @@ async function choose(direction: 1 | -1 | 0): Promise<void> {
       </article>
     </div>
     <p v-else class="text-xs text-ink-soft">还没有两组样本。</p>
-    <p v-if="stats" class="text-xs font-semibold" :class="stats.overlap ? 'text-red' : 'text-teal'">
-      {{ stats.overlap ? '两组区间重叠：差异还不明确' : '两组区间不重叠：方向可判断' }}
-    </p>
 
     <div class="flex flex-wrap gap-2">
       <button type="button" data-testid="inference-a-higher" :disabled="busy" class="min-h-10 rounded-xl bg-card px-3 text-xs font-bold text-ink" @click="choose(1)">A 更高</button>

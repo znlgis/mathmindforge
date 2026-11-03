@@ -6,8 +6,8 @@
   "template": "pattern",
   "thinkingTarget": "先定出对称规则，再把缺的半面墙补成镜像",
   "intro": "这面墙被拆掉了一半。先看看完整的一半有什么规律。",
-  "prompt": "判断它是重复还是镜像，再把缺的三块补上，让整面墙对称。",
-  "done": "你先定规则再补墙，整面墙从中间对折后完全重合。",
+  "prompt": "把缺的三块补上，让整面墙对称；按重复读还是按镜像读都算对。",
+  "done": "你把缺的半面墙补好了：不管按重复还是镜像读，它都能对得上。",
   "retry": "从中间对折试试：左边第 1 格应该和右边第 1 格一样。",
   "tools": [
     {
@@ -24,13 +24,9 @@
           "C"
         ],
         "maxPeriod": 4,
-        "cells": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+        "transforms": [
+          "none",
+          "reflect"
         ]
       }
     },
@@ -69,7 +65,6 @@
     }
   ],
   "requiredToolArtifacts": [
-    "pattern-rule",
     "repair-set"
   ],
   "levelScript": {
@@ -100,41 +95,26 @@
   },
   "evidencePlan": [
     {
-      "id": "observe",
-      "phase": "observe",
-      "require": "pattern/inspect >= 2",
-      "descriptionKey": "先点几格看看左半墙的规律"
-    },
-    {
-      "id": "hypothesis",
-      "phase": "hypothesize",
-      "require": "pattern/commit >= 1",
-      "descriptionKey": "提交一条对称/重复规则"
+      "id": "fill",
+      "phase": "construct",
+      "require": "construct/place >= 1",
+      "descriptionKey": "level.pattern.repair"
     },
     {
       "id": "repair",
       "phase": "construct",
-      "require": "construct/commit >= 1",
+      "require": "construct/place >= 3",
       "descriptionKey": "把缺的三块补上"
     }
   ],
   "solutions": [
     {
-      "id": "s-reflect",
+      "id": "s-repeat-abc",
       "artifact": {
-        "patternRule": {
-          "tokens": [
-            "A",
-            "B",
-            "C"
-          ],
-          "period": 3,
-          "transform": "reflect"
-        },
         "repair": [
           {
             "index": 3,
-            "token": "C"
+            "token": "A"
           },
           {
             "index": 4,
@@ -142,26 +122,14 @@
           },
           {
             "index": 5,
-            "token": "A"
+            "token": "C"
           }
         ]
       }
     },
     {
-      "id": "s-explicit",
+      "id": "s-mirror-cba",
       "artifact": {
-        "patternRule": {
-          "tokens": [
-            "A",
-            "B",
-            "C",
-            "C",
-            "B",
-            "A"
-          ],
-          "period": 6,
-          "transform": "none"
-        },
         "repair": [
           {
             "index": 3,
@@ -348,7 +316,7 @@
   "titleEn": "Symmetry Wall",
   "thinkingTargetEn": "Find the mirror rule and rebuild the missing half of the wall.",
   "introEn": "Half of the wall is missing. Look for the rule in the half that remains.",
-  "promptEn": "Decide whether it repeats or mirrors, then place the three missing blocks.",
-  "doneEn": "Your wall folds onto itself from the middle.",
+  "promptEn": "Fill the three missing blocks so the wall is symmetric; either a repeat or a mirror reading counts.",
+  "doneEn": "You rebuilt the missing half, and it works as a repeat or as a mirror.",
   "retryEn": "Fold the wall in the middle: the first and last visible cells should mirror."
 }

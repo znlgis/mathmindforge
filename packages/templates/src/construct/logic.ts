@@ -197,11 +197,13 @@ function paymentFailure(script: PaymentScript, payment: Record<string, unknown> 
 
 /**
  * 顺序有意义：
- * 1) 复用了主任务参数 → counter-reused-main（即使贪心确实更差，也不接受）；
- * 2) 目标离主任务太近（< minTargetGap）→ 同样按"和主任务太像"拒绝；
- * 3) 没测试过 → counter-not-tested；
+ * 1) 没填反例 → counter-not-tested（还没开始做反例）；
+ * 2) 复用了主任务参数 → counter-reused-main（即使贪心确实更差，也不接受）；
+ * 3) 目标离主任务太近（< minTargetGap）→ 同样按"和主任务太像"拒绝；
  * 4) 贪心并不差 / 数字对不上 → counter-invalid；
  * 5) 前提不对 → counter-wrong-premise。
+ *
+ * 不再校验 artifact.tested：UI 改成"编辑即自动测"，测没测过不再是玩家要走的步骤。
  */
 function counterFailure(script: PaymentScript, raw: unknown): Failure | null {
   const cfg = script.counter;
@@ -227,8 +229,6 @@ function counterFailure(script: PaymentScript, raw: unknown): Failure | null {
   if (cfg.minTargetGap > 0 && targetGap < cfg.minTargetGap) {
     return failure('counter-reused-main', 'target-gap', { gap: targetGap, minGap: cfg.minTargetGap });
   }
-
-  if (counter.tested !== true) return failure('counter-not-tested', 'untested');
 
   const evaluation: CounterEvaluation = evaluateCounterexample({ target, denominations });
   if (!evaluation.greedy) return failure('counter-invalid', 'greedy-cannot-pay', { target });

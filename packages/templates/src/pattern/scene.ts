@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import type { LevelContext, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { PatternRule } from '@mmf/toolkit/pattern';
+import { tokenAt } from '@mmf/toolkit/pattern';
 import {
   BaseScene,
   PALETTE,
@@ -14,6 +15,7 @@ import {
 import { PATH_LAYOUT } from '../layout';
 import {
   mismatchedPlacements,
+  nextFillToken,
   parseScript,
   patternRuleKey,
   patternStateOf,
@@ -40,6 +42,8 @@ interface TileState {
   wrong: boolean;
   /** 预览预测：空格画 ghost；有内容时标出与预测一致/冲突。 */
   ghost?: { token: string; conflict: boolean };
+  /** 空格上「点一下会放进来的字母」：让一次点击的后果在点之前就可读。 */
+  next?: string;
 }
 
 const TILE_RADIUS = 12;
@@ -95,7 +99,8 @@ function tokenCaption(token: string): string {
 
 /**
  * 模式关画布：一条 12 格的纸带。
- * 只读 runtime 快照重绘；画布本身也能点格子（与右侧「观察带子」按钮等价）。
+ * 只读 runtime 快照重绘，同时就是答题面：点空格循环填字母（一次点击填一格），
+ * 点已填的空格换下一个字母，点原本可见的格子只做观察环。
  */
 class PatternScene extends BaseScene {
   private readonly runtime: LevelRuntime;
@@ -106,6 +111,8 @@ class PatternScene extends BaseScene {
   private lastSignature = '';
   /** 命中检测用的格数：放指针回调里读，避免每次点都重新 parse 脚本。 */
   private tileTotal = 0;
+  /** 画布填格用的字母循环顺序：优先工具配置的 tokens，再补上带子里出现过的字母。 */
+  private tokenOrder: string[] = [];
 
   constructor(ctx: LevelContext, runtime: LevelRuntime) {
     super(ctx.manifest.id, ctx);
@@ -116,9 +123,10 @@ class PatternScene extends BaseScene {
     this.script = parseScript(this.ctx.detail.levelScript);
     this.lastSignature = '';
     this.tileTotal = Math.max(this.script.scenario.length, this.script.scenario.visible.length);
+    this.tokenOrder = this.readTokenOrder();
     this.drawPaperBackground();
     this.add
-      .text(26, 160, '先点几格，看看它是怎么重复的。', {
+      .text(26, 160, '把缺的三块补上', {
         fontFamily: '"Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif',
         fontSize: '20px',
         color: PALETTE.inkSoft,
@@ -179,13 +187,63 @@ class PatternScene extends BaseScene {
     return nearest;
   }
 
+  /** 字母循环顺序：工具配置 tokens 优先，再补带子里出现过的字母，最后兜底 A/B/C。 */
+  private readTokenOrder(): string[] {
+    const order: string[] = [];
+    const push = (token: string | null | undefined): void => {
+      if (typeof token === 'string' && token.length > 0 && !order.includes(token)) order.push(token);
+    };
+    const spec = this.ctx.detail.tools.find((tool) => tool.kind === 'pattern');
+    if (spec && spec.kind === 'pattern') {
+      for (const token of spec.config.tokens) push(token);
+    }
+    for (const token of this.script?.scenario.visible ?? []) push(token);
+    if (order.length < 2) {
+      for (const token of ['A', 'B', 'C']) push(token);
+    }
+    return order.slice(0, 4);
+  }
+
+  /** 当前规则（选过候选 chip 就会立刻提交）；空格第一下据此放「照这样做」的字母。 */
+  private currentRule(pattern: PatternToolStateView | undefined): PatternRule | null {
+    if (!pattern?.cycle || pattern.cycle.length < 2) return null;
+    return { tokens: [...pattern.cycle], period: pattern.cycle.length, transform: pattern.transform ?? 'none' };
+  }
+
+  private predictedToken(index: number, pattern: PatternToolStateView | undefined): string {
+    const rule = this.currentRule(pattern);
+    return rule ? tokenAt(rule, index) : '';
+  }
+
+  private pieceAt(snapshot: RunSnapshot, index: number): string | undefined {
+    for (const piece of snapshot.toolState.construct?.pieces ?? []) {
+      if (piece.x === index) return piece.shape;
+    }
+    return undefined;
+  }
+
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
     const index = this.indexAt(pointer.worldX, pointer.worldY);
     if (index < 0) return;
     // 派发会同步 notify → 重画整条带子（含销毁显示对象）。延到微任务，
     // 避免在 Phaser 输入处理的栈里销毁正在派发事件的显示对象。
+    const visible = this.script?.scenario.visible[index] ?? null;
+    if (visible !== null) {
+      // 原本就可见的格子只做观察：立刻出现观察环，不改答案。
+      queueMicrotask(() => {
+        void this.runtime.dispatch({ type: 'pattern/inspect', payload: { index } });
+      });
+      return;
+    }
+    const snapshot = this.runtime.snapshot();
+    const current = this.pieceAt(snapshot, index);
+    // 空格第一下按「照这样做」放规律预测的字母；再点一次换下一个——一次点击 = 一次输入。
+    const token = nextFillToken(this.tokenOrder, current, this.predictedToken(index, patternStateOf(snapshot)));
     queueMicrotask(() => {
-      void this.runtime.dispatch({ type: 'pattern/inspect', payload: { index } });
+      void this.runtime.dispatch({
+        type: 'construct/place',
+        payload: { piece: { id: 'tile-' + index, shape: token, x: index, y: 0 } },
+      });
     });
   }
 
@@ -265,6 +323,9 @@ class PatternScene extends BaseScene {
         ghost: ghostToken === undefined
           ? undefined
           : { token: ghostToken, conflict: token !== null && !sameTokenShape(token, ghostToken) },
+        next: token === null
+          ? nextFillToken(this.tokenOrder, undefined, this.predictedToken(index, pattern))
+          : undefined,
       });
       strip.add(tile);
       // 预览时按格错峰亮起，让「规则跑了一遍」看得见。
@@ -409,6 +470,15 @@ class PatternScene extends BaseScene {
       });
       hint.setAlpha(0.75);
       target.add(hint);
+    } else if (token === null && state.next) {
+      // 空格还没填：淡色预告「点一下会放这个字母」，点完立刻变成实块（一次点击 = 一次输入）。
+      this.paintUpcoming(target, box, state.next);
+      const hint = centeredLabel(this, box.x + 11, box.y + 13, '?', {
+        size: 11,
+        color: PALETTE.inkSoft,
+      });
+      hint.setAlpha(0.75);
+      target.add(hint);
     } else {
       const caption = token === null ? '?' : tokenCaption(token);
       const text = centeredLabel(this, box.cx, box.cy, caption, {
@@ -454,6 +524,24 @@ class PatternScene extends BaseScene {
     else if (state.wrong) this.paintWrongHint(target, box);
   }
 
+  /** 空格预告：淡一档的字母/形状，提示这一下点击会放什么，又不至于像已经填好。 */
+  private paintUpcoming(
+    target: Phaser.GameObjects.Container,
+    box: TileBox,
+    token: string,
+  ): void {
+    const shape = this.add.graphics();
+    this.paintGhostShape(shape, token, box, tokenColor(token));
+    target.add(shape);
+    const text = centeredLabel(this, box.cx, box.cy, tokenCaption(token), {
+      size: 20,
+      bold: true,
+      color: tokenColor(token),
+    });
+    text.setAlpha(0.32);
+    target.add(text);
+  }
+
   /** 预测格：铜色半透明形状 + 字母，看得见「规则猜这里是什么」。 */
   private paintGhost(
     target: Phaser.GameObjects.Container,
@@ -476,9 +564,9 @@ class PatternScene extends BaseScene {
     g: Phaser.GameObjects.Graphics,
     token: string,
     box: TileBox,
+    tint: string = PALETTE.brass,
   ): void {
     const half = 17;
-    const tint = PALETTE.brass;
     const shape = tokenShape(token);
     if (shape === 'circle') {
       circle(g, box.cx, box.cy, half, {

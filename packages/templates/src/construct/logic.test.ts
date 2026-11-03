@@ -142,10 +142,8 @@ describe('construct/payment template', () => {
     const runtime = createConstructRuntime(detail, RUN_CONFIG);
     const result = await runtime.autoplay();
     expect(result.verdict?.passed, result.verdict?.failure?.class).toBe(true);
-    expect(result.snapshot.checkpoints.construct).toBe(true);
-    expect(result.snapshot.checkpoints.test).toBe(true);
-    expect(result.snapshot.checkpoints.annotate).toBe(true);
-    expect(result.snapshot.checkpoints.commit).toBe(true);
+    expect(result.snapshot.checkpoints.payment).toBe(true);
+    expect(result.snapshot.checkpoints.counter).toBe(true);
     expect(result.snapshot.artifacts.map((item) => item.id)).toEqual(['payment', 'counterexample']);
     const coins = result.snapshot.toolState.construct?.pieces.map((piece) => Number(piece.shape));
     expect(coins).toEqual([3, 3]);

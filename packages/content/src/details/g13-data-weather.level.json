@@ -26,6 +26,7 @@
         ],
         "chart": "tally",
         "batchSize": 7,
+        "total": 14,
         "categories": [
           {
             "id": "sunny",
@@ -106,8 +107,8 @@
     {
       "id": "sample",
       "phase": "observe",
-      "require": "probe/sample >= 2",
-      "descriptionKey": "把 14 天分两把采完"
+      "require": "probe/sample >= 1",
+      "descriptionKey": "把 14 天都采集完。"
     },
     {
       "id": "tally",
@@ -364,7 +365,7 @@
   "feedback": {
     "probe-not-collected": {
       "messageKey": "还没采集：先按“采集一把”把天气收进来。",
-      "hintKey": "14 天分成两把，每把 7 天。",
+      "hintKey": "把 14 天都采集完。",
       "focus": "sample"
     },
     "probe-sample-small": {

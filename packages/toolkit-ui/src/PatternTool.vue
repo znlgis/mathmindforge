@@ -1,14 +1,29 @@
 <script setup lang="ts">
-import type {
-  LevelAction, LevelRuntime, PatternTransform, RunSnapshot,
-} from '@mmf/game-kit';
+import type { LevelAction, LevelRuntime, PatternTransform, RunSnapshot } from '@mmf/game-kit';
 import type { MessageParams, Translator } from '@mmf/i18n';
-import { computed, ref, watch } from 'vue';
+import type { PatternRule } from '@mmf/toolkit/pattern';
+import { tokenAt } from '@mmf/toolkit/pattern';
+import { computed, ref } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
 /** 与 @mmf/content 的 ToolSpec 中的 pattern 成员结构一致；toolkit-ui 不直接依赖 content。 */
 type PatternSpec = Extract<ToolSpecLike, { kind: 'pattern' }>;
+
+/**
+ * 工具配置里尚可选的扩展字段（content schema 由 Lead 独占，暂不加 transforms）：
+ * 缺省时回退到关卡脚本自己的 allowedTransforms，再缺省才列出全量。
+ */
+interface PatternConfigExtras {
+  tokens: string[];
+  maxPeriod?: number;
+  transforms?: PatternTransform[];
+}
+
+interface PatternLevelScript {
+  scenario?: { length?: number; visible?: (string | null)[] };
+  pattern?: { allowedPeriods?: number[]; allowedTransforms?: PatternTransform[] };
+}
 
 const props = defineProps<{
   spec: PatternSpec;
@@ -22,107 +37,132 @@ function translate(key: string, params?: MessageParams): string {
   return props.t.t(key, params);
 }
 
-const TRANSFORMS: PatternTransform[] = ['none', 'mirror', 'rotate', 'shift', 'reflect'];
-const transformOptions = TRANSFORMS.map((value) => ({
-  value,
-  labelKey: 'pattern.transform.' + value,
-}));
-
-const initialPattern = props.snapshot.toolState.pattern;
-const cycle = ref<string[]>(initialPattern?.cycle ? [...initialPattern.cycle] : []);
-const transform = ref<PatternTransform>(initialPattern?.transform ?? 'none');
+const ALL_TRANSFORMS: PatternTransform[] = ['none', 'mirror', 'rotate', 'shift', 'reflect'];
 const busy = ref(false);
 const error = ref<string | null>(null);
 
 const patternState = computed(() => props.snapshot.toolState.pattern);
-const inspectedCount = computed(() => patternState.value?.inspected.length ?? 0);
 const committed = computed(() => patternState.value?.committed === true);
-const canUseCycle = computed(() => (
-  cycle.value.length >= 2 && cycle.value.length <= props.spec.config.maxPeriod
+const cycle = computed<string[] | undefined>(() => patternState.value?.cycle);
+const transform = computed<PatternTransform>(() => patternState.value?.transform ?? 'none');
+const selectedKey = computed(() => (
+  cycle.value && cycle.value.length >= 2 ? cycle.value.join('') + '-' + transform.value : ''
 ));
 
-const submittedSummary = computed(() => {
-  const state = patternState.value;
-  if (!state?.committed || !state.cycle || state.cycle.length === 0) return null;
-  return state.cycle.join(' ') + ' · ' + translate('pattern.transform.' + (state.transform ?? 'none'));
+const config = computed(() => props.spec.config as unknown as PatternConfigExtras);
+const script = computed<PatternLevelScript>(() => {
+  const raw = props.runtime.detail.levelScript as unknown;
+  return raw && typeof raw === 'object' ? (raw as PatternLevelScript) : {};
 });
 
-async function inspect(index: number): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const result = await props.runtime.dispatch({ type: 'pattern/inspect', payload: { index } });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
+/** 变换 chip 只列本关允许的选项：不再像原来的下拉那样摆一个"选了必错"的项。 */
+const transforms = computed<PatternTransform[]>(() => {
+  const declared = config.value.transforms;
+  if (Array.isArray(declared) && declared.length > 0) {
+    return declared.filter((item) => ALL_TRANSFORMS.includes(item));
   }
+  const allowed = script.value.pattern?.allowedTransforms;
+  if (Array.isArray(allowed) && allowed.length > 0) return allowed;
+  return ALL_TRANSFORMS;
+});
+
+interface RuleCandidate {
+  key: string;
+  tokens: string[];
+  transform: PatternTransform;
+  label: string;
 }
 
-function pushToken(token: string): void {
-  if (busy.value) return;
-  if (cycle.value.length >= props.spec.config.maxPeriod) return;
-  cycle.value = [...cycle.value, token];
-}
-
-function clearCycle(): void {
-  if (busy.value) return;
-  cycle.value = [];
-}
-
-function onTransformChange(event: Event): void {
-  const value = (event.target as HTMLSelectElement | null)?.value;
-  if (value === 'none' || value === 'mirror' || value === 'rotate' || value === 'shift' || value === 'reflect') {
-    transform.value = value;
-  }
-}
-
-async function useCycle(mode: 'preview' | 'commit'): Promise<void> {
-  if (busy.value || !canUseCycle.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    // 预览把规则一起带上：以前先发 setCycle 再发 preview，而 setCycle 会清掉"已提交"，
-    // 于是"先点用这条规律、再点预览一下"会把提交状态打掉，之后 run/submit 全部失败。
-    const action: LevelAction = mode === 'preview'
-      ? { type: 'pattern/preview', payload: { cycle: [...cycle.value], transform: transform.value } }
-      : { type: 'pattern/setCycle', payload: { cycle: [...cycle.value], transform: transform.value } };
-    const selected = await props.runtime.dispatch(action);
-    if (!selected.ok) {
-      error.value = selected.message ? translate(selected.message) : null;
-      return;
-    }
-    if (mode === 'preview') return;
-    const result = await props.runtime.dispatch({ type: 'pattern/commit', payload: {} });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
-}
-
-// 关卡重来（runtime.reset）时，把本地草稿同步回运行时的空状态。
-watch(
-  () => patternState.value?.cycle,
-  (next, previous) => {
-    if (!next) {
-      if (previous) {
-        cycle.value = [];
-        // 重来后运行时里已经没有规则了；本地变换也要回到初始值，
-        // 否则下一次提交会带着上一轮选的镜像/旋转，玩家看不出为什么判定变了。
-        transform.value = 'none';
+/**
+ * 「一键候选」：从带子可见格直接推出候选重复单元。
+ * 口径与 runtime 的 repair-only 校验一致（周期内每格都可见、能解释所有可见格），
+ * 所以点候选就是把这个玩家从带子里读出来的规律交给判定。
+ */
+const candidates = computed<RuleCandidate[]>(() => {
+  const visible = script.value.scenario?.visible ?? [];
+  const length = script.value.scenario?.length ?? visible.length;
+  const periods = script.value.pattern?.allowedPeriods ?? [];
+  const maxPeriod = config.value.maxPeriod ?? 6;
+  const out: RuleCandidate[] = [];
+  const seen = new Set<string>();
+  for (const period of periods) {
+    if (period < 2 || period > length || period > maxPeriod) continue;
+    const tokens: string[] = [];
+    let complete = true;
+    for (let index = 0; index < period; index += 1) {
+      const token = visible[index];
+      if (!token) {
+        complete = false;
+        break;
       }
-      return;
+      tokens.push(token);
     }
-    cycle.value = [...next];
-    if (patternState.value?.transform) transform.value = patternState.value.transform;
-  },
-);
+    if (!complete) continue;
+    for (const item of transforms.value) {
+      const rule: PatternRule = { tokens: [...tokens], period, transform: item };
+      let explains = true;
+      for (let index = 0; index < length; index += 1) {
+        const token = visible[index];
+        if (token === null || token === undefined) continue;
+        if (tokenAt(rule, index) !== token) {
+          explains = false;
+          break;
+        }
+      }
+      if (!explains) continue;
+      // testid 里不放冒号：选择器更稳，也方便 e2e 用可读的名字。
+      const key = tokens.join('') + '-' + item;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        key,
+        tokens: [...tokens],
+        transform: item,
+        label: tokens.join(' ') + ' · ' + translate('pattern.transform.' + item),
+      });
+    }
+  }
+  return out;
+});
+
+async function dispatch(action: LevelAction): Promise<boolean> {
+  if (busy.value) return false;
+  busy.value = true;
+  error.value = null;
+  try {
+    const result = await props.runtime.dispatch(action);
+    if (!result.ok) {
+      error.value = result.message ? translate(result.message) : null;
+      return false;
+    }
+    return true;
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** 候选 chip 一次点击 = 选中并提交这条规律（第二产物），不再让玩家逐字母拼单元。 */
+async function pickRule(tokens: string[], nextTransform: PatternTransform): Promise<void> {
+  if (busy.value) return;
+  if (!(await dispatch({ type: 'pattern/setCycle', payload: { cycle: [...tokens], transform: nextTransform } }))) return;
+  await dispatch({ type: 'pattern/commit', payload: {} });
+}
+
+async function pickTransform(nextTransform: PatternTransform): Promise<void> {
+  if (!cycle.value || cycle.value.length < 2) return;
+  await pickRule([...cycle.value], nextTransform);
+}
+
+async function preview(): Promise<void> {
+  if (!cycle.value || cycle.value.length < 2) return;
+  await dispatch({ type: 'pattern/preview', payload: { cycle: [...cycle.value], transform: transform.value } });
+}
 </script>
 
 <template>
-  <section class="mt-2 flex flex-col gap-1.5" data-testid="pattern-tool">
+  <section class="mt-2 flex flex-col gap-2" data-testid="pattern-tool">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-xs font-semibold text-ink-soft">{{ translate('pattern.inspected', { n: inspectedCount }) }}</p>
+      <p class="text-xs font-semibold text-ink-soft">点画布上的空格直接补字母，一次点击填一格。</p>
       <span
         v-if="committed"
         data-testid="pattern-committed"
@@ -132,95 +172,55 @@ watch(
       </span>
     </div>
 
-    <div v-if="spec.config.cells && spec.config.cells.length > 0">
-      <p class="text-sm font-bold text-ink">观察带子</p>
-      <p class="mt-1 text-xs text-ink-soft">点格子，看看它是第几位、第几个单元。</p>
-      <div class="mt-2 flex flex-wrap gap-1">
+    <div>
+      <p class="text-sm font-bold text-ink">{{ translate('pattern.cycle') }}</p>
+      <p class="mt-1 text-xs text-ink-soft">带子里重复的那几格就是答案，点一下选中。</p>
+      <div class="mt-2 flex flex-wrap gap-2">
         <button
-          v-for="cell in spec.config.cells"
-          :key="cell"
+          v-for="candidate in candidates"
+          :key="candidate.key"
           type="button"
-          :data-testid="'pattern-inspect-' + cell"
-          :aria-label="'观察第 ' + (cell + 1) + ' 格'"
-          class="h-8 min-w-9 rounded-lg border border-grid bg-paper px-1 text-xs font-bold text-ink-soft active:scale-95"
-          @click="inspect(cell)"
+          :data-testid="'pattern-candidate-' + candidate.key"
+          :disabled="busy"
+          :aria-pressed="selectedKey === candidate.key"
+          class="min-h-11 rounded-2xl border px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
+          :class="selectedKey === candidate.key ? 'border-teal bg-mint text-teal' : 'border-grid bg-paper text-ink'"
+          @click="pickRule(candidate.tokens, candidate.transform)"
         >
-          {{ cell + 1 }}
+          {{ candidate.label }}
         </button>
+        <p v-if="candidates.length === 0" class="text-xs text-ink-soft">带子上还没看出重复的单元。</p>
       </div>
     </div>
 
     <div>
-      <p class="text-sm font-bold text-ink">{{ translate('pattern.cycle') }}</p>
-      <p class="mt-1 text-xs text-ink-soft">{{ translate('pattern.tokenHint') }}</p>
+      <p class="text-sm font-bold text-ink">{{ translate('pattern.transform') }}</p>
       <div class="mt-2 flex flex-wrap gap-2">
         <button
-          v-for="token in spec.config.tokens"
-          :key="token"
+          v-for="option in transforms"
+          :key="option"
           type="button"
-          :data-testid="'pattern-token-' + token"
-          :disabled="busy || cycle.length >= spec.config.maxPeriod"
-          :aria-label="translate('pattern.cycle') + ' ' + token"
-          class="flex h-11 w-11 items-center justify-center rounded-2xl border border-grid bg-paper text-lg font-black text-ink active:scale-95 disabled:opacity-40"
-          @click="pushToken(token)"
+          :data-testid="'pattern-transform-' + option"
+          :disabled="busy || !cycle || cycle.length < 2"
+          :aria-pressed="transform === option"
+          class="min-h-11 rounded-2xl border px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
+          :class="transform === option ? 'border-teal bg-mint text-teal' : 'border-grid bg-paper text-ink'"
+          @click="pickTransform(option)"
         >
-          {{ token }}
+          {{ translate('pattern.transform.' + option) }}
         </button>
       </div>
     </div>
-
-    <div class="rounded-2xl border border-grid bg-paper p-3" data-testid="pattern-cycle">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-sm font-bold text-ink">
-          {{ cycle.length > 0 ? cycle.join(' ') : '—' }}
-          <span class="ml-1 text-xs font-semibold text-ink-soft">{{ cycle.length }}/{{ spec.config.maxPeriod }}</span>
-        </p>
-        <button
-          type="button"
-          data-testid="pattern-clear"
-          :disabled="busy || cycle.length === 0"
-          class="min-h-11 rounded-xl bg-card px-3 text-xs font-bold text-ink active:scale-95 disabled:opacity-40"
-          @click="clearCycle"
-        >
-          清空
-        </button>
-      </div>
-      <p v-if="submittedSummary" class="mt-2 text-xs font-semibold text-teal">{{ submittedSummary }}</p>
-    </div>
-
-    <label class="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
-      {{ translate('pattern.transform') }}
-      <select
-        :value="transform"
-        :disabled="busy"
-        data-testid="pattern-transform"
-        class="min-h-11 rounded-xl border border-grid bg-card px-3 text-sm font-semibold text-ink"
-        @change="onTransformChange"
-      >
-        <option v-for="option in transformOptions" :key="option.value" :value="option.value">
-          {{ translate(option.labelKey) }}
-        </option>
-      </select>
-    </label>
 
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
         data-testid="pattern-preview"
-        :disabled="!canUseCycle || busy"
+        :disabled="busy || !cycle || cycle.length < 2"
         class="min-h-11 flex-1 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="useCycle('preview')"
+        @click="preview"
       >
         {{ translate('pattern.preview') }}
-      </button>
-      <button
-        type="button"
-        data-testid="pattern-commit"
-        :disabled="!canUseCycle || busy"
-        class="min-h-11 flex-1 rounded-2xl bg-blueprint px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
-        @click="useCycle('commit')"
-      >
-        {{ translate('pattern.commit') }}
       </button>
     </div>
 

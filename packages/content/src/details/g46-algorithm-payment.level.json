@@ -114,28 +114,16 @@
   },
   "evidencePlan": [
     {
-      "id": "construct",
+      "id": "payment",
       "phase": "construct",
-      "require": "construct/place >= 2",
+      "require": "construct/place >= 1",
       "descriptionKey": "level.payment.construct"
     },
     {
-      "id": "test",
-      "phase": "run",
-      "require": "counter/test >= 1",
-      "descriptionKey": "level.payment.test"
-    },
-    {
-      "id": "annotate",
-      "phase": "revise",
+      "id": "counter",
+      "phase": "generalize",
       "require": "counter/annotate >= 1",
       "descriptionKey": "level.payment.annotate"
-    },
-    {
-      "id": "commit",
-      "phase": "generalize",
-      "require": "counter/commit >= 1",
-      "descriptionKey": "level.payment.commit"
     }
   ],
   "solutions": [
@@ -160,8 +148,6 @@
           "greedyCoins": 4,
           "optimalCoins": 3,
           "isCounterexample": true,
-          "tested": true,
-          "committed": true,
           "failedPremise": "greedy-optimal"
         }
       }
@@ -188,8 +174,6 @@
           "greedyCoins": 4,
           "optimalCoins": 3,
           "isCounterexample": true,
-          "tested": true,
-          "committed": true,
           "failedPremise": "greedy-optimal"
         }
       }
@@ -219,8 +203,6 @@
           "greedyCoins": 4,
           "optimalCoins": 3,
           "isCounterexample": true,
-          "tested": true,
-          "committed": true,
           "failedPremise": "greedy-optimal"
         }
       }
@@ -247,8 +229,6 @@
           "greedyCoins": 4,
           "optimalCoins": 3,
           "isCounterexample": true,
-          "tested": true,
-          "committed": true,
           "failedPremise": "greedy-optimal"
         }
       }
@@ -275,8 +255,6 @@
           "greedyCoins": 3,
           "optimalCoins": 2,
           "isCounterexample": true,
-          "tested": true,
-          "committed": true,
           "failedPremise": "greedy-optimal"
         }
       }
@@ -303,8 +281,6 @@
           "greedyCoins": 4,
           "optimalCoins": 3,
           "isCounterexample": true,
-          "tested": true,
-          "committed": true,
           "failedPremise": "no-1-coin"
         }
       }
@@ -331,8 +307,6 @@
           "greedyCoins": 4,
           "optimalCoins": 4,
           "isCounterexample": false,
-          "tested": true,
-          "committed": true,
           "failedPremise": "greedy-optimal"
         }
       }
@@ -348,20 +322,6 @@
           ],
           "total": 6,
           "count": 2
-        },
-        "counterexample": {
-          "target": 10,
-          "denominations": [
-            1,
-            3,
-            4
-          ],
-          "greedyCoins": 4,
-          "optimalCoins": 3,
-          "isCounterexample": true,
-          "tested": false,
-          "committed": false,
-          "failedPremise": "greedy-optimal"
         }
       }
     }

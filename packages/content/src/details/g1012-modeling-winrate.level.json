@@ -47,9 +47,14 @@
           "defense": "守势",
           "economy": "经济"
         },
-        "commitLabel": "锁定配置",
         "resetLabel": "重置",
-        "runLabelKey": "跑满 1000 局",
+        "runLabel": "跑满 1000 局",
+        "metricsMode": "duel",
+        "targets": {
+          "winRate": 0.55,
+          "winRateLow": 0.5,
+          "baselineB": 0.52
+        },
         "presets": [
           {
             "attack": 30,
@@ -146,8 +151,8 @@
     {
       "id": "strategy",
       "phase": "hypothesize",
-      "require": "knob/commit >= 1",
-      "descriptionKey": "把 100 点资源分给攻、守、经济，并确认配置"
+      "require": "knob/run >= 1",
+      "descriptionKey": "用这组配置跑一次采样"
     },
     {
       "id": "run",
@@ -373,8 +378,8 @@
   ],
   "feedback": {
     "exp-not-run": {
-      "messageKey": "还没有可用的数据：先确认配置，再跑一次采样。",
-      "hintKey": "三个旋钮加起来要正好 100 点，确认后再采样。",
+      "messageKey": "先跑一次采样，拿到这一组参数的数据。",
+      "hintKey": "用这组配置跑一次采样",
       "focus": "sample-tool"
     },
     "exp-sample-small": {

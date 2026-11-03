@@ -141,19 +141,22 @@ export function createRuleAdapter(detail: LevelDetail): RuntimeAdapter<RuleState
     apply(state: RuleState, action: LevelAction): AdapterResult<RuleState> {
       return applyAction(script, state, action);
     },
+    // 程序拼好就是答案（docs/12 T1-rule）：「提交程序」按钮已删，宿主「完成」一次性校验，
+    // 所以产物不再要求 committed —— 有程序就交给验证器判定。
     artifact(state: RuleState): unknown | null {
-      if (!state.committed || state.program.length === 0) return null;
+      if (state.program.length === 0) return null;
       return { program: state.program };
     },
     artifactSummaries(state: RuleState) {
-      return state.committed ? summarizeProgram(state.program) : [];
+      return summarizeProgram(state.program);
     },
     checkpoints(state: RuleState, ctx) {
       return {
-        build: state.committed && state.program.length > 0,
-        // 宿主不再有独立的"运行"按钮（docs/12 T0-3）：提交程序那一步已经真的执行过一遍，
-        // 把它当事实记录；保留 ctx.runs 兜底，autoplay/旧路径仍然满足。
-        run: state.committed || ctx.runs > 0,
+        // 检查点改为事实记录（docs/12 T0-4）：放下第一块程序即"拼好了"，画布此时也已经在跑轨迹。
+        build: state.program.length > 0,
+        // 宿主没有独立的"运行"按钮；画布每次编辑都用当前程序重算轨迹（rule/scene.ts），
+        // 所以「运行」也是数据上屏即事实。ctx.runs 兜底旧路径。
+        run: state.program.length > 0 || ctx.runs > 0,
       };
     },
     toolState(state: RuleState) {

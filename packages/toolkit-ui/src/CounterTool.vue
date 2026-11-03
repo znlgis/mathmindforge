@@ -29,9 +29,6 @@ const range = computed<[number, number]>(() => {
 });
 const snapDraft = computed(() => props.snapshot.toolState.counter?.draft);
 const lastTest = computed(() => props.snapshot.toolState.counter?.lastTest);
-const counterSummary = computed(() => (
-  props.snapshot.artifacts.find((item) => item.id === 'counterexample')?.summary ?? null
-));
 
 function initialTarget(): number {
   const value = snapDraft.value?.instance.target;
@@ -60,6 +57,57 @@ function premiseLabel(id: string): string {
   return PREMISE_LABELS[id] ?? id;
 }
 
+/** 与引擎同口径的贪心枚数：每次拿不超过余额的最大面额。 */
+function greedyCount(target: number, denominations: number[]): number | null {
+  let remaining = target;
+  let count = 0;
+  for (const coin of [...denominations].sort((a, b) => b - a)) {
+    while (remaining >= coin) {
+      remaining -= coin;
+      count += 1;
+    }
+  }
+  return remaining === 0 ? count : null;
+}
+
+/** 与引擎同口径的最优枚数：完全背包取最少枚数。 */
+function optimalCount(target: number, denominations: number[]): number | null {
+  if (target === 0) return 0;
+  const best = new Array<number>(target + 1).fill(Number.POSITIVE_INFINITY);
+  best[0] = 0;
+  for (let value = 1; value <= target; value += 1) {
+    for (const coin of denominations) {
+      if (coin > value) continue;
+      const previous = best[value - coin] as number;
+      if (!Number.isFinite(previous)) continue;
+      if (previous + 1 < (best[value] as number)) best[value] = previous + 1;
+    }
+  }
+  return Number.isFinite(best[target] as number) ? (best[target] as number) : null;
+}
+
+const live = computed(() => {
+  if (!canEdit.value) return null;
+  const greedy = greedyCount(draftTarget.value, draftDenominations.value);
+  const optimal = optimalCount(draftTarget.value, draftDenominations.value);
+  const diff = greedy !== null && optimal !== null ? greedy - optimal : null;
+  return { greedy, optimal, diff };
+});
+
+const greedyText = computed(() => {
+  if (!live.value) return '—';
+  return live.value.greedy === null ? '付不清' : live.value.greedy + ' 枚';
+});
+const optimalText = computed(() => {
+  if (!live.value) return '—';
+  return live.value.optimal === null ? '付不清' : live.value.optimal + ' 枚';
+});
+const diffText = computed(() => {
+  const diff = live.value?.diff;
+  if (diff === null || diff === undefined) return '—';
+  return diff > 0 ? '+' + diff : String(diff);
+});
+
 async function dispatchEdit(): Promise<boolean> {
   error.value = null;
   const result = await props.runtime.dispatch({
@@ -81,6 +129,18 @@ async function dispatchEdit(): Promise<boolean> {
   return true;
 }
 
+/** 编辑即自动测：玩家不用再点一次"测试贪心"。 */
+async function autoTest(): Promise<void> {
+  const result = await props.runtime.dispatch({ type: 'counter/test', payload: {} });
+  if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
+}
+
+async function commitEdit(): Promise<boolean> {
+  if (!(await dispatchEdit())) return false;
+  await autoTest();
+  return true;
+}
+
 async function onTargetChange(event: Event): Promise<void> {
   if (busy.value) return;
   const value = Number((event.target as HTMLInputElement | null)?.value);
@@ -95,7 +155,7 @@ async function onTargetChange(event: Event): Promise<void> {
   }
   busy.value = true;
   try {
-    await dispatchEdit();
+    await commitEdit();
   } finally {
     busy.value = false;
   }
@@ -118,59 +178,20 @@ async function onDenominationChange(coin: number, event: Event): Promise<void> {
   }
   busy.value = true;
   try {
-    await dispatchEdit();
+    await commitEdit();
   } finally {
     busy.value = false;
   }
 }
 
-async function runTest(): Promise<void> {
-  if (busy.value || !canEdit.value) return;
+/** 失效前提是一排 chip：点一下就指出（不需要下拉展开、也不需要再点提交）。 */
+async function choosePremise(id: string): Promise<void> {
+  if (busy.value || !lastTest.value?.passed) return;
+  premise.value = id;
   busy.value = true;
   error.value = null;
   try {
-    if (!(await dispatchEdit())) return;
-    const result = await props.runtime.dispatch({ type: 'counter/test', payload: {} });
-    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function onPremiseChange(event: Event): Promise<void> {
-  const value = (event.target as HTMLSelectElement | null)?.value ?? '';
-  premise.value = value;
-  if (busy.value || value.length === 0) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const result = await props.runtime.dispatch({
-      type: 'counter/annotate',
-      payload: { premiseId: value },
-    });
-    if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function commitCounter(): Promise<void> {
-  if (busy.value || !canEdit.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    if (!(await dispatchEdit())) return;
-    if (premise.value.length > 0) {
-      const annotated = await props.runtime.dispatch({
-        type: 'counter/annotate',
-        payload: { premiseId: premise.value },
-      });
-      if (!annotated.ok) {
-        error.value = annotated.message ?? null;
-        return;
-      }
-    }
-    const result = await props.runtime.dispatch({ type: 'counter/commit', payload: {} });
+    const result = await props.runtime.dispatch({ type: 'counter/annotate', payload: { premiseId: id } });
     if (!result.ok) error.value = result.message ? props.t.t(result.message) : null;
   } finally {
     busy.value = false;
@@ -238,18 +259,10 @@ watch(snapDraft, (next) => {
       </div>
     </fieldset>
 
-    <button
-      type="button"
-      data-testid="counter-test"
-      :disabled="busy || !canEdit"
-      class="min-h-12 rounded-2xl bg-blueprint px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
-      @click="runTest"
-    >
-      测试贪心
-    </button>
-
     <div class="rounded-2xl border border-grid bg-paper p-3" data-testid="counter-result">
-      <p class="text-sm font-bold text-ink">{{ counterSummary ?? '还没测试' }}</p>
+      <p class="text-sm font-bold text-ink" data-testid="counter-live">
+        贪心 {{ greedyText }} / 最优 {{ optimalText }} / 差 {{ diffText }}
+      </p>
       <p
         v-if="lastTest"
         class="mt-1 text-xs font-semibold"
@@ -257,33 +270,29 @@ watch(snapDraft, (next) => {
       >
         {{ lastTest.passed ? '这个例子里贪心不是最优。' : '这个例子里贪心也用了最少枚数。' }}
       </p>
+      <p v-else class="mt-1 text-xs text-ink-soft">填好目标金额和面额，会自动帮你看贪心与最优。</p>
     </div>
 
-    <label class="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
-      失效前提
-      <select
-        :value="premise"
-        :disabled="busy || !lastTest?.passed"
-        data-testid="counter-premise"
-        class="min-h-11 rounded-xl border border-grid bg-card px-3 text-sm font-semibold text-ink"
-        @change="onPremiseChange"
-      >
-        <option value="">选一条前提</option>
-        <option v-for="item in premises" :key="item" :value="item">{{ premiseLabel(item) }}</option>
-      </select>
-    </label>
-
-    <button
-      type="button"
-      data-testid="counter-commit"
-      :disabled="busy || !lastTest?.passed || premise.length === 0"
-      class="min-h-12 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
-      @click="commitCounter"
-    >
-      提交反例
-    </button>
+    <div class="rounded-2xl border border-grid bg-paper p-3">
+      <p class="text-sm font-bold text-ink">这个反例推翻了哪条前提？</p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <button
+          v-for="item in premises"
+          :key="item"
+          type="button"
+          :data-testid="'counter-premise-' + item"
+          :aria-pressed="premise === item"
+          :disabled="busy || !lastTest?.passed"
+          class="min-h-10 rounded-full border-2 px-3 text-xs font-bold active:scale-95 disabled:opacity-40"
+          :class="premise === item ? 'border-teal bg-mint text-teal' : 'border-grid bg-card text-ink'"
+          @click="choosePremise(item)"
+        >
+          {{ premiseLabel(item) }}
+        </button>
+      </div>
+      <p class="mt-2 text-[11px] text-ink-soft">选中的那一刻就是最终答案，不用再点提交。</p>
+    </div>
 
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>
-    <p class="text-xs text-ink-soft">先让贪心跑一遍，再指出它错在哪条前提上。</p>
   </section>
 </template>

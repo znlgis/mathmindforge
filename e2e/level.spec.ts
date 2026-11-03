@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { events, openTool, saveSnapshot, waitEvent } from './shared';
+import { clickCanvasCell, events, interactions, saveSnapshot, startInteractionMeter, waitEvent } from './shared';
 
 const LEVEL_ID = 'k-structure-pattern-path';
 
@@ -33,34 +33,41 @@ test('没有使用工具时提交会被拒绝', async ({ page }) => {
   expect(save?.levels?.[LEVEL_ID]?.completed ?? false).toBe(false);
 });
 
-test('真实点击工具台可以通关（不靠 autoplay）', async ({ page }) => {
+test('真实点击：候选规律 + 画布点三格 + 完成（≤6 次交互）', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
   await expect(page.getByTestId('pattern-tool')).toBeVisible();
+  await startInteractionMeter(page);
 
-  // 观察两格，满足 observe 检查点
-  await page.getByTestId('pattern-inspect-0').click();
-  await page.getByTestId('pattern-inspect-1').click();
-
-  // 拼出 ABB 的重复单元并提交
-  await page.getByTestId('pattern-token-A').click();
-  await page.getByTestId('pattern-token-B').click();
-  await page.getByTestId('pattern-token-B').click();
-  await page.getByTestId('pattern-commit').click();
+  // 一次点击声明规律（原来要点 3 个字母 + 1 次提交）
+  await page.getByTestId('pattern-candidate-ABB-none').click();
   await expect(page.getByTestId('pattern-committed')).toBeVisible();
 
-  // 给三个缺口分别放 A / B / B（construct 是第二张卡，先展开它）
-  await openTool(page, 'construct', 1);
-  for (const [slot, token] of [[6, 'A'], [7, 'B'], [8, 'B']] as const) {
-    await page.getByTestId('construct-slot-' + slot).click();
-    await page.getByTestId('construct-place-' + token).click();
-  }
+  // 画布点三个缺口，点一次填一格（原来每格要 2 击：选槽 + 点色板）
+  await clickCanvasCell(page, 6);
+  await clickCanvasCell(page, 7);
+  await clickCanvasCell(page, 8);
 
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  const used = await interactions(page);
+  // 目标 5~6 次（docs/12 §4）；留 1 次余量给音效/焦点等实现差异
+  expect(used).toBeLessThanOrEqual(6);
   await expect.poll(async () => {
     const save = await saveSnapshot(page);
     return save?.levels?.[LEVEL_ID]?.completed === true;
   }, { timeout: 15_000 }).toBe(true);
+});
+
+test('画布点空格会立刻填上字母（一次点击 = 一次输入）', async ({ page }) => {
+  await page.goto('/#/play/' + LEVEL_ID);
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
+  await startInteractionMeter(page);
+  await clickCanvasCell(page, 6);
+  // 点完立刻派发一次 tool 使用；不依赖截图，用交互计数与"提交被拒理由"变化证明它生效
+  expect(await interactions(page)).toBeGreaterThanOrEqual(1);
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('failure-banner')).toBeVisible();
 });
 
 test('运行时不发外网请求，断网后工具仍可操作', async ({ page, context }) => {
@@ -73,8 +80,8 @@ test('运行时不发外网请求，断网后工具仍可操作', async ({ page,
   await page.goto('/#/play/' + LEVEL_ID);
   await expect(page.getByTestId('pattern-tool')).toBeVisible();
   await context.setOffline(true);
-  await page.getByTestId('pattern-inspect-0').click();
-  await expect(page.getByText('已经观察 1 格')).toBeVisible();
+  await page.getByTestId('pattern-candidate-ABB-none').click();
+  await expect(page.getByTestId('pattern-committed')).toBeVisible();
   await context.setOffline(false);
   expect(external).toEqual([]);
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LevelAction, LevelDetail } from '@mmf/game-kit';
 import detailJson from '../../../content/src/details/g79-modeling-dispatch.level.json';
+import queueDetailJson from '../../../content/src/details/g46-modeling-queue.level.json';
 import { costOf, coverageOf, runSimulation, waitOf } from './engine';
 import type { SimParams } from './engine';
 import {
@@ -12,9 +13,17 @@ import {
 } from './logic';
 import type { SimVariant } from './logic';
 import { createSimulateRuntime } from './runtime';
+import { createQueueRuntime, QUEUE_DATASET_ID } from './queue-runtime';
+import { queueScriptSchema } from './queue';
 
 // 直接读内容文件：不依赖 Lead 集成时对 @mmf/content/full 的登记，也不拖入整个内容层。
 const detail = detailJson as unknown as LevelDetail;
+const queueDetail = queueDetailJson as unknown as LevelDetail;
+const queueScript = queueScriptSchema.parse(queueDetail.levelScript);
+const queueConfig = queueScript as unknown as {
+  targets: { avgWaitMax: number; overtimeMax: number };
+  cost: { budget: number };
+};
 const script = parseScript(detail.levelScript);
 const base: SimVariant = { id: 'base', axis: 'structure', patch: {} };
 
@@ -189,7 +198,12 @@ describe('simulate · g79 城市调度', () => {
     expect(snapshot.checkpoints.params).toBe(false);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(result.verdict?.passed).toBe(false);
-    expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual(['params', 'run']);
+    // 参数一改，运行与对照都不再代表当前配置：三个检查点一起退回缺失。
+    expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual([
+      'params',
+      'run',
+      'compare',
+    ]);
   });
 
   it('autoplay 走公开动作路径通关', async () => {
@@ -203,7 +217,7 @@ describe('simulate · g79 城市调度', () => {
     expect(result.snapshot.toolState.knob?.values).toEqual({ vehicles: 3, teams: 1, shift: 90, route: 0 });
   });
 
-  it('actionsFor 只返回公开动作，且先摆参数再跑再提交', () => {
+  it('actionsFor 只返回公开动作，且「运行即锁定」：摆参数 → 运行 → 提交', () => {
     const actions = actionsFor(detail, base, detail.solutions[0]?.artifact);
     expect(actions.map((action) => action.type)).toEqual([
       'knob/set',
@@ -211,8 +225,6 @@ describe('simulate · g79 城市调度', () => {
       'knob/set',
       'knob/set',
       'knob/run',
-      'knob/commit',
-      'probe/focus',
       'submit',
     ]);
     const sets = actions.filter((action) => action.type === 'knob/set');
@@ -230,7 +242,11 @@ describe('simulate · g79 城市调度', () => {
       options?: Record<string, { value: number; label: string }[]>;
       labels?: Record<string, string>;
       budget?: number;
+      metricsMode?: string;
+      targets?: Record<string, { coverageMin: number; waitMax: number }>;
     };
+    expect(extras.metricsMode).toBe('dispatch');
+    expect(extras.targets).toEqual(script.targets);
     const keys = new Map(knob.config.keys.map((key) => [key.key, key]));
     expect([...keys.keys()]).toEqual(['vehicles', 'teams', 'shift', 'route']);
     expect(keys.get('vehicles')?.min).toBe(script.params.vehicles.min);
@@ -270,5 +286,83 @@ describe('simulate · g79 城市调度', () => {
     expect(script.budget).toBe(120);
     expect(script.targets.A).toEqual({ coverageMin: 0.9, waitMax: 18 });
     expect(script.targets.B).toEqual({ coverageMin: 0.85, waitMax: 20 });
+  });
+});
+
+describe('simulate · g46 排队规划（运行即锁定）', () => {
+  function queueRuntime() {
+    return createQueueRuntime(queueDetail, options());
+  }
+
+  it('无工具提交被拒，并列出三条缺失证据', async () => {
+    const runtime = queueRuntime();
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(false);
+    expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual([
+      'params',
+      'run',
+      'compare',
+    ]);
+  });
+
+  it('一次运行就锁定参数：三项检查点全满足，指标写进 queue-runs-v1', async () => {
+    const runtime = queueRuntime();
+    for (const [key, value] of [['servers', 2], ['serviceTime', 2], ['openMinutes', 30]] as const) {
+      const result = await runtime.dispatch({ type: 'knob/set', payload: { key, value } });
+      expect(result.ok, key).toBe(true);
+    }
+    const run = await runtime.dispatch({ type: 'knob/run', payload: {} });
+    expect(run.ok).toBe(true);
+    const snapshot = runtime.snapshot();
+    expect(snapshot.checkpoints).toEqual({ params: true, run: true, compare: true });
+
+    const dataset = snapshot.toolState.probe?.dataset;
+    expect(dataset?.id).toBe(QUEUE_DATASET_ID);
+    expect(dataset?.groups?.['run-1']).toEqual([2, 2, 30, 0, 0, 0, 16, 1]);
+    expect(snapshot.toolState.knob?.lastRunId).toBe('run-1');
+
+    const submitted = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(submitted.verdict?.passed).toBe(true);
+  });
+
+  it('参数一改，旧运行立刻作废（不再静默失败）', async () => {
+    const runtime = queueRuntime();
+    await runtime.dispatch({ type: 'knob/set', payload: { key: 'serviceTime', value: 2 } });
+    await runtime.dispatch({ type: 'knob/run', payload: {} });
+    const changed = await runtime.dispatch({ type: 'knob/set', payload: { key: 'servers', value: 3 } });
+    expect(changed.ok).toBe(true);
+    const snapshot = runtime.snapshot();
+    expect(snapshot.checkpoints).toEqual({ params: false, run: false, compare: false });
+    // 历史表还在（用于对照），但产物已经不可提交。
+    expect(snapshot.toolState.probe?.dataset?.groups?.['run-1']).toBeTruthy();
+    const submitted = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(submitted.verdict?.passed).toBe(false);
+    expect(submitted.verdict?.missingEvidence.length).toBeGreaterThan(0);
+  });
+
+  it('autoplay 走公开动作路径通关', async () => {
+    const runtime = queueRuntime();
+    const result = await runtime.autoplay();
+    expect(result.verdict?.passed, result.verdict?.failure?.class).toBe(true);
+    expect(result.snapshot.checkpoints).toEqual({ params: true, run: true, compare: true });
+  });
+
+  it('旋钮配置与关卡脚本不漂移（运行入口文案、指标模式、目标）', () => {
+    const knob = queueDetail.tools.find((tool) => tool.kind === 'knob');
+    expect(knob).toBeTruthy();
+    if (!knob || knob.kind !== 'knob') return;
+    const extras = knob.config as unknown as {
+      runLabel?: string;
+      metricsMode?: string;
+      budget?: number;
+      targets?: { avgWaitMax?: number; overtimeMax?: number };
+    };
+    expect(extras.runLabel).toBeTruthy();
+    expect(extras.metricsMode).toBe('queue');
+    expect(extras.targets?.avgWaitMax).toBe(queueConfig.targets.avgWaitMax);
+    expect(extras.targets?.overtimeMax).toBe(queueConfig.targets.overtimeMax);
+    expect(extras.budget).toBe(queueConfig.cost.budget);
+    // 「运行两个种子」对单日排队关是错的文案：现在由关卡自己给标签。
+    expect(extras.runLabel).not.toContain('两个种子');
   });
 });

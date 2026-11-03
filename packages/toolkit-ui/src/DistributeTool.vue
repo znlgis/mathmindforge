@@ -52,6 +52,41 @@ function remaining(itemId: string): number {
   return (item?.count ?? 0) - (totals.value.get(itemId) ?? 0);
 }
 
+/** 第一个容器当前的搭配（种类 → 件数）。 */
+const firstCounts = computed(() => {
+  const map = new Map<string, number>();
+  for (const item of items.value) {
+    const value = count(0, item.id);
+    if (value > 0) map.set(item.id, value);
+  }
+  return map;
+});
+
+/** 复制按钮旁边要显示的"一份搭配"。 */
+const copyPlan = computed(() => {
+  if (firstCounts.value.size === 0) return null;
+  const parts: string[] = [];
+  for (const item of items.value) {
+    const value = firstCounts.value.get(item.id) ?? 0;
+    if (value > 0) parts.push(item.token + '×' + value);
+  }
+  return parts.join(' + ');
+});
+
+/** 为什么现在不能复制：给玩家看人话，而不是禁用按钮后一片沉默。 */
+const copyBlockedReason = computed<string | null>(() => {
+  if (containers.value.length < 2) return '只有一个容器，不用复制。';
+  if (firstCounts.value.size === 0) return '先在第一个容器里摆好一份。';
+  if (containerTotal(0) > maxPer.value) return '第一个容器超过上限了，先减到 ' + maxPer.value + ' 件以内。';
+  for (const item of items.value) {
+    const need = (firstCounts.value.get(item.id) ?? 0) * containers.value.length;
+    if (need > item.count) {
+      return item.token + ' ' + item.label + '不够：每个容器都放的话，一共要用 ' + need + ' 件。';
+    }
+  }
+  return null;
+});
+
 async function add(containerIndex: number, itemId: string): Promise<void> {
   if (busy.value) return;
   if (remaining(itemId) <= 0) {
@@ -82,6 +117,49 @@ async function remove(containerIndex: number, itemId: string): Promise<void> {
   busy.value = true;
   try {
     await props.runtime.dispatch({ type: 'construct/remove', payload: { pieceId: piece.id } });
+  } finally {
+    busy.value = false;
+  }
+}
+
+/**
+ * 其余容器照第一个容器分：UI 侧循环 dispatch（不改 runtime/schema）。
+ * 先把其余容器清空，再按第一容器的搭配逐件放进去，保证不会触发"这种物品已经分完了"。
+ */
+async function copyFirstToRest(): Promise<void> {
+  if (busy.value) return;
+  if (copyBlockedReason.value) {
+    error.value = copyBlockedReason.value;
+    return;
+  }
+  busy.value = true;
+  error.value = null;
+  try {
+    for (let index = 1; index < containers.value.length; index += 1) {
+      const own = pieces.value.filter((piece) => piece.x === index).map((piece) => piece.id).reverse();
+      for (const pieceId of own) {
+        const result = await props.runtime.dispatch({ type: 'construct/remove', payload: { pieceId } });
+        if (!result.ok) {
+          error.value = result.message ? props.t.t(result.message) : null;
+          return;
+        }
+      }
+    }
+    for (let index = 1; index < containers.value.length; index += 1) {
+      for (const item of items.value) {
+        const value = firstCounts.value.get(item.id) ?? 0;
+        for (let n = 0; n < value; n += 1) {
+          const result = await props.runtime.dispatch({
+            type: 'construct/place',
+            payload: { piece: { id: 'dist-copy-' + index + '-' + item.id + '-' + n, shape: item.id, x: index, y: 0 } },
+          });
+          if (!result.ok) {
+            error.value = result.message ? props.t.t(result.message) : null;
+            return;
+          }
+        }
+      }
+    }
   } finally {
     busy.value = false;
   }
@@ -132,6 +210,26 @@ async function remove(containerIndex: number, itemId: string): Promise<void> {
         </div>
       </article>
     </div>
+
+    <div class="rounded-2xl border border-grid bg-paper p-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          data-testid="dist-copy-first"
+          :disabled="busy || copyBlockedReason !== null"
+          class="min-h-11 rounded-xl bg-blueprint px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+          @click="copyFirstToRest"
+        >
+          其余容器照这样分
+        </button>
+        <span v-if="copyPlan" class="text-[11px] font-semibold text-ink-soft">
+          每个容器各放：{{ copyPlan }}
+        </span>
+        <span v-else class="text-[11px] font-semibold text-ink-soft">{{ copyBlockedReason }}</span>
+      </div>
+      <p v-if="copyPlan && copyBlockedReason" class="mt-1 text-[11px] font-semibold text-red">{{ copyBlockedReason }}</p>
+    </div>
+
     <div class="flex flex-wrap gap-2 text-[11px] text-ink-soft">
       <span v-for="item in items" :key="item.id" :data-testid="'dist-remaining-' + item.id">
         剩余 {{ item.token }}：{{ remaining(item.id) }}

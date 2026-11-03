@@ -5,7 +5,7 @@ import { digest } from '@mmf/toolkit/shared';
 import type { RuntimeVariant } from '../shared/types';
 import { argueScriptSchema } from './schema';
 import type { ArgueScript } from './schema';
-import { boardCounts, rotateRemoved } from './engine';
+import { boardCounts, rotateRemoved, rotationFlipsColoring, warrantDecides } from './engine';
 import type { BoardCounts } from './engine';
 
 export const FAILURE_CLASSES = [
@@ -98,15 +98,17 @@ export function validateArtifact(
     if (evidence.black !== actual.black || evidence.white !== actual.white) {
       return failure('argue-invariant-false', '染色证据没有挂上当前图形的黑白格数量。');
     }
-    if (actual.black === actual.white) {
+    if (!warrantDecides('coloring', actual)) {
       return failure('argue-invariant-false', '黑白格数量相等时，染色法不能直接排除铺满。');
     }
-  } else if (argument.warrant === 'parity') {
+  } else if (argument.warrant === 'parity' || argument.warrant === 'area') {
+    // 奇偶与面积是同一个量：每块 1×2 骨牌都盖住 2 格，所以只由总格数的奇偶决定。
+    // 以前 area 一律判「检验不了」，但它在奇数格棋盘上和奇偶一样成立——那不是思维陷阱，是命名陷阱。
     const evidence = argument.evidence ?? {};
     if (evidence.cells !== actual.cells) {
       return failure('argue-invariant-false', '奇偶证据的格子数不对。');
     }
-    if (actual.cells % 2 === 0) {
+    if (!warrantDecides(argument.warrant, actual)) {
       return failure('argue-invariant-false', '格子数是偶数，奇偶法不能直接排除。');
     }
   } else {
@@ -125,39 +127,46 @@ export function validateArtifact(
   };
 }
 
+/**
+ * 黄金动作序列：和论证板的一次点击完全同构——数黑白格、选依据（其余自动补齐）、
+ * 提交论证（幂等）、宿主完成。没有「先放一块骨牌」「先挂证据」「先选范围」这类仪式动作。
+ */
 export function actionsFor(
   input: ArgueScript | LevelDetail,
   _variant: RuntimeVariant,
   artifact: unknown,
 ): LevelAction[] {
-  const raw = artifact as { counts?: BoardCounts; argument?: { warrant?: string } } | null;
   const script = 'levelScript' in input ? parseScript(input.levelScript) : input;
-  const first = script.board.removed.length > 0 ? script.board.removed[0] : { x: 0, y: 0 };
-  const actions: LevelAction[] = [];
-  // 先真的放一块多米诺（attempt 检查点），再由工具算证据、写证书。
-  actions.push({
-    type: 'construct/place',
-    payload: { piece: { id: 'domino-0', shape: 'h', x: first.x + 1, y: first.y } },
-  });
-  actions.push({ type: 'probe/sample', payload: {} });
-  actions.push({ type: 'argue/setClaim', payload: { claim: 'impossible' } });
-  actions.push({ type: 'argue/setWarrant', payload: { warrant: raw?.argument?.warrant ?? 'coloring' } });
-  actions.push({ type: 'argue/attachEvidence', payload: {} });
-  actions.push({ type: 'argue/setScope', payload: { scope: 'domino-tiling' } });
-  actions.push({ type: 'argue/commit', payload: {} });
-  actions.push({ type: 'submit', payload: {} });
-  return actions;
+  const raw = artifact as { argument?: { warrant?: string } } | null;
+  const wanted = raw?.argument?.warrant;
+  const warrant = script.warrants.includes(wanted as ArgueScript['warrants'][number])
+    ? (wanted as ArgueScript['warrants'][number])
+    : script.warrants[0];
+  return [
+    { type: 'probe/sample', payload: {} },
+    { type: 'argue/setWarrant', payload: { warrant } },
+    { type: 'argue/commit', payload: {} },
+    { type: 'submit', payload: {} },
+  ];
 }
 
 export function reachableFailureClasses(_input?: ArgueScript | LevelDetail): string[] {
   return [...FAILURE_CLASSES];
 }
 
-export function transferVariants(_detail: LevelDetail): RuntimeVariant[] {
-  return [
-    { id: 'v-rotate-90', axis: 'structure', patch: { rotate: 90 } },
-    { id: 'v-rotate-180', axis: 'structure', patch: { rotate: 180 } },
-  ];
+/**
+ * 迁移门只收「不改变棋盘染色」的旋转。
+ *
+ * 90°/270° 在偶数边棋盘上会把整张棋盘的棋盘染色翻转（黑白计数互换），任何计数型证书都会
+ * 因为坐标系换色而失配——那是几何事实，不是论证不够一般。所以偶数边棋盘只留 180°
+ * （它把 (x,y) 送到 (width-1-x, height-1-y)，奇偶差是偶数）。
+ */
+export function transferVariants(detail: LevelDetail): RuntimeVariant[] {
+  const script = parseScript(detail.levelScript);
+  const quarters: (1 | 2)[] = [1, 2];
+  return quarters
+    .filter((quarter) => !rotationFlipsColoring(script, quarter))
+    .map((quarter) => ({ id: 'v-rotate-' + quarter * 90, axis: 'structure', patch: { rotate: quarter * 90 } }));
 }
 
 export function transferFailureClass(_detail: LevelDetail): string {

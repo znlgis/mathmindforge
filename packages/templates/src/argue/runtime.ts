@@ -4,7 +4,7 @@ import type {
 import { digest } from '@mmf/toolkit/shared';
 import { createRuntimeWithAdapter } from '../shared/runtime';
 import type { AdapterResult, RuntimeAdapter } from '../shared/runtime';
-import { boardCells, boardCounts } from './engine';
+import { boardCells, boardCounts, impossibleByInvariant } from './engine';
 import type { BoardCounts } from './engine';
 import {
   actionsFor, parseScript, summarizeArgument, transferFailureClass, transferVariants, validateArtifact,
@@ -18,12 +18,14 @@ interface Domino {
   y: number;
 }
 
+/**
+ * 论证草稿：只存玩家真正输入的东西（依据）和它自动带出来的证据。
+ * 主张与适用范围不再是可填字段——它们由依据在棋盘上推出来，
+ * 这样「主张」「范围」那两个零信息量下拉就不会再回来。
+ */
 interface ArgumentDraft {
-  claim?: string;
   warrant?: string;
-  scope?: string;
   evidence?: { black?: number; white?: number; cells?: number };
-  committed: boolean;
 }
 
 interface ArgueState {
@@ -31,7 +33,6 @@ interface ArgueState {
   dominoes: Domino[];
   counts?: BoardCounts;
   argument: ArgumentDraft;
-  sampled: boolean;
 }
 
 function coveredCells(domino: Domino): string[] {
@@ -54,13 +55,35 @@ function canPlace(script: ArgueScript, dominoes: Domino[], next: Domino): string
   return null;
 }
 
+/** 棋盘自身的不变量已经判定：这些棋盘用 1×2 骨牌铺不满。 */
+function boardClaim(script: ArgueScript): 'impossible' | undefined {
+  return impossibleByInvariant(boardCounts(script)) ? 'impossible' : undefined;
+}
+
+/**
+ * 证据跟着依据走：换依据就换证据，不再有「先挂证据再换依据」的顺序陷阱。
+ * 染色要黑白两个数；奇偶/面积只要总格数（两者是同一个量）。
+ */
+function evidenceFor(warrant: string, counts: BoardCounts): { black?: number; white?: number; cells?: number } {
+  if (warrant === 'coloring') return { black: counts.black, white: counts.white, cells: counts.cells };
+  return { cells: counts.cells };
+}
+
+/** 论证是派生状态：有依据 + 有证据 + 有棋盘计数，就已经是一份提交过的证书。 */
+function isCommitted(state: ArgueState): boolean {
+  return Boolean(state.argument.warrant && state.argument.evidence && state.counts);
+}
+
 function toArgument(state: ArgueState): ArgumentSnapshot {
+  const warrant = state.argument.warrant;
+  const claim = warrant ? boardClaim(state.script) : undefined;
   return {
-    claim: state.argument.claim,
-    warrant: state.argument.warrant,
-    scope: state.argument.scope,
+    // 主张与范围由依据推出来：界面上看到的「不可能铺满 → 1×2 多米诺铺满」不是下拉选项，是结论。
+    claim,
+    warrant,
+    scope: warrant ? state.script.scopes[0] : undefined,
     evidence: state.argument.evidence,
-    committed: state.argument.committed,
+    committed: isCommitted(state),
   };
 }
 
@@ -70,8 +93,7 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
       return {
         script: parseScript(detail.levelScript),
         dominoes: [],
-        argument: { committed: false },
-        sampled: false,
+        argument: {},
       };
     },
 
@@ -94,6 +116,7 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
           const error = canPlace(next.script, next.dominoes, domino);
           if (error) return { state, error };
           next.dominoes.push(domino);
+          // 骨牌只是自由沙盒：记录它，但不进判定，也不再是必须先走的证据步骤。
           return {
             state: next,
             evidence: { phase: 'construct', tool: 'construct', action: 'construct/place', metrics: { placed: next.dominoes.length } },
@@ -110,7 +133,6 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
         case 'probe/sample': {
           const counts = boardCounts(next.script);
           next.counts = counts;
-          next.sampled = true;
           return {
             state: next,
             evidence: {
@@ -122,35 +144,34 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
             },
           };
         }
-        case 'argue/setClaim': {
-          next.argument.claim = action.payload.claim;
-          next.argument.committed = false;
-          return { state: next, evidence: { phase: 'argue', action: 'argue/setClaim' } };
-        }
         case 'argue/setWarrant': {
-          next.argument.warrant = action.payload.warrant;
-          next.argument.committed = false;
-          return { state: next, evidence: { phase: 'argue', action: 'argue/setWarrant' } };
-        }
-        case 'argue/attachEvidence': {
-          if (!next.counts) return { state, error: '先统计黑白格，再把证据挂到论证上。' };
-          next.argument.evidence = next.argument.warrant === 'parity'
-            ? { cells: next.counts.cells }
-            : { black: next.counts.black, white: next.counts.white, cells: next.counts.cells };
-          next.argument.committed = false;
-          return { state: next, evidence: { phase: 'argue', action: 'argue/attachEvidence' } };
-        }
-        case 'argue/setScope': {
-          next.argument.scope = action.payload.scope;
-          next.argument.committed = false;
-          return { state: next, evidence: { phase: 'argue', action: 'argue/setScope' } };
+          const wanted = action.payload.warrant;
+          if (!next.script.warrants.includes(wanted as ArgueScript['warrants'][number])) {
+            return { state, error: '这条依据不在这一关的选项里。' };
+          }
+          // 一次点击 = 一次输入：选依据时把计数、证据、主张、范围一起补齐（旧实现要四次下拉 + 两个按钮）。
+          const counts = boardCounts(next.script);
+          next.counts = counts;
+          next.argument.warrant = wanted;
+          next.argument.evidence = evidenceFor(wanted, counts);
+          return {
+            state: next,
+            evidence: {
+              phase: 'argue',
+              action: 'argue/setWarrant',
+              metrics: { black: counts.black, white: counts.white, cells: counts.cells },
+              artifact: {
+                id: 'argument',
+                kind: 'argument',
+                digest: digest({ warrant: wanted, evidence: next.argument.evidence }),
+                summary: wanted + ' · ' + (next.argument.evidence.cells ?? counts.cells) + ' 格',
+              },
+            },
+          };
         }
         case 'argue/commit': {
-          const a = next.argument;
-          if (!a.claim || !a.warrant || !a.scope || !a.evidence) {
-            return { state, error: '主张、依据、证据、适用范围都齐了才能提交论证。' };
-          }
-          a.committed = true;
+          // 幂等：论证齐了就通过（committed 已是派生状态），没齐只报缺什么。
+          if (!isCommitted(next)) return { state, error: '论证还缺一块：主张、依据、证据或范围。' };
           return { state: next, evidence: { phase: 'argue', action: 'argue/commit', outcome: 'info' } };
         }
         default:
@@ -159,14 +180,16 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
     },
 
     artifact(state) {
-      if (!state.counts || !state.argument.committed) return null;
+      if (!state.counts || !isCommitted(state)) return null;
+      const argument = toArgument(state);
+      if (!argument.claim || !argument.scope) return null;
       return {
         counts: state.counts,
         argument: {
-          claim: state.argument.claim,
-          warrant: state.argument.warrant,
-          scope: state.argument.scope,
-          evidence: state.argument.evidence,
+          claim: argument.claim,
+          warrant: argument.warrant,
+          scope: argument.scope,
+          evidence: argument.evidence,
         },
       };
     },
@@ -175,21 +198,16 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
       if (!state.counts) return [];
       return summarizeArgument(state.script, {
         counts: state.counts,
-        argument: {
-          claim: state.argument.claim,
-          warrant: state.argument.warrant,
-          scope: state.argument.scope,
-          evidence: state.argument.evidence,
-        },
+        argument: toArgument(state),
       });
     },
 
     checkpoints(state) {
       return {
-        attempt: state.dominoes.length > 0,
-        counts: state.sampled && state.counts !== undefined,
-        claim: Boolean(state.argument.claim && state.argument.warrant && state.argument.evidence),
-        commit: state.argument.committed,
+        // 三个检查点全是事实记录：数过 ↔ 选过依据 ↔ 证书已组成，不再有要玩家再走一遍的仪式。
+        counts: state.counts !== undefined,
+        warrant: Boolean(state.argument.warrant),
+        commit: isCommitted(state),
       };
     },
 
@@ -227,8 +245,6 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
     },
 
     // 只留一个事实来源：黄金动作序列与迁移门都委托给 logic.ts。
-    // 之前这里另抄了一份（多米诺朝 v、坐标 (0,1)），和 logic 的 h@(removed+1) 不一致；
-    // 两份都能通关，但改判定时必然漂移。
     actionsFor: (detail, variant, artifact) => actionsFor(detail, variant, artifact),
 
     transferVariants: (detail) => transferVariants(detail),

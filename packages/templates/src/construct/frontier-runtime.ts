@@ -9,6 +9,8 @@ import type { FrontierScript } from './frontier';
 
 interface FrontierState {
   costs: Record<string, number>;
+  /** 玩家是否真的改过至少一条边（开局默认值不算）。 */
+  edited: boolean;
 }
 
 function createFrontierAdapter(script: FrontierScript): RuntimeAdapter<FrontierState> {
@@ -21,6 +23,7 @@ function createFrontierAdapter(script: FrontierScript): RuntimeAdapter<FrontierS
     initialState(): FrontierState {
       return {
         costs: Object.fromEntries(script.edges.map((edge) => [edge.id, edge.default])),
+        edited: false,
       };
     },
     apply(state, action: LevelAction): AdapterResult<FrontierState> {
@@ -30,7 +33,7 @@ function createFrontierAdapter(script: FrontierScript): RuntimeAdapter<FrontierS
         if (!edge) return { state, error: '这条边不存在。' };
         const cost = Math.max(edge.min, Math.min(edge.max, Math.trunc(action.payload.piece.y)));
         return {
-          state: { costs: { ...state.costs, [edgeId]: cost } },
+          state: { costs: { ...state.costs, [edgeId]: cost }, edited: true },
           evidence: {
             phase: 'construct',
             tool: 'construct',
@@ -44,7 +47,7 @@ function createFrontierAdapter(script: FrontierScript): RuntimeAdapter<FrontierS
         const edge = script.edges.find((item) => item.id === edgeId);
         if (!edge) return { state, error: '这条边不存在。' };
         return {
-          state: { costs: { ...state.costs, [edgeId]: edge.default } },
+          state: { costs: { ...state.costs, [edgeId]: edge.default }, edited: true },
           evidence: { phase: 'revise', tool: 'construct', action: action.type },
         };
       }
@@ -64,8 +67,8 @@ function createFrontierAdapter(script: FrontierScript): RuntimeAdapter<FrontierS
     checkpoints(state) {
       const result = evaluateFrontier(script, state.costs);
       return {
-        set: Object.keys(state.costs).length === script.edges.length,
-        run: result.greedy.reached,
+        // 事实记录：玩家真的改过一条边（不再用默认值已填满冒充进度）。
+        edited: state.edited,
         counter: result.counterexample,
       };
     },

@@ -59,8 +59,6 @@ interface SimRunRecord {
 
 interface SimState {
   values: KnobValues;
-  /** 锁定过的一组参数；只有它和当前值、上次运行一致时才允许提交。 */
-  committed: KnobValues | null;
   /** 最近 10 次运行，给 MetricsTool 的表格用。 */
   history: SimRunRecord[];
   lastRun: SimRunRecord | null;
@@ -103,7 +101,6 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
   function initialState(): SimState {
     return {
       values: defaultValues(script),
-      committed: null,
       history: [],
       lastRun: null,
       focusId: '',
@@ -112,19 +109,24 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
     };
   }
 
+  /**
+   * 「运行即锁定」：一次运行同时锁定参数并产出两个种子日的指标。
+   * 参数一动，旧运行就不再代表当前配置（上面 knob/set 会清掉 lastRun），
+   * 所以产物只认「最近一次运行 + 参数没变」，不再需要单独的「锁定参数」按钮。
+   */
   function artifactOf(state: SimState): SimulateArtifact | null {
-    if (!state.committed || !state.lastRun) return null;
-    if (!valuesEqual(state.committed, state.values)) return null;
-    if (!valuesEqual(state.committed, state.lastRun.values)) return null;
-    return makeArtifact(paramsOf(script, state.committed), state.lastRun.seeds);
+    if (!state.lastRun) return null;
+    if (!valuesEqual(state.lastRun.values, state.values)) return null;
+    return makeArtifact(paramsOf(script, state.lastRun.values), state.lastRun.seeds);
   }
 
   function checkpointsOf(state: SimState): Record<string, boolean> {
     return {
-      params: state.committed !== null && valuesEqual(state.committed, state.values),
+      params: state.lastRun !== null && valuesEqual(state.lastRun.values, state.values),
       run: state.lastRun !== null,
-      // 跑完指标就在面板上：对照自动成立，删掉「查看指标」死按钮（docs/12 T0-4）。
-      compare: state.compared || state.lastRun !== null,
+      // 跑完指标就在同一张卡上：对照是事实，删掉「查看指标」死按钮（docs/12 T0-4）。
+      // 参数改过（lastRun 清空）时对照也一并作废，不能留下「看过旧指标」的假证据。
+      compare: state.lastRun !== null,
     };
   }
 
@@ -232,10 +234,12 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
         };
       }
       case 'knob/commit': {
+        // 旧动作保留为幂等空操作：autoplay/旧内容里的 knob/commit 不再决定产物，
+        // 但也不该把玩家的正当动作打成错误（界面已不再渲染这个按钮）。
         const params = paramsOf(script, state.values);
         const summary = summarizeArtifact(makeArtifact(params, []));
         return {
-          state: { ...state, committed: { ...state.values } },
+          state,
           evidence: {
             phase: 'construct',
             tool: 'knob',
@@ -249,7 +253,6 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
           state: {
             ...state,
             values: defaultValues(script),
-            committed: null,
             lastRun: null,
             compared: false,
           },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ClaimInput, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
+import type { ClaimInput, LevelAction, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { MessageParams, Translator } from '@mmf/i18n';
 import { computed, ref } from 'vue';
 
@@ -7,6 +7,14 @@ type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
 /** 与 @mmf/content 的 probe 成员结构一致；toolkit-ui 不直接依赖 content。 */
 type ProbeSpec = Extract<ToolSpecLike, { kind: 'probe' }>;
+
+/** probe.config 是 passthrough：tally 关额外读整筐总数与每把的数量。 */
+interface TallyConfigView {
+  categories?: { id: string; label: string; token: string }[];
+  batchSize?: number;
+  /** 整筐一共几个：决定「全部倒出来」一次拿到多少（关卡的 items.length）。 */
+  total?: number;
+}
 
 const props = defineProps<{
   spec: ProbeSpec;
@@ -19,15 +27,16 @@ function translate(key: string, params?: MessageParams): string {
   return props.t.t(key, params);
 }
 
-const categories = computed(() => props.spec.config.categories ?? []);
+const config = computed(() => props.spec.config as unknown as TallyConfigView);
+const categories = computed(() => config.value.categories ?? []);
 const probe = computed(() => props.snapshot.toolState.probe);
 const collected = computed<string[]>(() => probe.value?.items ?? []);
 const recorded = computed<Record<string, number>>(() => probe.value?.tally ?? {});
-const direction = ref<'most' | 'least'>('most');
-const category = ref<string | null>(null);
 const busy = ref(false);
 const error = ref<string | null>(null);
 const submitted = computed(() => probe.value?.claim !== undefined);
+/** 数字框草稿：只保存玩家正在输入的那几格；dispatch 成功后清空，回落到快照值。 */
+const drafts = ref<Record<string, string>>({});
 
 const tokenOf = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {};
@@ -43,71 +52,92 @@ const labelOf = computed<Record<string, string>>(() => {
 
 const chips = computed(() => collected.value.map((id) => tokenOf.value[id] ?? id));
 
-/** 结论里的并列项按玩家自己记下的统计条算：这正是“用数据说话”的一部分。 */
-const tiedWith = computed<string[]>(() => {
-  const chosen = category.value;
-  if (!chosen) return [];
-  const value = recorded.value[chosen] ?? 0;
+/** 整筐总数：配置优先；没配就按「已采 + 未知」处理，按钮仍可点（运行时按剩余量切片）。 */
+const total = computed(() => config.value.total ?? 0);
+const remaining = computed(() => (total.value > 0 ? Math.max(0, total.value - collected.value.length) : 1));
+// 配置缺失时退到「至少有一把」，避免工具面板被永久禁用（配置由 content 测试钉住）。
+const collectionComplete = computed(() => (
+  total.value > 0 ? collected.value.length >= total.value : collected.value.length > 0
+));
+
+/** 结论里的并列项按玩家自己记下的统计条算：这正是「用数据说话」的一部分。 */
+function tiedWithFor(categoryId: string): string[] {
+  const value = recorded.value[categoryId] ?? 0;
   return categories.value
-    .filter((item) => item.id !== chosen && (recorded.value[item.id] ?? 0) === value)
+    .filter((item) => item.id !== categoryId && (recorded.value[item.id] ?? 0) === value)
     .map((item) => item.id);
-});
+}
 
-const canSubmit = computed(() => category.value !== null && !busy.value);
-
-async function dispatchSample(): Promise<void> {
-  if (busy.value) return;
+async function dispatch(action: LevelAction): Promise<boolean> {
+  if (busy.value) return false;
   busy.value = true;
   error.value = null;
   try {
-    const result = await props.runtime.dispatch({ type: 'probe/sample', payload: {} });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
+    const result = await props.runtime.dispatch(action);
+    if (!result.ok) {
+      error.value = result.message ? translate(result.message) : null;
+      return false;
+    }
+    return true;
   } finally {
     busy.value = false;
   }
 }
 
-async function step(id: string, delta: number): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const counts: Record<string, number> = {};
-    for (const item of categories.value) counts[item.id] = recorded.value[item.id] ?? 0;
-    const next = Math.max(0, (counts[id] ?? 0) + delta);
-    counts[id] = next;
-    const result = await props.runtime.dispatch({ type: 'probe/tally', payload: { counts } });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
+/** 一次点击把整筐倒出来：复用 probe/sample 的 payload.n（运行时按剩余量切片）。 */
+async function dumpAll(): Promise<void> {
+  await dispatch({ type: 'probe/sample', payload: { n: remaining.value } });
+}
+
+async function sampleBatch(): Promise<void> {
+  await dispatch({ type: 'probe/sample', payload: {} });
+}
+
+function draftValue(id: string): string {
+  return drafts.value[id] ?? String(recorded.value[id] ?? 0);
+}
+
+function onNumberInput(id: string, event: Event): void {
+  const target = event.target as HTMLInputElement | null;
+  drafts.value = { ...drafts.value, [id]: target?.value ?? '' };
+}
+
+function clampCount(raw: string | undefined, fallback: number): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.floor(value));
+}
+
+/** 数字框：blur / Enter 时把整份统计条一次 dispatch（运行时只认整份 counts）。 */
+async function commitTally(): Promise<void> {
+  if (busy.value || !collectionComplete.value) return;
+  if (Object.keys(drafts.value).length === 0) return;
+  const counts: Record<string, number> = {};
+  for (const item of categories.value) {
+    counts[item.id] = clampCount(drafts.value[item.id], recorded.value[item.id] ?? 0);
   }
+  const ok = await dispatch({ type: 'probe/tally', payload: { counts } });
+  if (ok) drafts.value = {};
 }
 
-function chooseDirection(next: 'most' | 'least'): void {
-  direction.value = next;
+/** 合并答案：一个 chip 同时给出「最多/最少 + 类别」，点一次就写结论。 */
+async function answer(direction: 'most' | 'least', categoryId: string): Promise<void> {
+  if (!categoryId) return;
+  const claim: ClaimInput = {
+    kind: 'count-compare',
+    category: categoryId,
+    direction,
+    tiedWith: tiedWithFor(categoryId),
+    n: collected.value.length,
+  };
+  await dispatch({ type: 'probe/claim', payload: { claim } });
 }
 
-function chooseCategory(id: string): void {
-  category.value = id;
-}
-
-async function submitClaim(): Promise<void> {
-  if (!canSubmit.value || !category.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const claim: ClaimInput = {
-      kind: 'count-compare',
-      category: category.value,
-      direction: direction.value,
-      tiedWith: tiedWith.value,
-      n: collected.value.length,
-    };
-    const result = await props.runtime.dispatch({ type: 'probe/claim', payload: { claim } });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
+const currentClaim = computed(() => probe.value?.claim);
+function claimChipActive(direction: 'most' | 'least', categoryId: string): boolean {
+  const claim = currentClaim.value;
+  return Boolean(claim && claim.kind === 'count-compare'
+    && claim.direction === direction && claim.category === categoryId);
 }
 </script>
 
@@ -116,6 +146,7 @@ async function submitClaim(): Promise<void> {
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-xs font-semibold text-ink-soft">
         {{ translate('tally.collected') }} <span data-testid="tally-count">{{ collected.length }}</span>
+        <template v-if="total > 0"> / {{ total }}</template>
       </p>
       <span
         v-if="submitted"
@@ -126,15 +157,26 @@ async function submitClaim(): Promise<void> {
       </span>
     </div>
 
-    <button
-      type="button"
-      data-testid="tally-sample"
-      :disabled="busy"
-      class="min-h-14 rounded-2xl bg-blueprint px-4 text-base font-black text-white active:scale-95 disabled:opacity-40"
-      @click="dispatchSample"
-    >
-      采集一把
-    </button>
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="button"
+        data-testid="tally-dump"
+        :disabled="busy || collectionComplete"
+        class="min-h-14 flex-1 rounded-2xl bg-blueprint px-4 text-base font-black text-white active:scale-95 disabled:opacity-40"
+        @click="dumpAll"
+      >
+        {{ collectionComplete ? '整筐已经倒出来了' : '全部倒出来' }}
+      </button>
+      <button
+        type="button"
+        data-testid="tally-sample"
+        :disabled="busy || collectionComplete"
+        class="min-h-14 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
+        @click="sampleBatch"
+      >
+        采集一把
+      </button>
+    </div>
 
     <div class="flex min-h-10 flex-wrap gap-1.5" data-testid="tally-chips">
       <span
@@ -147,100 +189,79 @@ async function submitClaim(): Promise<void> {
       <span v-if="chips.length === 0" class="text-xs text-ink-soft">还没有采集，先点上面的按钮。</span>
     </div>
 
-    <div class="rounded-2xl border border-grid bg-paper p-3">
+    <div class="rounded-2xl border border-grid bg-paper p-3" data-testid="tally-board">
       <p class="text-sm font-bold text-ink">统计条</p>
-      <p class="mt-1 text-xs text-ink-soft">每采完一把，就在这里给对应类别加一格。</p>
+      <p class="mt-1 text-xs text-ink-soft">
+        {{ collectionComplete ? '照着上面的图形，把每一类的数量填进去（按回车或点别处生效）。' : '先把整筐倒出来，再照着图形填数字。' }}
+      </p>
+      <p v-if="!collectionComplete" class="mt-1 text-xs font-bold text-red" data-testid="tally-wait">
+        整筐还没倒出来：先点「全部倒出来」，统计条和答案才会解锁。
+      </p>
       <ul class="mt-2 flex flex-col gap-2">
         <li
           v-for="item in categories"
           :key="item.id"
           class="flex items-center justify-between gap-2"
         >
-          <span class="text-sm font-bold text-ink">
-            {{ item.token }} {{ item.label }}
-            <span class="ml-1 text-xs font-semibold text-ink-soft" :data-testid="'tally-value-' + item.id">
-              {{ recorded[item.id] ?? 0 }}
-            </span>
-          </span>
-          <span class="flex gap-2">
-            <button
-              type="button"
-              :data-testid="'tally-minus-' + item.id"
-              :disabled="busy"
-              :aria-label="item.label + ' 减一'"
-              class="h-11 w-11 rounded-xl bg-card text-lg font-black text-ink active:scale-95 disabled:opacity-40"
-              @click="step(item.id, -1)"
-            >
-              −
-            </button>
-            <button
-              type="button"
-              :data-testid="'tally-plus-' + item.id"
-              :disabled="busy"
-              :aria-label="item.label + ' 加一'"
-              class="h-11 w-11 rounded-xl bg-card text-lg font-black text-ink active:scale-95 disabled:opacity-40"
-              @click="step(item.id, 1)"
-            >
-              +
-            </button>
-          </span>
+          <span class="text-sm font-bold text-ink">{{ item.token }} {{ item.label }}</span>
+          <input
+            :value="draftValue(item.id)"
+            :data-testid="'tally-input-' + item.id"
+            :aria-label="item.label + ' 的数量'"
+            :disabled="busy || !collectionComplete"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            class="min-h-11 w-20 rounded-xl border border-grid bg-card px-3 text-center text-base font-black text-ink disabled:opacity-40"
+            @input="onNumberInput(item.id, $event)"
+            @change="commitTally"
+            @blur="commitTally"
+            @keydown.enter="commitTally"
+          >
         </li>
       </ul>
     </div>
 
-    <div class="rounded-2xl border border-grid bg-paper p-3">
+    <div class="rounded-2xl border border-grid bg-paper p-3" data-testid="tally-answer">
       <p class="text-sm font-bold text-ink">写下结论</p>
-      <div class="mt-2 flex gap-2">
-        <button
-          type="button"
-          data-testid="tally-claim-most"
-          :disabled="busy"
-          class="min-h-11 flex-1 rounded-xl px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
-          :class="direction === 'most' ? 'bg-blueprint text-white' : 'bg-card text-ink'"
-          @click="chooseDirection('most')"
-        >
-          最多
-        </button>
-        <button
-          type="button"
-          data-testid="tally-claim-least"
-          :disabled="busy"
-          class="min-h-11 flex-1 rounded-xl px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
-          :class="direction === 'least' ? 'bg-blueprint text-white' : 'bg-card text-ink'"
-          @click="chooseDirection('least')"
-        >
-          最少
-        </button>
-      </div>
-      <div class="mt-2 flex flex-wrap gap-2">
+      <p class="mt-1 text-xs text-ink-soft">一个答案 = 一次点击：选「最多」或「最少」，再点一个类别。</p>
+      <p class="mt-2 text-xs font-bold text-ink-soft">最多的是</p>
+      <div class="mt-1 flex flex-wrap gap-2">
         <button
           v-for="item in categories"
-          :key="item.id"
+          :key="'most-' + item.id"
           type="button"
-          :data-testid="'tally-category-' + item.id"
-          :disabled="busy"
+          :data-testid="'tally-claim-most-' + item.id"
+          :disabled="busy || !collectionComplete"
           class="min-h-11 rounded-xl px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
-          :class="category === item.id ? 'bg-teal text-white' : 'bg-card text-ink'"
-          @click="chooseCategory(item.id)"
+          :class="claimChipActive('most', item.id) ? 'bg-blueprint text-white' : 'bg-card text-ink'"
+          @click="answer('most', item.id)"
         >
           {{ item.token }} {{ item.label }}
         </button>
       </div>
-      <p class="mt-2 text-xs text-ink-soft">
-        {{ direction === 'most' ? '最多' : '最少' }}：
-        <template v-if="category">{{ labelOf[category] }}</template>
-        <template v-else>还没选类别</template>
-        <template v-if="tiedWith.length > 0">（并列：{{ tiedWith.map((id) => labelOf[id]).join('、') }}）</template>
+      <p class="mt-3 text-xs font-bold text-ink-soft">最少的是</p>
+      <div class="mt-1 flex flex-wrap gap-2">
+        <button
+          v-for="item in categories"
+          :key="'least-' + item.id"
+          type="button"
+          :data-testid="'tally-claim-least-' + item.id"
+          :disabled="busy || !collectionComplete"
+          class="min-h-11 rounded-xl px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
+          :class="claimChipActive('least', item.id) ? 'bg-blueprint text-white' : 'bg-card text-ink'"
+          @click="answer('least', item.id)"
+        >
+          {{ item.token }} {{ item.label }}
+        </button>
+      </div>
+      <p v-if="currentClaim" class="mt-2 text-xs text-ink-soft">
+        当前结论：{{ currentClaim.kind === 'count-compare' ? (currentClaim.direction === 'most' ? '最多' : '最少') + ' ' + labelOf[currentClaim.category] : '' }}
+        <template v-if="currentClaim.kind === 'count-compare' && (currentClaim.tiedWith?.length ?? 0) > 0">
+          （并列：{{ (currentClaim.tiedWith ?? []).map((id) => labelOf[id]).join('、') }}）
+        </template>
       </p>
-      <button
-        type="button"
-        data-testid="tally-claim-submit"
-        :disabled="!canSubmit"
-        class="mt-2 min-h-12 w-full rounded-2xl bg-teal px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
-        @click="submitClaim"
-      >
-        提交结论
-      </button>
     </div>
 
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>

@@ -22,19 +22,10 @@
           "B"
         ],
         "maxPeriod": 4,
-        "cells": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11
+        "transforms": [
+          "none",
+          "mirror",
+          "shift"
         ]
       }
     },
@@ -107,12 +98,6 @@
   },
   "evidencePlan": [
     {
-      "id": "observe",
-      "phase": "observe",
-      "require": "pattern/inspect >= 2",
-      "descriptionKey": "level.pattern.observe"
-    },
-    {
       "id": "hypothesis",
       "phase": "hypothesize",
       "require": "pattern/commit >= 1",
@@ -121,7 +106,7 @@
     {
       "id": "repair",
       "phase": "construct",
-      "require": "construct/commit >= 1",
+      "require": "construct/place >= 1",
       "descriptionKey": "level.pattern.repair"
     }
   ],

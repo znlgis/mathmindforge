@@ -64,7 +64,7 @@ export const en: Record<string, string> = {
   'level.payment.overpay.message': 'The total is above what the counter asks.',
   'level.payment.overpay.hint': 'Remove coins until the total is exactly the target.',
   'level.payment.notTested.message': 'Run greedy on this case first.',
-  'level.payment.notTested.hint': 'Tap "Test greedy" and see how many coins it uses.',
+  'level.payment.notTested.hint': 'Fill in the target and the denominations; the tool works out the greedy and optimal coin counts for you.',
   'level.payment.invalid.message': 'Greedy is optimal here, so this is not a counterexample yet.',
   'level.payment.invalid.hint': 'Change the target or denominations so greedy uses more coins.',
   'level.payment.reused.message': 'This case is the main task, so it cannot count as an independent counterexample.',

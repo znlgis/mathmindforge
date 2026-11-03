@@ -42,6 +42,12 @@
           }
         ],
         "budget": 30,
+        "runLabel": "运行一次",
+        "metricsMode": "queue",
+        "targets": {
+          "avgWaitMax": 1,
+          "overtimeMax": 0
+        },
         "labels": {
           "servers": "服务台",
           "serviceTime": "每位服务",
@@ -61,8 +67,7 @@
         "sampleSizes": [
           15
         ],
-        "chart": "queue",
-        "focusLabel": "查看排队指标"
+        "chart": "queue"
       }
     }
   ],
@@ -121,8 +126,8 @@
     {
       "id": "params",
       "phase": "construct",
-      "require": "knob/commit >= 1",
-      "descriptionKey": "先锁定一组参数"
+      "require": "knob/run >= 1",
+      "descriptionKey": "运行一次，看看等待和加班"
     },
     {
       "id": "run",
@@ -133,8 +138,8 @@
     {
       "id": "compare",
       "phase": "result",
-      "require": "probe/focus >= 1",
-      "descriptionKey": "打开排队指标对照"
+      "require": "knob/run >= 1",
+      "descriptionKey": "运行一次，看看等待和加班"
     }
   ],
   "solutions": [
@@ -280,7 +285,7 @@
   "feedback": {
     "queue-not-run": {
       "messageKey": "还没有可提交的运行记录。",
-      "hintKey": "先运行一次，再锁定参数。",
+      "hintKey": "运行一次，看看等待和加班",
       "focus": "run"
     },
     "queue-unserved": {

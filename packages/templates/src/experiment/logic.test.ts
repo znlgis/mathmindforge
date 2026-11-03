@@ -108,11 +108,31 @@ describe('experiment template · tally', () => {
     expect(tallyStep.ok).toBe(false);
   });
 
-  it('exposes every declared action through actionsFor', () => {
+  it('exposes every declared action through actionsFor（一次倒出整筐）', () => {
     const actions = actionsFor(tallyDetail, baseVariant, tallyDetail.solutions[0]?.artifact);
-    expect(actions.filter((action) => action.type === 'probe/sample')).toHaveLength(4);
+    const samples = actions.filter((action) => action.type === 'probe/sample');
+    expect(samples).toHaveLength(1);
+    expect(samples[0]?.payload.n).toBe(tallyDetail.levelScript && (tallyDetail.levelScript as { items?: string[] }).items?.length);
     expect(actions.some((action) => action.type === 'probe/tally')).toBe(true);
     expect(actions.some((action) => action.type === 'submit')).toBe(true);
+  });
+
+  it('一次性倒出整筐：probe/sample 的 payload.n 覆盖剩余量', async () => {
+    const runtime = runtimeOf(tallyDetail);
+    const result = await runtime.dispatch({ type: 'probe/sample', payload: { n: 20 } });
+    expect(result.ok).toBe(true);
+    expect(result.snapshot.toolState.probe?.items).toHaveLength(20);
+    expect(result.snapshot.checkpoints.sample).toBe(true);
+  });
+
+  it('界面读的两份配置与关卡脚本不漂移（整筐总数、批次大小）', () => {
+    const probe = tallyDetail.tools.find((tool) => tool.kind === 'probe');
+    expect(probe).toBeTruthy();
+    if (!probe || probe.kind !== 'probe') return;
+    const extras = probe.config as unknown as { total?: number; batchSize?: number };
+    const script = parseScript(tallyDetail.levelScript) as TallyScript;
+    expect(extras.total).toBe(script.items.length);
+    expect(extras.batchSize).toBe(script.batchSize);
   });
 });
 
@@ -254,12 +274,46 @@ describe('experiment template · duel', () => {
     expect(commit.ok).toBe(false);
   });
 
-  it('exposes every declared action through actionsFor', () => {
+  it('旋钮配置把三条目标线与运行入口写给界面（目标线必须上屏）', () => {
+    const knob = winrateDetail.tools.find((tool) => tool.kind === 'knob');
+    expect(knob).toBeTruthy();
+    if (!knob || knob.kind !== 'knob') return;
+    const extras = knob.config as unknown as {
+      runLabel?: string;
+      sumTo?: number;
+      metricsMode?: string;
+      presets?: Record<string, number>[];
+      targets?: { winRate?: number; winRateLow?: number; baselineB?: number };
+    };
+    expect(extras.runLabel).toBeTruthy();
+    expect(extras.sumTo).toBe(script.resources);
+    expect(extras.metricsMode).toBe('duel');
+    expect(extras.presets?.length).toBeGreaterThan(0);
+    expect(extras.targets?.winRate).toBe(script.targets.winRate);
+    expect(extras.targets?.winRateLow).toBe(script.targets.winRateLow);
+    expect(extras.targets?.baselineB).toBe(script.targets.baselineB);
+  });
+
+  it('exposes every declared action through actionsFor（单一运行入口）', () => {
     const actions = actionsFor(winrateDetail, baseVariant, winrateDetail.solutions[0]?.artifact);
     expect(actions.filter((action) => action.type === 'knob/set')).toHaveLength(3);
-    expect(actions.some((action) => action.type === 'knob/commit')).toBe(true);
-    expect(actions.some((action) => action.type === 'probe/sample')).toBe(true);
+    expect(actions.some((action) => action.type === 'knob/run')).toBe(true);
+    expect(actions.some((action) => action.type === 'knob/commit')).toBe(false);
+    expect(actions.some((action) => action.type === 'probe/sample')).toBe(false);
     expect(actions.at(-1)?.type).toBe('submit');
+  });
+
+  it('knob/run 是唯一运行入口：它同时锁定配置并跑满默认局数', async () => {
+    const runtime = runtimeOf(winrateDetail);
+    const actions = actionsFor(winrateDetail, baseVariant, winrateDetail.solutions[0]?.artifact);
+    for (const action of actions.filter((item) => item.type !== 'submit')) {
+      const result = await runtime.dispatch(action);
+      expect(result.ok, action.type).toBe(true);
+    }
+    const snapshot = runtime.snapshot();
+    expect(snapshot.checkpoints.strategy).toBe(true);
+    expect(snapshot.checkpoints.run).toBe(true);
+    expect(snapshot.toolState.probe?.dataset?.n).toBe(script.matches);
   });
 
   it('rejects an out-of-range match count without re-running the whole simulation', () => {

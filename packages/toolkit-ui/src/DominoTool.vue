@@ -50,7 +50,9 @@ const occupied = computed(() => {
 });
 
 const rows = computed(() => {
-  const out: { x: number; y: number; removed: boolean; occupied: string | null; selected: boolean }[][] = [];
+  const out: {
+    x: number; y: number; removed: boolean; occupied: string | null; selected: boolean; black: boolean;
+  }[][] = [];
   for (let y = 0; y < board.value.height; y += 1) {
     const row = [];
     for (let x = 0; x < board.value.width; x += 1) {
@@ -60,6 +62,7 @@ const rows = computed(() => {
         removed: removedKeys.value.has(key),
         occupied: occupied.value.get(key) ?? null,
         selected: selected.value?.x === x && selected.value?.y === y,
+        black: (x + y) % 2 === 0,
       });
     }
     out.push(row);
@@ -70,6 +73,9 @@ const rows = computed(() => {
 function cellTestId(x: number, y: number): string {
   return 'domino-cell-' + x + '-' + y;
 }
+
+/** 8×8 的棋盘用小一档的格子，整个工具区在 1280×800 里不用滚动就能看到论证板。 */
+const cellSizeClass = computed(() => (board.value.width >= 8 ? 'h-8 w-8' : 'h-10 w-10'));
 
 /** 格子按钮的内容只有空 / ▭ / ×，屏幕阅读器读不出坐标与状态，这里补可访问名。 */
 function cellLabel(cell: { x: number; y: number; removed: boolean; occupied: string | null }): string {
@@ -131,7 +137,9 @@ async function remove(id: string): Promise<void> {
 
 <template>
   <section class="mt-3 flex flex-col gap-3" data-testid="domino-tool">
-    <p class="text-xs text-ink-soft">点两格相邻的格子放一块 1×2 多米诺；缺口不能盖。</p>
+    <p class="text-xs text-ink-soft">
+      随便铺几块试试——这里不设检查点，铺不满很正常。深色格是黑格，浅色格是白格。
+    </p>
     <div class="flex flex-col gap-1" data-testid="domino-board">
       <div v-for="(row, y) in rows" :key="y" class="flex gap-1">
         <button
@@ -142,14 +150,16 @@ async function remove(id: string): Promise<void> {
           :aria-label="cellLabel(cell)"
           :aria-pressed="cell.selected"
           :disabled="cell.removed || busy"
-          class="h-10 w-10 rounded-lg border text-xs font-bold active:scale-95 disabled:opacity-30"
-          :class="cell.removed
+          class="rounded-lg border text-xs font-bold active:scale-95 disabled:opacity-30"
+          :class="[cellSizeClass, cell.removed
             ? 'border-grid bg-paper text-ink-soft'
             : cell.occupied
               ? 'border-teal bg-mint text-teal'
               : cell.selected
                 ? 'border-blueprint bg-blueprint text-white'
-                : 'border-grid bg-card text-ink'"
+                : cell.black
+                  ? 'border-grid bg-ink/15 text-ink'
+                  : 'border-grid bg-card text-ink']"
           @click="clickCell(cell.x, cell.y)"
         >
           {{ cell.removed ? '×' : cell.occupied ? '▭' : '' }}
@@ -165,7 +175,7 @@ async function remove(id: string): Promise<void> {
         class="rounded-full border border-grid bg-card px-3 py-1 text-xs font-semibold"
         @click="remove(piece.id)"
       >
-        拿走 第{{ piece.x }},{{ piece.y }} 格
+        拿走 第{{ piece.y + 1 }} 行第{{ piece.x + 1 }} 列
       </button>
     </div>
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>

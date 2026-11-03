@@ -26,6 +26,7 @@
         ],
         "chart": "tally",
         "batchSize": 5,
+        "total": 20,
         "categories": [
           {
             "id": "circle",
@@ -112,8 +113,8 @@
     {
       "id": "sample",
       "phase": "observe",
-      "require": "probe/sample >= 4",
-      "descriptionKey": "先把整筐采完（一次 5 个）"
+      "require": "probe/sample >= 1",
+      "descriptionKey": "要把整筐都采完，再下结论。"
     },
     {
       "id": "tally",

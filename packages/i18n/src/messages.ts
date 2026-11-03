@@ -56,7 +56,7 @@ export const zh = {
   'level.payment.overpay.message': '总额超过柜台要收的钱了。',
   'level.payment.overpay.hint': '把硬币拿掉几枚，让总额正好等于目标。',
   'level.payment.notTested.message': '先让贪心在这个例子上跑一遍。',
-  'level.payment.notTested.hint': '点“测试贪心”，看看它用了几枚。',
+  'level.payment.notTested.hint': '填好目标金额和面额，工具会自动算贪心和最优各用几枚。',
   'level.payment.invalid.message': '这个例子里贪心也是最优的，它还不是反例。',
   'level.payment.invalid.hint': '换一个目标金额或面额组合，让贪心多花几枚。',
   'level.payment.reused.message': '这个例子和主任务一样，不能算独立反例。',

@@ -29,8 +29,6 @@ const claimed = computed(() => probe.value?.claim !== undefined);
 const busy = ref(false);
 const error = ref<string | null>(null);
 
-const sizes = computed(() => props.spec.config.sampleSizes ?? [100]);
-
 const stats = computed(() => {
   const n = sampleCount.value;
   if (n <= 0) return null;
@@ -43,30 +41,7 @@ function percent(value: number): string {
   return (Math.round(value * 1000) / 10).toFixed(1) + '%';
 }
 
-async function sample(n: number): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const result = await props.runtime.dispatch({ type: 'probe/sample', payload: { n } });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function clear(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const result = await props.runtime.dispatch({ type: 'probe/clear', payload: {} });
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
-}
-
+/** 唯一运行入口是旋钮卡的「跑满 N 局」；这张卡只负责把数据翻译成结论。 */
 async function submitClaim(): Promise<void> {
   const current = stats.value;
   if (busy.value || !current) return;
@@ -104,20 +79,6 @@ async function submitClaim(): Promise<void> {
       </span>
     </div>
 
-    <div class="flex flex-wrap gap-2">
-      <button
-        v-for="n in sizes"
-        :key="n"
-        type="button"
-        :data-testid="'sample-' + n"
-        :disabled="busy"
-        class="min-h-12 flex-1 rounded-2xl bg-blueprint px-3 text-sm font-black text-white active:scale-95 disabled:opacity-40"
-        @click="sample(n)"
-      >
-        跑 {{ n }} 局
-      </button>
-    </div>
-
     <div class="rounded-2xl border border-grid bg-paper p-3" data-testid="sample-result">
       <template v-if="stats">
         <p class="text-sm font-bold text-ink">
@@ -128,29 +89,20 @@ async function submitClaim(): Promise<void> {
         </p>
         <p class="mt-1 text-xs text-ink-soft">胜场 {{ wins }} ／ {{ stats.n }}（平局各记半场）</p>
       </template>
-      <p v-else class="text-xs text-ink-soft">还没有数据：先确认配置，再跑一次采样。</p>
+      <p v-else class="text-xs text-ink-soft">
+        还没有数据：先在旋钮卡里把 100 点分配好，再点「跑满 1000 局」。
+      </p>
     </div>
 
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        data-testid="sample-clear"
-        :disabled="busy || sampleCount === 0"
-        class="min-h-11 rounded-xl bg-card px-3 text-xs font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="clear"
-      >
-        清空数据
-      </button>
-      <button
-        type="button"
-        data-testid="sample-claim"
-        :disabled="busy || !stats"
-        class="min-h-11 flex-1 rounded-xl bg-teal px-3 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
-        @click="submitClaim"
-      >
-        {{ translate('probe.claim') }}
-      </button>
-    </div>
+    <button
+      type="button"
+      data-testid="sample-claim"
+      :disabled="busy || !stats"
+      class="min-h-12 w-full rounded-2xl bg-teal px-3 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+      @click="submitClaim"
+    >
+      {{ translate('probe.claim') }}
+    </button>
 
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>
   </section>

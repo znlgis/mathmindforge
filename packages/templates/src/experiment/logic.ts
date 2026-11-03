@@ -213,10 +213,8 @@ function tallyActions(script: TallyScript, artifact: unknown): LevelAction[] {
   const raw = (artifact ?? {}) as RawTallyArtifact;
   const counts = (raw.tally?.counts ?? raw.dataset?.counts ?? truthCounts(script)) as Record<string, number>;
   const actions: LevelAction[] = [];
-  const batches = Math.ceil(script.items.length / script.batchSize);
-  for (let index = 0; index < batches; index += 1) {
-    actions.push({ type: 'probe/sample', payload: {} });
-  }
+  // 与界面一致：一次「全部倒出来」就把整筐采完（payload.n 交给运行时按剩余量切片）。
+  actions.push({ type: 'probe/sample', payload: { n: script.items.length } });
   actions.push({ type: 'probe/tally', payload: { counts: { ...counts } } });
   const claim = raw.claim as ClaimInput | undefined;
   if (claim) actions.push({ type: 'probe/claim', payload: { claim } });
@@ -231,9 +229,8 @@ function duelActions(script: DuelScript, artifact: unknown): LevelAction[] {
   for (const key of ['attack', 'defense', 'economy'] as const) {
     actions.push({ type: 'knob/set', payload: { key, value: params[key] } });
   }
-  actions.push({ type: 'knob/commit', payload: {} });
-  const n = raw.dataset?.n && raw.dataset.n > 0 ? raw.dataset.n : script.matches;
-  actions.push({ type: 'probe/sample', payload: { n } });
+  // 唯一的运行入口：knob/run 同时锁定配置并按 script.matches 跑满（界面不再有「锁定配置」按钮）。
+  actions.push({ type: 'knob/run', payload: {} });
   const claim = raw.claim;
   if (claim) actions.push({ type: 'probe/claim', payload: { claim } });
   actions.push({ type: 'submit', payload: {} });

@@ -85,7 +85,17 @@
         },
         "budget": 120,
         "runLabelKey": "knob.run",
-        "commitLabel": "锁定参数",
+        "metricsMode": "dispatch",
+        "targets": {
+          "A": {
+            "coverageMin": 0.9,
+            "waitMax": 18
+          },
+          "B": {
+            "coverageMin": 0.85,
+            "waitMax": 20
+          }
+        },
         "resetLabel": "重置参数"
       }
     },
@@ -121,8 +131,7 @@
         "seedLabels": [
           "A",
           "B"
-        ],
-        "focusLabel": "查看指标"
+        ]
       }
     }
   ],
@@ -240,8 +249,8 @@
     {
       "id": "params",
       "phase": "construct",
-      "require": "knob/commit >= 1",
-      "descriptionKey": "level.g79.sim.params"
+      "require": "knob/run >= 1",
+      "descriptionKey": "level.g79.sim.run"
     },
     {
       "id": "run",
@@ -252,7 +261,7 @@
     {
       "id": "compare",
       "phase": "result",
-      "require": "probe/focus >= 1",
+      "require": "knob/run >= 1",
       "descriptionKey": "level.g79.sim.compare"
     }
   ],

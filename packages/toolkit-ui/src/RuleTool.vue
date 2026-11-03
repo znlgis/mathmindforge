@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LevelAction, LevelRuntime, ProgramBlock, RunSnapshot } from '@mmf/game-kit';
-import type { MessageParams, Translator } from '@mmf/i18n';
+import type { Translator } from '@mmf/i18n';
 import { computed, ref } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
@@ -15,10 +15,7 @@ const props = defineProps<{
   t: Translator;
 }>();
 
-/** 始终读取当前的 t，避免语言切换后拿到旧翻译器。 */
-function translate(key: string, params?: MessageParams): string {
-  return props.t.t(key, params);
-}
+// 面板文案是 toolkit-ui 里的中文短句；t 仍传给宿主翻译器（工具卡头用），这里不再单独查表。
 
 const busy = ref(false);
 const error = ref<string | null>(null);
@@ -26,9 +23,6 @@ const selectedId = ref<string | null>(null);
 
 const ruleState = computed(() => props.snapshot.toolState.rule);
 const program = computed<ProgramBlock[]>(() => ruleState.value?.program ?? []);
-/** RuleToolState 没有 committed 字段：提交后会写 lastTrace，编辑后清空，用它当"已提交"。 */
-const committed = computed(() => ruleState.value?.lastTrace !== undefined);
-const lastTrace = computed(() => ruleState.value?.lastTrace);
 const selectedIndex = computed(() => program.value.findIndex((block) => block.id === selectedId.value));
 const maxBlocks = computed(() => props.spec.config.maxBlocks);
 const blockTotal = computed(() => countBlocks(program.value));
@@ -93,18 +87,6 @@ const PALETTE_ITEMS: { testid: string; label: string; build: () => ProgramBlock 
   { testid: 'rule-add-ifwall', label: '遇墙右转', build: makeIfWall },
 ];
 
-const traceText = computed(() => {
-  const trace = lastTrace.value;
-  if (!trace) return '';
-  if (trace.failureClass === 'rule-wall') {
-    return '试跑：第 ' + (trace.failureStep ?? trace.steps) + ' 步撞到墙了。';
-  }
-  if (trace.failureClass === 'rule-loop') {
-    return '试跑：步数用完了，程序可能在绕圈。';
-  }
-  return '试跑：一共 ' + trace.steps + ' 步。';
-});
-
 async function dispatch(action: LevelAction): Promise<boolean> {
   if (busy.value) return false;
   busy.value = true;
@@ -152,10 +134,6 @@ async function moveSelected(delta: number): Promise<void> {
   await dispatch({ type: 'rule/move', payload: { id: block.id, at } });
 }
 
-async function commitProgram(): Promise<void> {
-  await dispatch({ type: 'rule/commit', payload: {} });
-}
-
 const canMoveUp = computed(() => selectedIndex.value > 0);
 const canMoveDown = computed(() => (
   selectedIndex.value >= 0 && selectedIndex.value < program.value.length - 1
@@ -168,13 +146,7 @@ const canMoveDown = computed(() => (
       <p class="text-xs font-semibold text-ink-soft">
         程序格 {{ blockTotal }}/{{ maxBlocks }}（重复里的块也算）
       </p>
-      <span
-        v-if="committed"
-        data-testid="rule-committed"
-        class="rounded-full bg-mint px-3 py-1 text-xs font-bold text-teal"
-      >
-        程序已提交
-      </span>
+      <span class="text-xs font-semibold text-ink-soft">拼好程序后直接点下面的「完成」</span>
     </div>
 
     <div>
@@ -251,20 +223,8 @@ const canMoveDown = computed(() => (
       >
         下移
       </button>
-      <button
-        type="button"
-        data-testid="rule-commit"
-        :disabled="busy || program.length === 0"
-        class="min-h-11 flex-1 rounded-xl bg-blueprint px-3 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
-        @click="commitProgram"
-      >
-        {{ translate('rule.commit') }}
-      </button>
     </div>
 
-    <p v-if="traceText" class="text-xs font-bold" :class="lastTrace?.failureClass ? 'text-red' : 'text-teal'">
-      {{ traceText }}
-    </p>
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>
   </section>
 </template>

@@ -74,23 +74,32 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
     return state.usage[tool];
   }
 
-  function artifactOf(): { patternRule: PatternRule; repair: { index: number; token: string }[] } | null {
-    if (!state.rule || !state.committed) return null;
+  /**
+   * 产物：规律和补块各自都可以单独存在。
+   * - 玩家点「候选规律」后立刻提交规律（committed）；
+   * - g13 允许「只填不声明」：只补块、不声明规律时也必须能提交，交给只填判定给明确失败类；
+   * - 只有两者都没有时才是空产物，走 missingEvidence 分支（audit A1）。
+   */
+  function artifactOf(): { patternRule?: PatternRule; repair: { index: number; token: string }[] } | null {
     const repair = [...state.placements.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([index, token]) => ({ index, token }));
-    return { patternRule: state.rule, repair };
+    if (!state.rule && repair.length === 0) return null;
+    return { ...(state.rule ? { patternRule: state.rule } : {}), repair };
   }
 
   function artifactSummaries(): ArtifactSummary[] {
     const artifact = artifactOf();
     if (!artifact) return [];
-    const out: ArtifactSummary[] = [{
-      id: 'pattern-rule',
-      kind: 'pattern-rule',
-      digest: patternDigest(artifact.patternRule),
-      summary: artifact.patternRule.tokens.join('') + ' / ' + artifact.patternRule.transform,
-    }];
+    const out: ArtifactSummary[] = [];
+    if (artifact.patternRule) {
+      out.push({
+        id: 'pattern-rule',
+        kind: 'pattern-rule',
+        digest: patternDigest(artifact.patternRule),
+        summary: artifact.patternRule.tokens.join('') + ' / ' + artifact.patternRule.transform,
+      });
+    }
     if (artifact.repair.length > 0) {
       out.push({
         id: 'repair-set',
@@ -100,6 +109,12 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
       });
     }
     return out;
+  }
+
+  /** 补块进度是事实记录：填过至少一块 / 缺口全部填上（g13 的证据计划用 fill + repair）。 */
+  function refreshPlacementCheckpoints(): void {
+    state.checkpoints.fill = state.placements.size > 0;
+    state.checkpoints.repair = state.placements.size >= brokenIndices.length;
   }
 
   function missingEvidence(): Verdict['missingEvidence'] {
@@ -194,7 +209,8 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         usage('pattern').used += 1;
         usage('pattern').lastAction = action.type;
         if (!state.inspected.includes(index)) state.inspected.push(index);
-        if (state.inspected.length >= 2) state.checkpoints.observe = true;
+        // observe 检查点已随「观察带子」仪式一起删（docs/12 T1-pattern）：点画布上的可见格
+        // 只留观察环做即时反馈，不再作为提交前的硬步骤。
         state.phase = 'observing';
         emit({ phase: 'observe', tool: 'pattern', action: action.type, metrics: { index } });
         notify();
@@ -286,7 +302,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         usage('construct').used += 1;
         usage('construct').lastAction = action.type;
         state.placements.set(piece.x, piece.shape);
-        if (state.placements.size >= brokenIndices.length) state.checkpoints.repair = true;
+        refreshPlacementCheckpoints();
         state.phase = 'editing';
         emit({
           phase: 'construct',
@@ -302,7 +318,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         if (!match) return fail('找不到这块。');
         const index = Number(match[1]);
         state.placements.delete(index);
-        state.checkpoints.repair = state.placements.size >= brokenIndices.length;
+        refreshPlacementCheckpoints();
         usage('construct').used += 1;
         usage('construct').lastAction = action.type;
         emit({ phase: 'construct', tool: 'construct', action: action.type, metrics: { index } });

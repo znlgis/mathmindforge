@@ -12,6 +12,8 @@ interface SamplingState {
   red: number;
   total: number;
   batches: number;
+  /** 每批的原始结果：两批的比例波动才是这一关要看的东西，不能只留累计值。 */
+  records: { n: number; red: number }[];
   claim: ClaimInput | null;
   focusId?: string;
 }
@@ -46,7 +48,7 @@ function createSamplingAdapter(script: SamplingScript): RuntimeAdapter<SamplingS
 
   return {
     initialState(): SamplingState {
-      return { red: 0, total: 0, batches: 0, claim: null };
+      return { red: 0, total: 0, batches: 0, records: [], claim: null };
     },
     apply(state, action: LevelAction): AdapterResult<SamplingState> {
       switch (action.type) {
@@ -62,6 +64,7 @@ function createSamplingAdapter(script: SamplingScript): RuntimeAdapter<SamplingS
               red: state.red + draw.red,
               total: state.total + draw.n,
               batches: state.batches + 1,
+              records: [...state.records, { n: draw.n, red: draw.red }],
               claim: null,
             },
             evidence: {
@@ -74,7 +77,7 @@ function createSamplingAdapter(script: SamplingScript): RuntimeAdapter<SamplingS
         }
         case 'probe/clear': {
           return {
-            state: { red: 0, total: 0, batches: 0, claim: null },
+            state: { red: 0, total: 0, batches: 0, records: [], claim: null },
             evidence: { phase: 'revise', tool: 'probe', action: action.type },
           };
         }
@@ -116,7 +119,11 @@ function createSamplingAdapter(script: SamplingScript): RuntimeAdapter<SamplingS
                 n: state.total,
                 values: [state.red, state.total - state.red],
                 counts: { red: state.red, total: state.total, batches: state.batches },
-                digest: digest({ red: state.red, total: state.total }),
+                // 每批存成 [n, red]：面板据此逐批显示比例（第二批与第一批差多少）。
+                groups: Object.fromEntries(
+                  state.records.map((record, index) => ['batch-' + (index + 1), [record.n, record.red]]),
+                ),
+                digest: digest({ red: state.red, total: state.total, records: state.records }),
               }
             : undefined,
           focusId: state.focusId,

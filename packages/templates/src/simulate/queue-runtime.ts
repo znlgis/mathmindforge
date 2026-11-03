@@ -19,7 +19,6 @@ interface QueueRunRecord {
 
 interface QueueState {
   params: QueueParams;
-  committed: QueueParams | null;
   lastRun: QueueRunRecord | null;
   history: QueueRunRecord[];
   compared: boolean;
@@ -39,10 +38,15 @@ function defaults(script: QueueScript): QueueParams {
 }
 
 function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
+  /**
+   * 「运行即锁定」：一次运行就是这组参数的结论。
+   * 参数一动（下面 knob/set 会清 lastRun），旧运行不再代表当前配置，
+   * 所以产物只认「最近一次运行 + 参数没变」，不再需要单独的「锁定参数」按钮。
+   */
   function artifactOf(state: QueueState): unknown | null {
-    if (!state.committed || !state.lastRun) return null;
-    if (!same(state.committed, state.params) || !same(state.committed, state.lastRun.params)) return null;
-    return queueArtifact(script, state.committed);
+    if (!state.lastRun) return null;
+    if (!same(state.lastRun.params, state.params)) return null;
+    return queueArtifact(script, state.lastRun.params);
   }
 
   function datasetOf(state: QueueState): ToolStateMap['probe']['dataset'] | undefined {
@@ -75,7 +79,6 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
     initialState(): QueueState {
       return {
         params: defaults(script),
-        committed: null,
         lastRun: null,
         history: [],
         compared: false,
@@ -90,9 +93,17 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
             return { state, error: '这个旋钮不属于排队关。' };
           }
           const range = key === 'servers' ? script.servers : key === 'serviceTime' ? script.serviceTime : script.openMinutes;
-          const value = Math.max(range.min, Math.min(range.max, Math.trunc(action.payload.value)));
+          const clamped = Math.max(range.min, Math.min(range.max, Math.trunc(action.payload.value)));
+          const value = range.min + Math.round((clamped - range.min) / range.step) * range.step;
+          const params: QueueParams = { ...state.params, [key]: value };
+          const changed = !same(params, state.params);
           return {
-            state: { ...state, params: { ...state.params, [key]: value } },
+            state: {
+              ...state,
+              params,
+              // 参数一动，上一次运行就不再代表这组参数：指标与产物都必须重跑（与 dispatch 一致）。
+              lastRun: changed ? null : state.lastRun,
+            },
             evidence: { phase: 'construct', tool: 'knob', action: action.type, metrics: { [key]: value } },
           };
         }
@@ -122,14 +133,15 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
           };
         }
         case 'knob/commit': {
+          // 旧动作保留为幂等空操作：产物已改成「运行即锁定」，界面不再渲染这个按钮。
           return {
-            state: { ...state, committed: { ...state.params } },
+            state,
             evidence: { phase: 'construct', tool: 'knob', action: action.type },
           };
         }
         case 'knob/reset': {
           return {
-            state: { ...state, params: defaults(script), committed: null },
+            state: { ...state, params: defaults(script), lastRun: null, compared: false },
             evidence: { phase: 'construct', tool: 'knob', action: action.type },
           };
         }
@@ -156,15 +168,20 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
     },
     checkpoints(state) {
       return {
-        params: state.committed !== null && same(state.committed, state.params),
+        params: state.lastRun !== null && same(state.lastRun.params, state.params),
         run: state.lastRun !== null,
-        // 运行之后指标表就在同一块面板上：对照是事实，不需要再点一次「查看排队指标」。
-        compare: state.compared || state.lastRun !== null,
+        // 运行之后指标就在同一张卡上：对照是事实，不需要再点一次「查看排队指标」。
+        // 参数改过（lastRun 清空）时对照也一并作废，不能留下「看过旧指标」的假证据。
+        compare: state.lastRun !== null,
       };
     },
     toolState(state): Partial<ToolStateMap> {
+      const run = state.lastRun;
       return {
-        knob: { values: { servers: state.params.servers, serviceTime: state.params.serviceTime, openMinutes: state.params.openMinutes } },
+        knob: {
+          values: { servers: state.params.servers, serviceTime: state.params.serviceTime, openMinutes: state.params.openMinutes },
+          lastRunId: run ? run.id : undefined,
+        },
         probe: { dataset: datasetOf(state), focusId: state.compared ? 'queue-metrics' : undefined },
       };
     },

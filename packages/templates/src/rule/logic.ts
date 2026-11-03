@@ -272,15 +272,19 @@ export function validateArtifact(source: ScriptSource, variant: RuleVariant, art
 /* 动作回放与失败类                                                    */
 /* ------------------------------------------------------------------ */
 
-/** autoplay 只走公开动作：逐块放 → 提交 → 运行 → 验证。 */
+/**
+ * autoplay 的公开动作：逐块放 → 点击「提交程序」 → 宿主「完成」。
+ * 「试一下」按钮与它的硬检查点已随 docs/12 T0-3 删掉；画布在每次编辑后
+ * 就重算了轨迹，run 不再是一条独立动作。
+ */
 export function actionsFor(_source: ScriptSource, _variant: RuleVariant, artifact: unknown): LevelAction[] {
   const program = readProgram(artifact);
   const actions: LevelAction[] = program.map((block, index) => ({
     type: 'rule/place',
     payload: { block, at: index },
   }));
+  // 保留 rule/commit 供 autoplay/audit 走旧路径（程序拼好即答案，玩家侧没有这个按钮）。
   actions.push({ type: 'rule/commit', payload: {} });
-  actions.push({ type: 'run', payload: {} });
   actions.push({ type: 'submit', payload: {} });
   return actions;
 }

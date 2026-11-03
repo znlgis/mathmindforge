@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LevelDetail, ProgramBlock } from '@mmf/game-kit';
 import detailJson from '../../../content/src/details/g13-algorithm-route.level.json';
+import trainJson from '../../../content/src/details/k-algorithm-train.level.json';
 import { executeProgram } from './engine';
 import {
   BASE_VARIANT, FAILURE_CLASSES, actionsFor, applyVariant, countBlocks, parseScript,
@@ -149,13 +150,28 @@ describe('rule runtime', () => {
     expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual(['build', 'run']);
   });
 
-  it('does not hand out an artifact before commit', async () => {
+  it('hands out the program as the artifact as soon as it exists', async () => {
     const runtime = runtimeAt();
-    await runtime.dispatch({ type: 'rule/place', payload: { block: { id: 'x1', op: 'forward' }, at: 0 } });
     expect(runtime.snapshot().artifacts).toHaveLength(0);
-    const result = await runtime.dispatch({ type: 'run', payload: {} });
-    expect(result.ok).toBe(false);
-    expect(runtime.snapshot().toolState.rule?.program).toHaveLength(1);
+    await runtime.dispatch({ type: 'rule/place', payload: { block: { id: 'x1', op: 'forward' }, at: 0 } });
+    // 「提交程序」按钮已删：程序拼好就是答案，产物不再等 committed。
+    expect(runtime.snapshot().artifacts.map((item) => item.kind)).toEqual(['program']);
+    expect(runtime.snapshot().checkpoints.build).toBe(true);
+    expect(runtime.snapshot().checkpoints.run).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.ok).toBe(true);
+    expect(result.verdict?.passed).toBe(false);
+    expect(result.verdict?.failure?.class).toBe('rule-missed-item');
+  });
+
+  it('passes submit on a built golden program without a commit button', async () => {
+    const runtime = runtimeAt();
+    for (const [index, block] of UNROLLED.entries()) {
+      await runtime.dispatch({ type: 'rule/place', payload: { block, at: index } });
+    }
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+    expect(result.snapshot.stamps).toContain('transfer');
   });
 
   it('places, moves, removes and commits program blocks', async () => {
@@ -167,9 +183,10 @@ describe('rule runtime', () => {
     expect(runtime.snapshot().toolState.rule?.program.map((block) => block.id)).toEqual(['c', 'a', 'b']);
     await runtime.dispatch({ type: 'rule/remove', payload: { id: 'c' } });
     expect(runtime.snapshot().toolState.rule?.program.map((block) => block.id)).toEqual(['a', 'b']);
+    expect(runtime.snapshot().checkpoints.build).toBe(true);
+    expect(runtime.snapshot().checkpoints.run).toBe(true);
     const committed = await runtime.dispatch({ type: 'rule/commit', payload: {} });
     expect(committed.ok).toBe(true);
-    expect(runtime.snapshot().checkpoints.build).toBe(true);
     expect(runtime.snapshot().toolState.rule?.lastTrace?.steps).toBe(2);
   });
 
@@ -244,7 +261,8 @@ describe('rule verifier', () => {
     expect(actions[0]?.type).toBe('rule/place');
     expect(actions.filter((action) => action.type === 'rule/place')).toHaveLength(12);
     expect(actions[actions.length - 1]?.type).toBe('submit');
-    expect(actions.some((action) => action.type === 'run')).toBe(true);
+    // 宿主不再有独立「试一下」：动作表里也不该再出现 run（docs/12 T0-3 / T1-rule）。
+    expect(actions.some((action) => action.type === 'run')).toBe(false);
   });
 
   it('replays the same actions as the pure helper', () => {
@@ -276,5 +294,38 @@ describe('shared runtime bookkeeping', () => {
     expect(runtime.snapshot().toolUsage.rule.used).toBe(1);
     // 快照语义是浅拷贝：拿到的用量不能被后续动作改写。
     expect(before.toolUsage.rule.used).toBe(0);
+  });
+});
+describe('交互次数口径（拼程序 + 完成）', () => {
+  function runtimeOf(source: LevelDetail) {
+    return createRuleRuntime(source, {
+      seed: 101, now: () => 1_700_000_000_000, locale: 'zh-CN', reducedMotion: true,
+    });
+  }
+
+  it('k-algorithm-train：5 块展开解 + 完成 = 6 击', async () => {
+    const train = trainJson as unknown as LevelDetail;
+    const runtime = runtimeOf(train);
+    const program = (train.solutions[0]?.artifact as { program: ProgramBlock[] }).program;
+    for (const [index, block] of program.entries()) {
+      const placed = await runtime.dispatch({ type: 'rule/place', payload: { block, at: index } });
+      expect(placed.ok).toBe(true);
+    }
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+    // 玩家侧只有「放积木」和宿主「完成」两类输入：没有提交程序按钮、没有试一下。
+    expect(program.length + 1).toBe(6);
+  });
+
+  it('g13-algorithm-route：12 块重复解 + 完成 = 13 击（保守目标）', async () => {
+    const runtime = runtimeOf(detail);
+    const program = REPEAT;
+    for (const [index, block] of program.entries()) {
+      const placed = await runtime.dispatch({ type: 'rule/place', payload: { block, at: index } });
+      expect(placed.ok).toBe(true);
+    }
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+    expect(program.length + 1).toBe(13);
   });
 });

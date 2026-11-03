@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { LevelAction, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
+import type { LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { MessageParams, Translator } from '@mmf/i18n';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { readMetricsRows, seedPasses } from './metricsRows';
 import type { MetricsRow, MetricsTargets } from './metricsRows';
 
@@ -16,7 +16,6 @@ interface ProbeConfigView {
   targets?: MetricsTargets;
   budget?: number;
   routeLabels?: string[];
-  focusLabel?: string;
 }
 
 const DEFAULT_TARGETS: MetricsTargets = {
@@ -41,9 +40,6 @@ const config = computed(() => props.spec.config as unknown as ProbeConfigView);
 const targets = computed<MetricsTargets>(() => config.value.targets ?? DEFAULT_TARGETS);
 const budget = computed(() => config.value.budget ?? DEFAULT_BUDGET);
 const rows = computed(() => readMetricsRows(props.snapshot));
-const focusId = computed(() => props.snapshot.toolState.probe?.focusId ?? null);
-const busy = ref(false);
-const error = ref<string | null>(null);
 
 function percent(value: number): string {
   return (value * 100).toFixed(0) + '%';
@@ -58,43 +54,18 @@ function rowPass(row: MetricsRow) {
   return seedPasses(row, targets.value, budget.value);
 }
 
-async function focusMetrics(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    const action: LevelAction = { type: 'probe/focus', payload: { id: 'metrics-table' } };
-    const result = await props.runtime.dispatch(action);
-    if (!result.ok) error.value = result.message ? translate(result.message) : null;
-  } finally {
-    busy.value = false;
-  }
-}
 </script>
 
 <template>
   <section class="mt-3 flex flex-col gap-3" data-testid="metrics-tool">
-    <div class="flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <p class="text-sm font-bold text-ink">{{ translate('sim.targets') }}</p>
-        <p class="mt-1 text-xs text-ink-soft">
-          A：覆盖率 ≥ {{ percent(targets.A.coverageMin) }}、等待 ≤ {{ targets.A.waitMax }} 分；
-          B：覆盖率 ≥ {{ percent(targets.B.coverageMin) }}、等待 ≤ {{ targets.B.waitMax }} 分；
-          成本 ≤ {{ budget }}。
-        </p>
-      </div>
-      <button
-        type="button"
-        data-testid="metrics-focus"
-        :disabled="busy"
-        class="min-h-11 rounded-xl bg-blueprint px-4 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
-        @click="focusMetrics"
-      >
-        {{ config.focusLabel ?? '查看指标' }}
-      </button>
+    <div>
+      <p class="text-sm font-bold text-ink">{{ translate('sim.targets') }}</p>
+      <p class="mt-1 text-xs text-ink-soft">
+        A：覆盖率 ≥ {{ percent(targets.A.coverageMin) }}、等待 ≤ {{ targets.A.waitMax }} 分；
+        B：覆盖率 ≥ {{ percent(targets.B.coverageMin) }}、等待 ≤ {{ targets.B.waitMax }} 分；
+        成本 ≤ {{ budget }}。
+      </p>
     </div>
-
-    <p v-if="focusId" class="text-xs font-semibold text-teal">正在看：{{ focusId }}</p>
 
     <div v-if="rows.length === 0" class="rounded-2xl border border-grid bg-paper p-3">
       <p class="text-xs text-ink-soft">还没有运行记录。先回到旋钮那边跑一次，这里会列出每次运行的指标。</p>
@@ -153,7 +124,5 @@ async function focusMetrics(): Promise<void> {
         预算 {{ rowPass(row).budget ? '合规' : '超支' }}
       </span>
     </div>
-
-    <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>
   </section>
 </template>
