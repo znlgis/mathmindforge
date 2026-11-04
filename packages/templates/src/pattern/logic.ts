@@ -1,4 +1,4 @@
-import type { PatternToolState, RunSnapshot, Verdict } from '@mmf/game-kit';
+import type { LevelDetail, PatternToolState, RunSnapshot, Verdict } from '@mmf/game-kit';
 import type { PatternRule, PatternWorld } from '@mmf/toolkit/pattern';
 import { patternDigest, tokenAt, validatePattern } from '@mmf/toolkit/pattern';
 import { patternScriptSchema } from './schema';
@@ -255,13 +255,88 @@ export function applyVariant(script: PatternScript, variant: PatternVariant): Pa
   return patternScriptSchema.parse(merged);
 }
 
-export function toWorld(script: PatternScript): PatternWorld {
+/** 换表征映射：token(原字母) → 新符号（形状名/颜色名等）。 */
+export type PatternSymbolMap = Record<string, string>;
+
+/**
+ * 从变体 patch 里读换表征映射（`{ scenario: { symbols: { A: 'round', ... } } }`）。
+ * 这是 pattern 唯一的真迁移门：同一抽象规律换个表示（颜色→形状、字母→颜色）之后仍要成立。
+ */
+export function symbolsOf(variant: PatternVariant): PatternSymbolMap {
+  const patch = variant?.patch as { scenario?: { symbols?: Record<string, unknown> } } | null | undefined;
+  const raw = patch?.scenario?.symbols;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const symbols: PatternSymbolMap = {};
+  for (const [from, to] of Object.entries(raw)) {
+    if (typeof to === 'string' && to.length > 0) symbols[from] = to;
+  }
+  return symbols;
+}
+
+/** 把带子上的 token 按映射改名；映射里没有的 token 原样保留，不静默丢信息。 */
+export function relabelVisible(
+  visible: readonly (string | null)[],
+  symbols: PatternSymbolMap,
+): (string | null)[] {
+  if (Object.keys(symbols).length === 0) return [...visible];
+  return visible.map((token) => (
+    token === null || token === undefined ? null : (symbols[token] ?? token)
+  ));
+}
+
+/**
+ * 世界视图。传 symbols 时返回换表征后的可见格——迁移门和 repair-only 校验共用同一份换算。
+ */
+export function toWorld(script: PatternScript, symbols: PatternSymbolMap = {}): PatternWorld {
   return {
     length: script.scenario.length,
-    visible: script.scenario.visible,
+    visible: relabelVisible(script.scenario.visible, symbols),
     allowedPeriods: script.pattern.allowedPeriods,
     allowedTransforms: script.pattern.allowedTransforms,
   };
+}
+
+/** 把产物里的 token（规律与补块）换到新表征：玩家提交时用原始字母，迁移门里再换算比对。 */
+export function relabelArtifact(artifact: unknown, symbols: PatternSymbolMap): unknown {
+  if (Object.keys(symbols).length === 0) return artifact;
+  if (!artifact || typeof artifact !== 'object') return artifact;
+  const raw = artifact as {
+    patternRule?: { tokens?: unknown };
+    repair?: unknown;
+  };
+  const relabelToken = (token: unknown): unknown => (
+    typeof token === 'string' ? (symbols[token] ?? token) : token
+  );
+  const next: { patternRule?: unknown; repair?: unknown } = { ...raw };
+  if (raw.patternRule && typeof raw.patternRule === 'object') {
+    const rule = raw.patternRule as { tokens?: unknown };
+    if (Array.isArray(rule.tokens)) {
+      next.patternRule = { ...rule, tokens: rule.tokens.map(relabelToken) };
+    }
+  }
+  if (Array.isArray(raw.repair)) {
+    next.repair = raw.repair.map((item) => (
+      item && typeof item === 'object'
+        ? { ...item, token: relabelToken((item as { token?: unknown }).token) }
+        : item
+    ));
+  }
+  return next;
+}
+
+/**
+ * 迁移门：内容里所有带 `scenario.symbols` 的变体都是换表征变体，逐条要过。
+ * 返回空数组表示这一关没有迁移门（template verifier 的可选约定）。
+ */
+export function transferVariants(detail: LevelDetail): PatternVariant[] {
+  const variants = Array.isArray(detail.variants) ? detail.variants : [];
+  return variants
+    .filter((variant) => Object.keys(symbolsOf(variant)).length > 0)
+    .map((variant) => ({ id: variant.id, axis: variant.axis, patch: { ...variant.patch } }));
+}
+
+export function transferFailureClass(_detail?: LevelDetail): string {
+  return 'pattern-transfer-failed';
 }
 
 function summarizeArtifact(artifact: unknown): Verdict['artifacts'] {
@@ -292,7 +367,9 @@ export function validateArtifact(
   artifact: unknown,
 ): Verdict {
   const applied = applyVariant(script, variant);
-  const world = toWorld(applied);
+  const symbols = symbolsOf(variant);
+  const relabeled = Object.keys(symbols).length > 0;
+  const world = toWorld(applied, symbols);
   const artifacts = summarizeArtifact(artifact);
   const candidate = artifact as { patternRule?: { tokens?: unknown }; repair?: unknown } | null | undefined;
   const hasRule = Boolean(candidate?.patternRule && Array.isArray(candidate.patternRule.tokens));
@@ -307,8 +384,24 @@ export function validateArtifact(
       artifacts,
     };
   }
+  // 迁移门只认「随映射走」的产物：只填不声明的 repair-only 是把答案抄在旧表征上（空壳），
+  // 换个表示以后没有规律可翻译，必须报 pattern-transfer-failed，而不是悄悄当成通过。
+  if (relabeled && !hasRule) {
+    return {
+      passed: false,
+      stamps: [],
+      failure: {
+        class: 'pattern-transfer-failed',
+        variantId: variant.id,
+        causes: [{ kind: 'variant', ref: variant.id, messageKey: 'level.pattern.transfer.message' }],
+      },
+      missingEvidence: [],
+      artifacts,
+    };
+  }
   // 有 patternRule 走原判定；只有 repair 时按「只填不声明」用可见格推出来的候选规律校验，
   // 绝不返回「既无 failure 也无 missingEvidence」的空判决（docs/12 §T1-pattern 的坑）。
+  const translated = relabeled ? relabelArtifact(artifact, symbols) : artifact;
   const result: {
     passed: boolean;
     failureClass?: string;
@@ -316,7 +409,7 @@ export function validateArtifact(
     missingIndices?: number[];
     mismatchIndices?: number[];
   } = hasRule
-    ? validatePattern(world, artifact)
+    ? validatePattern(world, translated)
     : validateRepairOnly(applied, candidate?.repair);
   if (result.passed) {
     const stamps: Verdict['stamps'] = ['constraint'];
@@ -324,7 +417,7 @@ export function validateArtifact(
     return { passed: true, stamps, missingEvidence: [], artifacts };
   }
 
-  const failureClass = result.failureClass ?? 'pattern-rule-invalid';
+  const failureClass = relabeled ? 'pattern-transfer-failed' : (result.failureClass ?? 'pattern-rule-invalid');
   const causes = [];
   if (result.conflictIndex !== undefined) {
     causes.push({

@@ -6,9 +6,9 @@
   "template": "construct",
   "thinkingTarget": "在预算内选边，把五个站点连成一张连通的网",
   "intro": "五个站点之间有一些候选道路。预算只够修一部分，但所有站点必须连起来。",
-  "prompt": "选一组道路，让五个站点全部连通，成本 ≤ 9，最多选 5 条，并且连到学校与医院。",
-  "done": "你选的边把所有站点连成了一张网，而且没有超预算。",
-  "retry": "先看哪些边能连到关键站点，再检查有没有孤立的块。",
+  "prompt": "选一组道路，让五个站点全部连通，成本 ≤ 9，最多选 5 条；学校和医院两个站点合计至少接 3 条路。",
+  "done": "你选的边把所有站点连成了一张网，成本没超预算，学校和医院也接够了路。",
+  "retry": "先检查有没有孤立的块，再数一数学校和医院接了几条路。",
   "tools": [
     {
       "kind": "construct",
@@ -118,7 +118,7 @@
     ],
     "budget": 9,
     "maxEdges": 5,
-    "minKeyEdges": 2
+    "minKeyEdges": 3
   },
   "evidencePlan": [
     {
@@ -142,13 +142,13 @@
   ],
   "solutions": [
     {
-      "id": "s-chain",
+      "id": "s-hubs",
       "artifact": {
         "edges": [
           "ab",
-          "bc",
-          "cd",
-          "de"
+          "ae",
+          "bd",
+          "ce"
         ]
       }
     },
@@ -205,6 +205,18 @@
           "cd",
           "de",
           "ae"
+        ]
+      }
+    },
+    {
+      "id": "n-key",
+      "expectFailure": "network-key",
+      "artifact": {
+        "edges": [
+          "ab",
+          "bc",
+          "bd",
+          "de"
         ]
       }
     }
@@ -283,8 +295,8 @@
       "focus": "count"
     },
     "network-key": {
-      "messageKey": "关键站点没有连上。",
-      "hintKey": "学校与医院都要接入路网。",
+      "messageKey": "关键站点接入的道路还不够。",
+      "hintKey": "学校和医院接进来的道路加起来至少 3 条。",
       "focus": "key"
     },
     "network-not-general": {
@@ -305,7 +317,7 @@
   "titleEn": "Network Planner",
   "thinkingTargetEn": "Choose roads within budget so all five stations become one connected network.",
   "introEn": "Five stations have candidate roads. The budget only covers some of them, but every station must be connected.",
-  "promptEn": "Choose roads so all five stations are connected, cost ≤ 9, at most 5 roads, and both school and hospital are linked.",
-  "doneEn": "Your roads connected every station without going over budget.",
-  "retryEn": "Check which roads touch the key stations, then look for isolated blocks."
+  "promptEn": "Choose roads so all five stations are connected, cost ≤ 9, at most 5 roads, and the school and the hospital together have at least 3 roads connected to them.",
+  "doneEn": "Your roads connected every station within budget, with enough roads reaching the school and the hospital.",
+  "retryEn": "Look for isolated blocks first, then count how many roads reach the school and the hospital."
 }

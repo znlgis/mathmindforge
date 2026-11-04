@@ -6,7 +6,7 @@
   "template": "pattern",
   "thinkingTarget": "先定出对称规则，再把缺的半面墙补成镜像",
   "intro": "这面墙被拆掉了一半。先看看完整的一半有什么规律。",
-  "prompt": "把缺的三块补上，让整面墙对称；按重复读还是按镜像读都算对。",
+  "prompt": "先选中重复或镜像的规律，再把缺的三块补上，让整面墙对称；两种读法都算对。",
   "done": "你把缺的半面墙补好了：不管按重复还是镜像读，它都能对得上。",
   "retry": "从中间对折试试：左边第 1 格应该和右边第 1 格一样。",
   "tools": [
@@ -111,6 +111,15 @@
     {
       "id": "s-repeat-abc",
       "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C"
+          ],
+          "period": 3,
+          "transform": "none"
+        },
         "repair": [
           {
             "index": 3,
@@ -130,6 +139,15 @@
     {
       "id": "s-mirror-cba",
       "artifact": {
+        "patternRule": {
+          "tokens": [
+            "A",
+            "B",
+            "C"
+          ],
+          "period": 3,
+          "transform": "reflect"
+        },
         "repair": [
           {
             "index": 3,
@@ -250,7 +268,7 @@
   ],
   "variants": [
     {
-      "id": "v-relabel",
+      "id": "v-relabel-shapes",
       "axis": "representation",
       "patch": {
         "scenario": {
@@ -263,11 +281,15 @@
       }
     },
     {
-      "id": "v-shift",
+      "id": "v-relabel-colors",
       "axis": "transfer",
       "patch": {
         "scenario": {
-          "startIndex": 1
+          "symbols": {
+            "A": "red",
+            "B": "blue",
+            "C": "green"
+          }
         }
       }
     }
@@ -294,8 +316,8 @@
       "focus": "repair"
     },
     "pattern-transfer-failed": {
-      "messageKey": "换了符号后，对称规则还在。",
-      "hintKey": "A/B/C 换成形状，次序没有变。",
+      "messageKey": "level.pattern.hypothesis",
+      "hintKey": "level.pattern.transfer.hint",
       "focus": "variant"
     },
     "pattern-rule-invalid": {
@@ -316,7 +338,7 @@
   "titleEn": "Symmetry Wall",
   "thinkingTargetEn": "Find the mirror rule and rebuild the missing half of the wall.",
   "introEn": "Half of the wall is missing. Look for the rule in the half that remains.",
-  "promptEn": "Fill the three missing blocks so the wall is symmetric; either a repeat or a mirror reading counts.",
+  "promptEn": "Pick the repeat or mirror rule, then fill the three missing blocks so the wall is symmetric; either reading counts.",
   "doneEn": "You rebuilt the missing half, and it works as a repeat or as a mirror.",
   "retryEn": "Fold the wall in the middle: the first and last visible cells should mirror."
 }

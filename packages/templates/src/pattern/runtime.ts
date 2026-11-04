@@ -5,7 +5,10 @@ import type {
 import type { PatternRule } from '@mmf/toolkit/pattern';
 import { validateRule } from '@mmf/toolkit/pattern';
 import { patternDigest } from '@mmf/toolkit/pattern';
-import { actionsFor, buildPreview, parseScript, patternRuleKey, toWorld, validateArtifact } from './logic';
+import {
+  actionsFor, buildPreview, parseScript, patternRuleKey, toWorld, transferFailureClass, transferVariants,
+  validateArtifact,
+} from './logic';
 import type { PatternPreview, PatternScript, PatternToolStateView, PatternVariant } from './logic';
 
 interface RuntimeState {
@@ -62,6 +65,9 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
   const brokenIndices = script.scenario.visible
     .map((value, index) => (value === null ? index : -1))
     .filter((index) => index >= 0);
+  // 真迁移门：内容里带 scenario.symbols 的变体（换表征），submit 时逐条重验。
+  // pattern 自管 runtime（不像 rule/construct 走 shared/runtime 的 adapter），所以门要在这里接。
+  const gateVariants = transferVariants(detail);
 
   let state = initialState(opts.now());
   const listeners = new Set<(snapshot: RunSnapshot) => void>();
@@ -77,7 +83,8 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
   /**
    * 产物：规律和补块各自都可以单独存在。
    * - 玩家点「候选规律」后立刻提交规律（committed）；
-   * - g13 允许「只填不声明」：只补块、不声明规律时也必须能提交，交给只填判定给明确失败类；
+   * - 只有补块、没有规律时母本仍能通过（保护 A1/A1b 的结构反馈），但迁移门会拒绝——
+   *   没有规律就没有「换表征后仍成立」可验，这是空壳答案；
    * - 只有两者都没有时才是空产物，走 missingEvidence 分支（audit A1）。
    */
   function artifactOf(): { patternRule?: PatternRule; repair: { index: number; token: string }[] } | null {
@@ -197,6 +204,21 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
   function fail(message: string): ActionResult {
     notify();
     return { ok: false, reason: 'invalid-action', message, snapshot: snapshot() };
+  }
+
+  /** 逐条跑换表征变体；和 shared/runtime 的 transferCheck 同语义：第一条失败即门失败。 */
+  function transferCheck(artifact: unknown): {
+    passed: boolean;
+    results: { id: string; passed: boolean }[];
+    failure?: Verdict;
+  } {
+    const results: { id: string; passed: boolean }[] = [];
+    for (const variant of gateVariants) {
+      const verdict = validateArtifact(script, variant, artifact);
+      results.push({ id: variant.id, passed: verdict.passed });
+      if (!verdict.passed) return { passed: false, results, failure: verdict };
+    }
+    return { passed: true, results };
   }
 
   async function dispatch(action: LevelAction): Promise<ActionResult> {
@@ -398,6 +420,40 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
           notify();
           return { ok: true, verdict: pending, snapshot: snapshot() };
         }
+        // 迁移门：母本通过后，还必须在"换表征"的变体上成立（A/B 换成形状、颜色）。
+        // 只补块不声明规律的产物没有可翻译的规律，会在这里落 pattern-transfer-failed。
+        const transfer = transferCheck(artifact);
+        if (!transfer.passed) {
+          const failed: Verdict = {
+            passed: false,
+            stamps: [],
+            failure: {
+              class: transferFailureClass(detail),
+              variantId: transfer.failure?.failure?.variantId ?? gateVariants[0]?.id ?? 'variant',
+              causes: transfer.failure?.failure?.causes ?? [],
+            },
+            missingEvidence: [],
+            artifacts: artifactSummaries(),
+            variantResults: transfer.results,
+          };
+          state.verdict = failed;
+          state.stamps = failed.stamps;
+          state.phase = 'failed';
+          state.revision += 1;
+          addRun('fail', failed.failure?.class);
+          emit({
+            phase: 'result',
+            action: action.type,
+            outcome: 'fail',
+            failureClass: failed.failure?.class,
+          });
+          notify();
+          return { ok: true, verdict: failed, snapshot: snapshot() };
+        }
+        if (gateVariants.length > 0 && !verdict.stamps.includes('transfer')) {
+          verdict.stamps = [...verdict.stamps, 'transfer'];
+        }
+        verdict.variantResults = transfer.results;
         state.verdict = verdict;
         state.stamps = verdict.stamps;
         state.phase = verdict.passed ? 'passed' : 'failed';

@@ -9,6 +9,18 @@ import {
 } from './network';
 import type { NetworkScript } from './network';
 
+/**
+ * 失败类 → 玩家可读的原因。这里用内容层已有的中文句子（英文兜底在
+ * packages/i18n/src/zh-source.ts），宿主会优先显示关卡 feedback 里的同款文案。
+ */
+const FAILURE_MESSAGES: Record<string, string> = {
+  'network-empty': '一条路都没选。',
+  'network-too-many': '选的道路太多，超过上限。',
+  'network-disconnected': '还有站点没有连进路网。',
+  'network-budget': '路网成本超过预算。',
+  'network-key': '关键站点接入的道路还不够。',
+};
+
 interface NetworkState {
   edges: string[];
 }
@@ -91,13 +103,24 @@ function createNetworkAdapter(script: NetworkScript): RuntimeAdapter<NetworkStat
           metrics: result.metrics,
         };
       }
+      const failureClass = result.failures[0] ?? 'network-empty';
       return {
         passed: false,
         stamps: [],
         failure: {
-          class: result.failures[0] ?? 'network-empty',
+          class: failureClass,
           variantId: variant.id,
-          causes: [{ kind: 'constraint', ref: 'network', messageKey: '路网还没有连通或超出预算。' }],
+          causes: [{
+            kind: 'constraint',
+            ref: failureClass,
+            messageKey: FAILURE_MESSAGES[failureClass] ?? '路网还没有连通或超出预算。',
+            params: {
+              keyEdges: result.metrics.keyEdges ?? 0,
+              minKeyEdges: script.minKeyEdges,
+              cost: result.metrics.cost ?? 0,
+              budget: script.budget,
+            },
+          }],
         },
         missingEvidence: [],
         artifacts: [],

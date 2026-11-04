@@ -7,6 +7,8 @@ import {
   applyVariant as patternApplyVariant,
   parseScript as parsePatternScript,
   reachableFailureClasses as patternReachable,
+  transferFailureClass as patternTransferFailureClass,
+  transferVariants as patternTransferVariants,
   validateArtifact as patternValidate,
 } from './pattern/logic';
 import { ruleVerifier } from './rule/logic';
@@ -40,6 +42,10 @@ const patternVerifier: TemplateVerifier = {
   applyVariant: (detail, variant) =>
     patternApplyVariant(parsePatternScript(detail.levelScript), variant),
   reachableFailureClasses: (detail) => patternReachable(parsePatternScript(detail.levelScript)),
+  // 真迁移门：内容里带 scenario.symbols 的变体（A/B 换成形状、颜色）逐条过；
+  // 玩家答案里的 token 按同一映射翻译后再比对，只补块不声明规律的空壳会在这里失败。
+  transferVariants: (detail) => patternTransferVariants(detail),
+  transferFailureClass: (detail) => patternTransferFailureClass(detail),
 };
 
 const argueVerifierShape: TemplateVerifier = {

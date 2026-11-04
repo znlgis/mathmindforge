@@ -62,7 +62,7 @@ const SIGNAL_LABELS_EN: Record<string, string> = {
   'structure-transfer-stamps': 'Transfer stamps',
   'rule-levels-completed': 'Rule levels completed',
   'rule-revised-levels': 'Levels revised after failure',
-  'rule-transfer-levels': 'Rule levels with transfer stamps',
+  'rule-variant-levels': 'Rule levels run on more than one map',
   'rule-run-events': 'Program runs',
   'model-knob-probe-events': 'Parameter and data events',
   'model-levels-completed': 'Simulation / experiment levels completed',

@@ -25,6 +25,7 @@ interface NetworkScriptView {
   edges?: NetworkEdgeView[];
   budget?: number;
   maxEdges?: number;
+  /** 至少有几条候选边的一端是关键站点（同一条边只算 1 次）。 */
   minKeyEdges?: number;
 }
 
@@ -150,16 +151,21 @@ const stats = computed(() => {
   };
   const nodeById = new Map(nodes.value.map((node) => [node.id, node]));
   let cost = 0;
-  let keys = 0;
+  let keyEdges = 0;
+  const keyStations = new Set<string>();
   for (const edge of edges.value) {
     if (!selected.value.has(edge.id)) continue;
     cost += edge.cost;
     union(edge.a, edge.b);
-    if (nodeById.get(edge.a)?.key) keys += 1;
-    if (nodeById.get(edge.b)?.key) keys += 1;
+    const aKey = Boolean(nodeById.get(edge.a)?.key);
+    const bKey = Boolean(nodeById.get(edge.b)?.key);
+    if (aKey || bKey) keyEdges += 1;
+    if (aKey) keyStations.add(edge.a);
+    if (bKey) keyStations.add(edge.b);
   }
   const components = new Set(ids.map((id) => find(id))).size;
-  return { components, cost, keys, count: selected.value.size };
+  const totalKeyStations = nodes.value.filter((node) => node.key).length;
+  return { components, cost, keyEdges, keyStations: keyStations.size, totalKeyStations, count: selected.value.size };
 });
 
 const budget = computed(() => script.value.budget ?? 0);
@@ -185,7 +191,7 @@ async function toggle(edgeId: string): Promise<void> {
 <template>
   <section data-testid="network-tool" class="mt-3 flex flex-col gap-3">
     <p class="text-xs text-ink-soft">
-      点一条候选道路选中或取消。把站点连成一整块，成本不超过 {{ budget }}，并且连到关键站点。
+      点一条候选道路选中或取消。把站点连成一整块，成本不超过 {{ budget }}；学校和医院合计至少接 {{ minKey }} 条路。
     </p>
 
     <div class="rounded-2xl border border-grid bg-paper p-2">
@@ -278,8 +284,8 @@ async function toggle(edgeId: string): Promise<void> {
       <span data-testid="network-cost" :class="stats.cost > budget ? 'text-red' : 'text-ink-soft'">
         成本 {{ stats.cost }} / {{ budget }}
       </span>
-      <span data-testid="network-keys" :class="stats.keys >= minKey ? 'text-teal' : 'text-ink-soft'">
-        关键站点 {{ stats.keys }}/{{ minKey }}
+      <span data-testid="network-keys" :class="stats.keyEdges >= minKey ? 'text-teal' : 'text-red'">
+        关键站点接入 {{ stats.keyEdges }}/{{ minKey }} 条 · 已接 {{ stats.keyStations }}/{{ stats.totalKeyStations }} 站
       </span>
       <span data-testid="network-edges" :class="stats.count > maxEdges ? 'text-red' : 'text-ink-soft'">
         边 {{ stats.count }}/{{ maxEdges }}

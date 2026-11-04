@@ -10,7 +10,7 @@
     "rule"
   ],
   "estimatedMinutes": 8,
-  "thinkingTarget": "用顺序与重复拼出程序，让它在转过的地图上也成立",
+  "thinkingTarget": "用顺序与重复拼出程序：收齐三颗星，再开到终点",
   "difficulty": {
     "structure": 2,
     "representation": 2,
@@ -21,5 +21,5 @@
     "after": []
   },
   "titleEn": "Rule Engineer: Route",
-  "thinkingTargetEn": "Build a program that collects every star and reaches the goal."
+  "thinkingTargetEn": "Build a program with sequence and repetition: collect every star, then reach the goal."
 }

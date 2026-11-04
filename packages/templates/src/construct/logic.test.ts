@@ -3,9 +3,11 @@ import { LevelDetailSchema } from '@mmf/content/full';
 import paymentDetailRaw from '../../../content/src/details/g46-algorithm-payment.level.json';
 import paymentSummaryRaw from '../../../content/src/levels/g46-algorithm-payment.json';
 import packDetailRaw from '../../../content/src/details/g13-modeling-pack.level.json';
+import networkLevelRaw from '../../../content/src/details/g79-structure-network.level.json';
 import { constructVerifier } from './verifier';
 import { greedyCoins, optimalCoins } from './engine';
 import { actionsFor, parseScript, reachableFailureClasses, validateArtifact } from './logic';
+import { networkScriptSchema, selectedEdges, validateNetworkArtifact } from './network';
 import type { RuntimeVariant } from '../shared/types';
 import { createConstructRuntime } from './runtime';
 
@@ -230,6 +232,59 @@ describe('construct/payment template', () => {
     expect(result.verdict?.passed).toBe(false);
     expect(result.verdict?.failure?.class).toBe('construct-not-optimal');
     expect(result.verdict?.failure?.causes[0]?.params?.count).toBe(3);
+  });
+});
+
+
+describe('construct/network minKeyEdges', () => {
+  const networkDetail = LevelDetailSchema.parse(networkLevelRaw);
+  const networkScript = networkScriptSchema.parse(networkDetail.levelScript);
+  const selection = (edges: string[]) => selectedEdges(networkScript, { edges });
+
+  it('counts a key-ending edge once even when both ends are key stations', () => {
+    const script = networkScriptSchema.parse({
+      ...networkScript,
+      nodes: networkScript.nodes.map((node) => ({ ...node, key: node.id === 'A' || node.id === 'B' })),
+    });
+    // ab 的两端（A、B）都是关键站点：按"边"算 1 条，而不是按端点算 2 条。
+    expect(selectedEdges(script, { edges: ['ab'] }).keyEdges).toBe(1);
+  });
+
+  it('lets both golden solutions through under the new rule', () => {
+    for (const solution of networkDetail.solutions) {
+      const verdict = validateNetworkArtifact(networkScript, solution.artifact);
+      expect(verdict.passed, solution.id + ' ' + verdict.failures.join(',')).toBe(true);
+    }
+  });
+
+  it('rejects a connected, in-budget artifact whose key stations only get two roads', () => {
+    // 能连通（A-B-C、B-D、D-E）、成本 7 ≤ 9，但学校和医院只各接 1 条：keyEdges = 2 < minKeyEdges = 3。
+    // 旧实现按端点累加（1 + 1 = 2 ≥ 2）会放行，新实现必须落到 network-key。
+    const result = validateNetworkArtifact(networkScript, { edges: ['ab', 'bc', 'bd', 'de'] });
+    expect(result.passed).toBe(false);
+    expect(result.failures[0]).toBe('network-key');
+    expect(result.metrics.keyEdges).toBe(2);
+  });
+
+  it('shows network-key as reachable for this level', () => {
+    const reachable = constructVerifier.reachableFailureClasses(networkDetail);
+    expect(reachable).toContain('network-key');
+    expect(networkDetail.feedback['network-key']).toBeDefined();
+  });
+
+  it('rejects every network negative sample with its declared class', () => {
+    for (const negative of networkDetail.negativeSamples) {
+      const result = validateNetworkArtifact(networkScript, negative.artifact);
+      expect(result.passed, negative.id).toBe(false);
+      expect(result.failures[0], negative.id).toBe(negative.expectFailure);
+    }
+  });
+
+  it('selects the new hub solution and reports the key-edge count', () => {
+    const verdict = validateNetworkArtifact(networkScript, { edges: ['ab', 'ae', 'bd', 'ce'] });
+    expect(verdict.passed).toBe(true);
+    expect(selection(['ab', 'ae', 'bd', 'ce']).keyEdges).toBe(3);
+    expect(selection(['ab', 'bc', 'bd', 'ce']).keyEdges).toBe(3);
   });
 });
 

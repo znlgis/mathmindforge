@@ -8,13 +8,16 @@ import type { RuleTrace } from './engine';
 import { asProgramBlocks, programBlockSchema, ruleScriptSchema } from './schema';
 import type { Cell, Direction, RuleScript } from './schema';
 
-/** rule 模板的失败类（transfer 门失败用 rule-not-general）。 */
+/**
+ * rule 模板的失败类。
+ * 迁移门（旋转变体）已按 docs/12 T2-3 删掉：旋转是刚体变换，程序通过母本必然通过，
+ * 那个门恒真、rule-not-general 永不可达。这里不再保留死失败类。
+ */
 export const FAILURE_CLASSES = [
   'rule-empty',
   'rule-wall',
   'rule-loop',
   'rule-missed-item',
-  'rule-not-general',
 ] as const;
 export type RuleFailureClass = (typeof FAILURE_CLASSES)[number];
 
@@ -31,30 +34,17 @@ export interface TraceSummary {
 /** 调用方可以传脚本本身，也可以传整份关卡详情（脚本在 levelScript 里）。 */
 export type ScriptSource = RuleScript | LevelDetail;
 
-/** docs/06 §1 的 verifier 形状：构建期/审计用，不含 Phaser。 */
+/**
+ * docs/06 §1 的 verifier 形状：构建期/审计用，不含 Phaser。
+ * 注意：rule 没有迁移门。历史上这里挂过 90°/180° 旋转变体，
+ * 但旋转保持相对方向，母本通过必然变体通过（恒真），已在 docs/12 T2-3 删除。
+ */
 export interface TemplateVerifier {
   parseScript(input: unknown): RuleScript;
   validateArtifact(detail: LevelDetail, variant: RuleVariant, artifact: unknown): Verdict;
   actionsFor(detail: LevelDetail, variant: RuleVariant, artifact: unknown): LevelAction[];
   applyVariant(detail: LevelDetail, variant: RuleVariant): RuleScript;
   reachableFailureClasses(detail: LevelDetail): string[];
-  transferVariants?(detail: LevelDetail): RuleVariant[];
-  transferFailureClass?(detail: LevelDetail): string;
-}
-
-/** transfer 门：同一段程序必须在转过的地图上也成立。 */
-export const RULE_TRANSFER_VARIANTS: RuleVariant[] = [
-  { id: 'v-rotate-90', axis: 'transfer', patch: { rotate: 90 } },
-  { id: 'v-rotate-180', axis: 'transfer', patch: { rotate: 180 } },
-];
-
-export function transferVariants(_source?: ScriptSource): RuleVariant[] {
-  return RULE_TRANSFER_VARIANTS.map((variant) => ({ ...variant, patch: { ...variant.patch } }));
-}
-
-/** transfer 门失败时统一报 rule-not-general（docs/06 §8）。 */
-export function transferFailureClass(_source?: ScriptSource): string {
-  return 'rule-not-general';
 }
 
 /** 母本变体：内容层与运行时都用它表示"没换皮"。 */
@@ -256,9 +246,9 @@ export function validateArtifact(source: ScriptSource, variant: RuleVariant, art
     return fail(variant, 'rule-missed-item', causes, artifacts);
   }
 
+  // 没有迁移门就不再发 transfer 印章：印章必须来自真的逐变体校验（shared/runtime.ts 统一加）。
   const stamps: Verdict['stamps'] = ['constraint'];
   if (program.length <= 14) stamps.push('simple');
-  if (variant.id !== 'base') stamps.push('transfer');
   return {
     passed: true,
     stamps,
@@ -304,6 +294,4 @@ export const ruleVerifier: TemplateVerifier = {
   actionsFor,
   applyVariant,
   reachableFailureClasses,
-  transferVariants,
-  transferFailureClass,
 };

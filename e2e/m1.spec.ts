@@ -120,11 +120,12 @@ test('真实点击：对称补墙在画布上点三格', async ({ page }) => {
   await expect(page.getByTestId('completion-panel')).toBeVisible();
 });
 
-test('完成面板显示变体通行证', async ({ page }) => {
-  await page.goto('/#/play/g13-algorithm-route?autoplay=1');
+test('完成面板显示变体通行证（换表征迁移门）', async ({ page }) => {
+  // pattern 关现在有真的换表征迁移门：A/B 换成形状之后规律仍要成立（docs/12 遗留项 1）
+  await page.goto('/#/play/k-structure-pattern-path?autoplay=1');
   await expect(page.getByTestId('completion-panel')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('variant-passport')).toBeVisible();
-  await expect(page.getByTestId('variant-passport')).toContainText('v-rotate-90');
+  await expect(page.getByTestId('variant-passport')).toContainText('v-relabel-shapes');
   await expect(page.getByTestId('variant-passport')).toContainText('通过');
 });
 

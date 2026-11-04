@@ -254,7 +254,7 @@
   ],
   "variants": [
     {
-      "id": "v-relabel",
+      "id": "v-relabel-shapes",
       "axis": "representation",
       "patch": {
         "scenario": {
@@ -266,11 +266,14 @@
       }
     },
     {
-      "id": "v-shift",
+      "id": "v-relabel-colors",
       "axis": "transfer",
       "patch": {
         "scenario": {
-          "startIndex": 1
+          "symbols": {
+            "A": "red",
+            "B": "blue"
+          }
         }
       }
     }

@@ -5,7 +5,8 @@ import type { PatternRule } from '@mmf/toolkit/pattern';
 import { tokenAt } from '@mmf/toolkit/pattern';
 import { createPatternRuntime } from './runtime';
 import {
-  actionsFor, applyVariant, candidateRules, nextFillToken, parseScript, validateArtifact,
+  actionsFor, applyVariant, candidateRules, nextFillToken, parseScript, relabelArtifact, relabelVisible,
+  symbolsOf, toWorld, transferFailureClass, transferVariants, validateArtifact,
 } from './logic';
 import type { PatternVariant } from './logic';
 
@@ -21,6 +22,9 @@ function runtimeAt(level: typeof detail = detail, overrides: Partial<RuntimeOpti
     seed: 101, now: () => 1_700_000_000_000, locale: 'zh-CN', reducedMotion: true, ...overrides,
   });
 }
+
+const K_TRANSFER = transferVariants(detail);
+const SYMMETRY_TRANSFER = transferVariants(symmetry);
 
 describe('pattern template', () => {
   it('accepts both golden solutions', () => {
@@ -73,7 +77,7 @@ describe('pattern template', () => {
     expect((result.verdict?.missingEvidence.length ?? 0)).toBeGreaterThan(0);
   });
 
-  it('autoplays through the public action path', async () => {
+  it('autoplays through the public action path and earns the transfer stamp', async () => {
     const runtime = runtimeAt();
     const result = await runtime.autoplay();
     expect(result.verdict?.passed).toBe(true);
@@ -81,9 +85,13 @@ describe('pattern template', () => {
     expect(result.snapshot.checkpoints.observe).toBeUndefined();
     expect(result.snapshot.checkpoints.hypothesis).toBe(true);
     expect(result.snapshot.checkpoints.repair).toBe(true);
+    expect(result.snapshot.stamps).toContain('transfer');
+    expect(result.snapshot.verdict?.variantResults?.map((item) => item.id)).toEqual(
+      K_TRANSFER.map((variant) => variant.id),
+    );
   });
 
-  it('accepts a repair-only artifact without a declared rule', () => {
+  it('accepts a repair-only artifact at base without a declared rule', () => {
     const verdict = validateArtifact(script, base, { repair: detail.solutions[0]?.artifact.repair });
     expect(verdict.passed).toBe(true);
     expect(verdict.failure).toBeUndefined();
@@ -101,7 +109,7 @@ describe('pattern template', () => {
     expect(runtime.snapshot().checkpoints.repair).toBe(true);
     expect(runtime.snapshot().checkpoints.hypothesis ?? false).toBe(false);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
-    // 补对了也得先声明一次规律（本关要靠"候选规律"做第二产物）；这里必须给出缺证据而不是空判定。
+    // 补对了也得先声明一次规律（迁移门要求产物本身携带可翻译的规律）；这里必须给出缺证据。
     expect(result.verdict?.passed).toBe(false);
     expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual(['hypothesis']);
   });
@@ -149,16 +157,88 @@ describe('pattern template', () => {
   });
 });
 
-describe('symmetry wall (fill only)', () => {
-  it('accepts both gap fills without a declared rule', () => {
-    for (const solution of symmetry.solutions) {
-      const verdict = validateArtifact(symmetryScript, base, solution.artifact);
-      expect(verdict.passed, solution.id + ' ' + verdict.failure?.class).toBe(true);
-      expect(verdict.artifacts.map((item) => item.kind)).toEqual(['repair-set']);
+describe('pattern 换表征迁移门', () => {
+  it('reads the transfer gate from content variants and maps the whole strip', () => {
+    expect(K_TRANSFER.map((variant) => variant.id)).toEqual(['v-relabel-shapes', 'v-relabel-colors']);
+    expect(SYMMETRY_TRANSFER.map((variant) => variant.id)).toEqual(['v-relabel-shapes', 'v-relabel-colors']);
+    expect(transferFailureClass(detail)).toBe('pattern-transfer-failed');
+
+    const shapes = symbolsOf(K_TRANSFER[0] as PatternVariant);
+    expect(shapes).toEqual({ A: 'round', B: 'square' });
+    // 世界（带子）按映射改名，而不是被忽略。
+    expect(toWorld(script, shapes).visible.slice(0, 3)).toEqual(['round', 'square', 'square']);
+    expect(relabelVisible(['A', null, 'B'], shapes)).toEqual(['round', null, 'square']);
+    // 产物里规律与补块一起翻译，玩家提交的仍是原始字母。
+    const translated = relabelArtifact({
+      patternRule: { tokens: ['A', 'B', 'B'], period: 3, transform: 'none' },
+      repair: [{ index: 6, token: 'A' }, { index: 7, token: 'B' }],
+    }, shapes) as { patternRule: { tokens: string[] }; repair: { token: string }[] };
+    expect(translated.patternRule.tokens).toEqual(['round', 'square', 'square']);
+    expect(translated.repair.map((item) => item.token)).toEqual(['round', 'square']);
+  });
+
+  it('keeps every golden solution[0] valid under both relabels (audit A6)', () => {
+    for (const [level, levelScript] of [[detail, script], [symmetry, symmetryScript]] as const) {
+      const variants = transferVariants(level);
+      expect(variants.length).toBeGreaterThan(0);
+      for (const variant of variants) {
+        const verdict = validateArtifact(levelScript, variant as PatternVariant, level.solutions[0]?.artifact);
+        expect(verdict.passed, level.id + ' ' + variant.id + ' ' + verdict.failure?.class).toBe(true);
+        expect(verdict.stamps).toContain('transfer');
+      }
     }
   });
 
-  it('keeps the two golden repairs distinct for audit A3', () => {
+  it('rejects the shell artifact at real submit with a user-facing failure class', async () => {
+    const runtime = runtimeAt(symmetry);
+    // 玩家只点画布补三格（没点候选规律）——母本判定是通过的。
+    for (const [index, token] of [[3, 'C'], [4, 'B'], [5, 'A']] as const) {
+      await runtime.dispatch({
+        type: 'construct/place',
+        payload: { piece: { id: 'tile-' + index, shape: token, x: index, y: 0 } },
+      });
+    }
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(false);
+    expect(result.verdict?.failure?.class).toBe('pattern-transfer-failed');
+    expect(result.snapshot.phase).toBe('failed');
+    // 反馈走内容 JSON 的 pattern-transfer-failed 文案，应当能指导玩家去模式卡声明规律。
+    expect(symmetry.feedback['pattern-transfer-failed']?.messageKey).toBe('level.pattern.hypothesis');
+    console.log('[relabel-shell-submit]', JSON.stringify({
+      passed: result.verdict?.passed,
+      class: result.verdict?.failure?.class,
+      results: result.verdict?.variantResults,
+    }));
+  });
+
+  it('fails the shell artifact that passes base: repair-only has no rule to relabel', () => {
+    const shell = { repair: (symmetry.solutions[1]?.artifact as { repair: unknown }).repair };
+    // 母本：只填不声明是通过的（这正是"空壳"的迷惑性）。
+    const atBase = validateArtifact(symmetryScript, base, shell);
+    expect(atBase.passed).toBe(true);
+    // 换表征：没有可翻译的 patternRule，必须落 pattern-transfer-failed。
+    const atRelabel = validateArtifact(symmetryScript, SYMMETRY_TRANSFER[0] as PatternVariant, shell);
+    expect(atRelabel.passed).toBe(false);
+    expect(atRelabel.failure?.class).toBe('pattern-transfer-failed');
+    expect(atRelabel.failure?.variantId).toBe(SYMMETRY_TRANSFER[0]?.id);
+    // 报告里的实际反例输出
+    console.log('[relabel-shell]', JSON.stringify({
+      atBase: { passed: atBase.passed },
+      atRelabel: { passed: atRelabel.passed, class: atRelabel.failure?.class, variantId: atRelabel.failure?.variantId },
+    }));
+  });
+});
+
+describe('symmetry wall', () => {
+  it('accepts both golden solutions (each carries a rule that transfers)', () => {
+    for (const solution of symmetry.solutions) {
+      const verdict = validateArtifact(symmetryScript, base, solution.artifact);
+      expect(verdict.passed, solution.id + ' ' + verdict.failure?.class).toBe(true);
+      expect(verdict.artifacts.map((item) => item.kind)).toContain('pattern-rule');
+    }
+  });
+
+  it('keeps the two golden artifacts distinct for audit A3', () => {
     const artifacts = symmetry.solutions.map((solution) => JSON.stringify(solution.artifact));
     expect(new Set(artifacts).size).toBe(artifacts.length);
   });
@@ -186,16 +266,19 @@ describe('symmetry wall (fill only)', () => {
     expect(impossible.failure?.class).toBe('pattern-mismatch');
   });
 
-  it('autoplays the wall through the public action path', async () => {
+  it('autoplays the wall through the public action path with the transfer gate', async () => {
     const runtime = runtimeAt(symmetry);
     const result = await runtime.autoplay();
     expect(result.verdict?.passed).toBe(true);
     expect(result.snapshot.checkpoints.fill).toBe(true);
     expect(result.snapshot.checkpoints.repair).toBe(true);
-    // g13 的证据计划不含 hypothesis：只填不声明也能走完。
+    // 只填不声明在母本是通过的，但迁移门会按 pattern-transfer-failed 拒绝；
+    // 这里 autoplay 的黄金解带规律，所以能过门并拿到 transfer 印章。
     expect(symmetry.evidencePlan.map((item) => item.id)).toEqual(['fill', 'repair']);
+    expect(result.snapshot.stamps).toContain('transfer');
   });
 });
+
 describe('画布点击序列（交互次数口径）', () => {
   function tokenOrderOf(level: typeof detail): string[] {
     const spec = level.tools.find((tool) => tool.kind === 'pattern');
@@ -224,18 +307,22 @@ describe('画布点击序列（交互次数口径）', () => {
     return runtime.snapshot().toolState.construct?.pieces.find((piece) => piece.x === index)?.shape;
   }
 
+  /** 候选 chip 的一次点击 = setCycle + commit（PatternTool.pickRule 的内部动作）。 */
+  async function pickCandidate(runtime: ReturnType<typeof runtimeAt>, rule: PatternRule): Promise<void> {
+    await runtime.dispatch({
+      type: 'pattern/setCycle',
+      payload: { cycle: [...rule.tokens], transform: rule.transform },
+    });
+    await runtime.dispatch({ type: 'pattern/commit', payload: {} });
+  }
+
   it('k-structure-pattern-path：1 次候选规律 + 3 次画布补格 + 1 次完成 = 5 击', async () => {
     const runtime = runtimeAt();
     const order = tokenOrderOf(detail);
     const candidate = candidateRules(script)[0];
     expect(candidate).toBeDefined();
     let clicks = 0;
-    // 候选 chip：一个点击同时发 setCycle + commit（PatternTool.pickRule 的内部动作）
-    await runtime.dispatch({
-      type: 'pattern/setCycle',
-      payload: { cycle: [...(candidate?.tokens ?? [])], transform: candidate?.transform ?? 'none' },
-    });
-    await runtime.dispatch({ type: 'pattern/commit', payload: {} });
+    if (candidate) await pickCandidate(runtime, candidate);
     clicks += 1;
     for (const index of [6, 7, 8]) {
       await clickGap(runtime, order, index);
@@ -248,25 +335,24 @@ describe('画布点击序列（交互次数口径）', () => {
     expect(clicks).toBe(5);
   });
 
-  it('g13-structure-symmetry：只点 3 个缺口（3+2+1 次）再完成 = 7 击', async () => {
+  it('g13-structure-symmetry：1 次候选规律 + 3 次画布补格 + 1 次完成 = 5 击', async () => {
     const runtime = runtimeAt(symmetry);
     const order = tokenOrderOf(symmetry);
-    const expected = new Map<number, string>([[3, 'C'], [4, 'B'], [5, 'A']]);
+    const candidate = candidateRules(symmetryScript).find((rule) => rule.transform === 'reflect');
+    expect(candidate).toBeDefined();
     let clicks = 0;
-    for (const [index, token] of expected) {
-      let guard = 0;
-      while (shapeAt(runtime, index) !== token) {
-        await clickGap(runtime, order, index);
-        clicks += 1;
-        guard += 1;
-        expect(guard).toBeLessThanOrEqual(order.length);
-      }
+    if (candidate) await pickCandidate(runtime, candidate);
+    clicks += 1;
+    for (const index of [3, 4, 5]) {
+      await clickGap(runtime, order, index);
+      clicks += 1;
     }
+    expect([shapeAt(runtime, 3), shapeAt(runtime, 4), shapeAt(runtime, 5)]).toEqual(['C', 'B', 'A']);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     clicks += 1;
-    // 只填不声明：产物只有 repair-set，同样通过。
+    // 迁移门要求产物带规律；这条路径与 e2e 的「先点候选 chip」一致。
     expect(result.verdict?.passed).toBe(true);
-    expect(result.verdict?.artifacts.map((item) => item.kind)).toEqual(['repair-set']);
-    expect(clicks).toBe(7);
+    expect(result.verdict?.artifacts.map((item) => item.kind)).toEqual(['pattern-rule', 'repair-set']);
+    expect(clicks).toBe(5);
   });
 });

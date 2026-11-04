@@ -5,8 +5,7 @@ import { createRuntimeWithAdapter } from '../shared/runtime';
 import type { AdapterResult, RuntimeAdapter, RuntimeVariant } from '../shared';
 import { executeProgram } from './engine';
 import {
-  RULE_TRANSFER_VARIANTS, actionsFor, countBlocks, parseScript, summarizeProgram, transferFailureClass,
-  traceSummary, validateArtifact,
+  actionsFor, countBlocks, parseScript, summarizeProgram, traceSummary, validateArtifact,
 } from './logic';
 import type { TraceSummary } from './logic';
 import { programBlockSchema } from './schema';
@@ -174,16 +173,8 @@ export function createRuleAdapter(detail: LevelDetail): RuntimeAdapter<RuleState
     actionsFor(_detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): LevelAction[] {
       return actionsFor(_detail, variant, artifact);
     },
-    transferVariants(): RuntimeVariant[] {
-      return RULE_TRANSFER_VARIANTS.map((variant) => ({ ...variant, patch: { ...variant.patch } }));
-    },
-    transferFailureClass(): string {
-      return transferFailureClass(detail);
-    },
   };
 }
-
-export { RULE_TRANSFER_VARIANTS };
 
 /** 规则关运行时：submit / run / reset / autoplay 全交给共享运行时。 */
 export function createRuleRuntime(detail: LevelDetail, opts: RuntimeOptions): LevelRuntime {

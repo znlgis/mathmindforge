@@ -81,11 +81,12 @@ describe('rule golden solutions', () => {
     }
   });
 
-  it('keeps both golden solutions valid after rotate 90 / 180', () => {
+  it('still executes both golden solutions correctly on a rotated map (executor property, not a gate)', () => {
+    // 旋转门已删：旋转是刚体变换，程序按相对方向执行，母本通过必然旋转通过。
+    // 这里只验证执行器本身对旋转地图的兼容性，不再把它当迁移证据。
     for (const variant of ROTATIONS) {
       const rotated = applyVariant(detail, variant);
       const turn = Number(variant.patch.rotate) / 90;
-      // 逆时针顺序：east → north → west → south
       const expected = { dir: ['east', 'north', 'west', 'south'][turn % 4] };
       expect(rotated.grid.start.dir, variant.id).toBe(expected.dir);
       expect(rotated.grid.goal).toEqual(
@@ -95,7 +96,7 @@ describe('rule golden solutions', () => {
       for (const solution of PROGRAM_SOLUTIONS) {
         const verdict = validateArtifact(detail, variant, { program: solution.program });
         expect(verdict.passed, variant.id + ' ' + solution.id + ' ' + verdict.failure?.class).toBe(true);
-        expect(verdict.stamps).toContain('transfer');
+        expect(verdict.stamps).not.toContain('transfer');
       }
     }
   });
@@ -136,9 +137,10 @@ describe('rule negative samples', () => {
     expect(verdict.failure?.class).toBe('rule-empty');
   });
 
-  it('lists every failure class as reachable, including rule-not-general', () => {
+  it('lists every reachable failure class and retires rule-not-general', () => {
     expect(reachableFailureClasses(detail)).toEqual([...FAILURE_CLASSES]);
-    expect(reachableFailureClasses(script)).toContain('rule-not-general');
+    expect(FAILURE_CLASSES).not.toContain('rule-not-general');
+    expect(reachableFailureClasses(script)).not.toContain('rule-not-general');
   });
 });
 
@@ -171,7 +173,8 @@ describe('rule runtime', () => {
     }
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(result.verdict?.passed).toBe(true);
-    expect(result.snapshot.stamps).toContain('transfer');
+    // 没有迁移门就不再自动发 transfer 印章。
+    expect(result.snapshot.stamps).not.toContain('transfer');
   });
 
   it('places, moves, removes and commits program blocks', async () => {
@@ -213,20 +216,18 @@ describe('rule runtime', () => {
     expect(result.verdict?.passed).toBe(true);
     expect(result.snapshot.checkpoints.build).toBe(true);
     expect(result.snapshot.checkpoints.run).toBe(true);
-    expect(result.snapshot.stamps).toContain('transfer');
+    expect(result.snapshot.stamps).not.toContain('transfer');
     expect(result.snapshot.artifacts.map((item) => item.kind)).toEqual(['program']);
   });
 
-  it('declares rotate 90 / 180 as the transfer gate and rule-not-general as its failure class', () => {
-    const adapter = createRuleAdapter(detail);
-    const variants = adapter.transferVariants?.(detail) ?? [];
-    expect(variants.map((variant) => variant.id)).toEqual(['v-rotate-90', 'v-rotate-180']);
-    expect(variants.map((variant) => variant.patch.rotate)).toEqual([90, 180]);
-    expect(adapter.transferFailureClass?.(detail)).toBe('rule-not-general');
+  it('exposes no transfer gate: the rotation gate was provably tautological', () => {
+    const adapter = createRuleAdapter(detail) as unknown as Record<string, unknown>;
+    expect(adapter.transferVariants).toBeUndefined();
+    expect(adapter.transferFailureClass).toBeUndefined();
   });
 
   it('turns a non-rigid patch into a real structural failure', () => {
-    // rotate 是刚体变换，程序不可能"只在母本成立"；这里用平移补丁验证 patch 与失败读数确实生效。
+    // 这不是迁移门，只是证明 applyVariant 的补丁真的会改变判定读数（旋转则不会）。
     const shifted: RuleVariant = { id: 'v-shifted', axis: 'transfer', patch: { grid: { start: { x: 2, y: 2 } } } };
     const variantVerdict = validateArtifact(detail, shifted, { program: UNROLLED });
     expect(variantVerdict.passed).toBe(false);
@@ -236,14 +237,10 @@ describe('rule runtime', () => {
 });
 
 describe('rule verifier', () => {
-  it('exposes the transfer gate metadata that audit:levels relies on', () => {
-    const variants = ruleVerifier.transferVariants?.(detail) ?? [];
-    expect(variants.map((variant) => variant.id)).toEqual(['v-rotate-90', 'v-rotate-180']);
-    for (const variant of variants) {
-      const verdict = ruleVerifier.validateArtifact(detail, variant, detail.solutions[0]?.artifact);
-      expect(verdict.passed, variant.id + ' ' + verdict.failure?.class).toBe(true);
-    }
-    expect(ruleVerifier.transferFailureClass?.(detail)).toBe('rule-not-general');
+  it('declares no transfer gate to audit:levels (fake gate removed)', () => {
+    const verifier = ruleVerifier as unknown as Record<string, unknown>;
+    expect(verifier.transferVariants).toBeUndefined();
+    expect(verifier.transferFailureClass).toBeUndefined();
   });
 
   it('rejects an empty artifact as rule-empty instead of missing evidence', () => {
@@ -255,7 +252,8 @@ describe('rule verifier', () => {
 
   it('is wired for build-time audits', () => {
     expect(ruleVerifier.parseScript(detail.levelScript).grid.width).toBe(5);
-    expect(ruleVerifier.reachableFailureClasses(detail)).toHaveLength(5);
+    expect(ruleVerifier.reachableFailureClasses(detail)).toHaveLength(4);
+    expect(ruleVerifier.reachableFailureClasses(detail)).not.toContain('rule-not-general');
     expect(ruleVerifier.applyVariant(detail, ROTATIONS[0] as RuleVariant).grid.start).toEqual({ x: 4, y: 0, dir: 'north' });
     const actions = ruleVerifier.actionsFor(detail, BASE_VARIANT, { program: REPEAT });
     expect(actions[0]?.type).toBe('rule/place');

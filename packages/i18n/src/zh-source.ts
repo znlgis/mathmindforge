@@ -138,6 +138,8 @@ export const zhSourceEn: Record<string, string> = {
   '打开排队指标对照': 'Open the queue metrics comparison',
 
   // ── g79-structure-network（construct · network）──────────────────────
+  '关键站点接入的道路还不够。': 'Not enough roads reach the key stops.',
+  '学校和医院接进来的道路加起来至少 3 条。': 'The school and the hospital together need at least 3 connecting roads.',
   '一条路都没选。': 'No roads selected yet.',
   '至少先把入口和中心连起来。': 'At least connect the entrance to the centre first.',
   '还有站点没有连进路网。': 'Some stops are not connected to the network.',

@@ -4,10 +4,10 @@
   "band": "g13",
   "thread": "algorithm",
   "template": "rule",
-  "thinkingTarget": "用顺序与重复拼出程序，让它在转过的地图上也成立",
+  "thinkingTarget": "用顺序与重复拼出程序：收齐三颗星，再开到终点",
   "intro": "机器人停在图纸左下角，前面是一条拐了两个弯的路线。",
   "prompt": "拼一段程序：收齐三颗星，再把机器人开到终点。",
-  "done": "你用重复把程序缩短了一半，地图转过之后它照样能走。",
+  "done": "你用重复把程序缩短了，还收齐了星星、开到了终点。",
   "retry": "数一数是在第几步撞到墙的：该转弯的时候有没有转弯？",
   "tools": [
     {
@@ -415,14 +415,14 @@
   "variants": [
     {
       "id": "v-rotate-90",
-      "axis": "transfer",
+      "axis": "structure",
       "patch": {
         "rotate": 90
       }
     },
     {
       "id": "v-rotate-180",
-      "axis": "transfer",
+      "axis": "structure",
       "patch": {
         "rotate": 180
       }
@@ -448,11 +448,6 @@
       "messageKey": "level.rule.missedItem.message",
       "hintKey": "level.rule.missedItem.hint",
       "focus": "star-cell"
-    },
-    "rule-not-general": {
-      "messageKey": "level.rule.transfer.message",
-      "hintKey": "level.rule.transfer.hint",
-      "focus": "variant"
     }
   },
   "badges": [
@@ -465,9 +460,9 @@
     "notesKey": "level.rule.manualAudit"
   },
   "titleEn": "Rule Engineer: Route",
-  "thinkingTargetEn": "Build a program that collects every star and reaches the goal.",
+  "thinkingTargetEn": "Build a program with sequence and repetition: collect every star, then reach the goal.",
   "introEn": "The route has one star and a goal. Build a program that does both.",
-  "promptEn": "Run the program, then make it work on a rotated map.",
-  "doneEn": "Your program followed the route and survived a rotation.",
+  "promptEn": "Collect all three stars, then drive the robot to the goal.",
+  "doneEn": "Your program collected every star and reached the goal.",
   "retryEn": "Count the steps to the goal before adding turns."
 }

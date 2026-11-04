@@ -32,26 +32,53 @@ export interface NetworkValidation {
   metrics: Record<string, number>;
 }
 
+export interface NetworkSelection {
+  ids: string[];
+  cost: number;
+  /** 至少有一端是关键站点的候选边数（同一条边只算 1 次，不按端点重复计数）。 */
+  keyEdges: number;
+  /** 真正接进路网的站点数（用于 UI 实时灯）。 */
+  keyStations: number;
+  totalKeyStations: number;
+}
+
 export function edgeById(script: NetworkScript, id: string) {
   return script.edges.find((edge) => edge.id === id) ?? null;
 }
 
-/** 并查集：只接受候选边，忽略重复/未知 id。 */
-export function selectedEdges(script: NetworkScript, artifact: unknown): { ids: string[]; cost: number; keys: number } {
+/**
+ * 选边统计：只接受候选边，忽略重复/未知 id。
+ *
+ * minKeyEdges 的口径是「至少有几条候选边的一端是关键站点」（与工具文案一致）：
+ * 同一条边即使两端都是关键站点也只算 1 条。旧实现按端点累加，会把一条
+ * 两端都关键的边算成 2，和"边数"的说法对不上。
+ */
+export function selectedEdges(script: NetworkScript, artifact: unknown): NetworkSelection {
   const raw = artifact as NetworkArtifact | null;
   const ids = Array.isArray(raw?.edges)
     ? [...new Set(raw.edges.filter((id): id is string => typeof id === 'string' && edgeById(script, id) !== null))]
     : [];
+  const nodeById = new Map(script.nodes.map((node) => [node.id, node]));
   let cost = 0;
-  let keys = 0;
+  let keyEdges = 0;
+  const keyNodes = new Set<string>();
   for (const id of ids) {
     const edge = edgeById(script, id);
     if (!edge) continue;
     cost += edge.cost;
-    if (script.nodes.find((node) => node.id === edge.a)?.key) keys += 1;
-    if (script.nodes.find((node) => node.id === edge.b)?.key) keys += 1;
+    const aKey = Boolean(nodeById.get(edge.a)?.key);
+    const bKey = Boolean(nodeById.get(edge.b)?.key);
+    if (aKey || bKey) keyEdges += 1;
+    if (aKey) keyNodes.add(edge.a);
+    if (bKey) keyNodes.add(edge.b);
   }
-  return { ids, cost, keys };
+  return {
+    ids,
+    cost,
+    keyEdges,
+    keyStations: keyNodes.size,
+    totalKeyStations: script.nodes.filter((node) => node.key).length,
+  };
 }
 
 export function connectedComponents(script: NetworkScript, ids: string[]): string[][] {
@@ -91,7 +118,7 @@ export function validateNetworkArtifact(script: NetworkScript, artifact: unknown
   if (edges.length > script.maxEdges) {
     return { passed: false, failures: ['network-too-many'], metrics };
   }
-  const { ids, cost, keys } = selectedEdges(script, artifact);
+  const { ids, cost, keyEdges, keyStations, totalKeyStations } = selectedEdges(script, artifact);
   const components = connectedComponents(script, ids);
   if (components.length !== 1) {
     return { passed: false, failures: ['network-disconnected'], metrics: { ...metrics, components: components.length } };
@@ -99,10 +126,18 @@ export function validateNetworkArtifact(script: NetworkScript, artifact: unknown
   if (cost > script.budget) {
     return { passed: false, failures: ['network-budget'], metrics: { ...metrics, cost } };
   }
-  if (keys < script.minKeyEdges) {
-    return { passed: false, failures: ['network-key'], metrics: { ...metrics, keys } };
+  if (keyEdges < script.minKeyEdges) {
+    return {
+      passed: false,
+      failures: ['network-key'],
+      metrics: { ...metrics, keyEdges, keyStations, totalKeyStations },
+    };
   }
-  return { passed: true, failures: [], metrics: { ...metrics, cost, components: 1 } };
+  return {
+    passed: true,
+    failures: [],
+    metrics: { ...metrics, cost, components: 1, keyEdges, keyStations, totalKeyStations },
+  };
 }
 
 /** 最小生成树式参考解：按成本排序后并查集贪心，供内容 solution 与审计用。 */

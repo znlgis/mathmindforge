@@ -197,9 +197,14 @@ export function buildEvidenceProfile(
   const completedStructure = structureLevels.filter((summary) => completed.has(summary.id)).length;
   const completedRule = ruleLevels.filter((summary) => completed.has(summary.id)).length;
   const completedModel = modelLevels.filter((summary) => completed.has(summary.id)).length;
-  const ruleTransfer = ruleLevels.filter(
-    (summary) => completed.has(summary.id) && transferred.has(summary.id),
-  ).length;
+  const ruleVariantLevels = ruleLevels.filter((summary) => {
+    const state = levelState(save, summary.id);
+    return completed.has(summary.id)
+      && Array.isArray(state?.completedVariants)
+      && (state?.completedVariants?.length ?? 0) > 0;
+  }).length;
+  // transferred 仍被结构/建模线消费，保留。
+  void transferred;
 
   let multiVariantModel = 0;
   for (const summary of modelLevels) {
@@ -215,7 +220,7 @@ export function buildEvidenceProfile(
   const anyTransfer = transferred.size > 0;
 
   const structureBand: Band = anyTransfer ? 3 : completedStructure > 0 ? 2 : observed.size > 0 ? 1 : 0;
-  const ruleBand: Band = ruleTransfer > 0
+  const ruleBand: Band = ruleVariantLevels > 0
     ? 3
     : completedRule > 0 && revisedCount > 0
       ? 2
@@ -271,11 +276,14 @@ export function buildEvidenceProfile(
       band: completedRule > 0 && revisedCount > 0 ? 2 : 0,
     },
     {
-      id: 'rule-transfer-levels',
-      label: '带迁移印章的规则关',
-      value: ruleTransfer,
+      // rule 模板不再有迁移门（旋转是刚体变换，恒真，见 docs/12 遗留项 1），
+      // 所以"带迁移印章的规则关"永远是 0。这里换成规则线真正可观测的信号：
+      // 在多张地图上跑通过程序的关卡数（变体通行证里出现过的规则关）。
+      id: 'rule-variant-levels',
+      label: '在多张地图上跑通过程序的规则关',
+      value: ruleVariantLevels,
       sample: ruleLevels.length,
-      band: ruleTransfer > 0 ? 3 : 0,
+      band: ruleVariantLevels > 0 ? 3 : 0,
     },
     {
       id: 'rule-run-events',

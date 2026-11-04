@@ -6,8 +6,8 @@
   "template": "rule",
   "thinkingTarget": "用顺序指令让小火车收星到站",
   "intro": "小火车要沿着轨道收一颗星，再开到终点。先拼一条顺序指令。",
-  "prompt": "让程序收星并到终点；同一段程序在转过的轨道上也要成立。",
-  "done": "你用顺序和重复让小车到站，转个方向也难不倒它。",
+  "prompt": "让程序收星并到终点。",
+  "done": "你用顺序和重复让小车收星到站。",
   "retry": "先看看车头朝哪边，再决定前进和转身的顺序。",
   "tools": [
     {
@@ -228,11 +228,6 @@
       "messageKey": "到终点了，但星星还没收集。",
       "hintKey": "把“收集”放在经过星星的时候。",
       "focus": "star"
-    },
-    "rule-not-general": {
-      "messageKey": "轨道转过之后，程序失效了。",
-      "hintKey": "规则要对旋转后的地图也成立。",
-      "focus": "variant"
     }
   },
   "badges": [
@@ -247,7 +242,7 @@
   "titleEn": "Rule Train",
   "thinkingTargetEn": "Use a sequence of commands to collect a star and reach the station.",
   "introEn": "The train needs to collect one star and stop at the goal. Build a sequence.",
-  "promptEn": "Collect the star, reach the goal, and keep the program valid on a rotated track.",
-  "doneEn": "Your sequence reached the station and survived a turn.",
+  "promptEn": "Collect the star and reach the goal.",
+  "doneEn": "Your sequence collected the star and reached the station.",
   "retryEn": "Check which way the train faces before choosing forward and turn."
 }
