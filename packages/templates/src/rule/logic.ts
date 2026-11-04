@@ -288,6 +288,105 @@ export function traceProgram(source: ScriptSource, program: readonly ProgramBloc
   return executeProgram(scriptOf(source), program);
 }
 
+/* ------------------------------------------------------------------ */
+/* 画布点格画路线：把「点到同一行/列的格子」编译成展开版程序           */
+/* ------------------------------------------------------------------ */
+
+export type RouteClickFailure = 'same-cell' | 'not-straight' | 'behind' | 'blocked' | 'budget';
+
+/** 一次画布点击编译出来的路线计划（场景用来画预览、runtime 用来逐块 place）。 */
+export interface RouteClickPlan {
+  /** 当前程序执行完停在的位置与朝向。 */
+  from: Cell;
+  facing: Direction;
+  target: Cell;
+  /** 需要的转向块；null = 当前朝向正好走这条直线。 */
+  turn: 'left' | 'right' | null;
+  /** 直线距离（格）。 */
+  distance: number;
+  /** 本次点击自动补上的收集块数量。 */
+  collects: number;
+  /** 要追加到程序末尾的块（展开版，不压缩成 repeat）。 */
+  blocks: ProgramBlock[];
+}
+
+export type RouteClickResult =
+  | { ok: true; plan: RouteClickPlan }
+  | { ok: false; reason: RouteClickFailure };
+
+/** 顺时针方向序：north → east → south → west（右转一步 = +1）。 */
+const CLOCKWISE: readonly Direction[] = ['north', 'east', 'south', 'west'];
+
+/**
+ * 把「点目标格」编译成程序块。
+ * 规则（与画布预览一致）：
+ * - 目标必须与当前位置同一行或同一列，且中间没有墙；
+ * - 目标在正前方 → 只追加 forward × 距离；
+ * - 目标在左手边 → 追加 left + forward × 距离；右手边 → right + forward × 距离；
+ * - 正后方不接（一次点击要产生 1~2 类有意义的动作，倒车会塞 3 块）；
+ * - 路过/落在星星上时自动补 collect（和玩家手拼时一样，收集是显式积木）；
+ * - 超过程序格上限、点自己、斜对角、撞墙 → 失败原因，由画布给短暂高亮。
+ * 产物永远是展开版：不生成 repeat / if-wall，简洁印章仍归手拼压缩版。
+ */
+export function planRouteClick(
+  script: RuleScript,
+  program: readonly ProgramBlock[],
+  target: Cell,
+  options: { idPrefix?: string } = {},
+): RouteClickResult {
+  const trace = executeProgram(script, program);
+  const from: Cell = { x: trace.end.x, y: trace.end.y };
+  const facing = trace.end.dir;
+  if (target.x === from.x && target.y === from.y) return { ok: false, reason: 'same-cell' };
+
+  let dir: Direction;
+  if (target.x === from.x) dir = target.y > from.y ? 'north' : 'south';
+  else if (target.y === from.y) dir = target.x > from.x ? 'east' : 'west';
+  else return { ok: false, reason: 'not-straight' };
+
+  const delta = (CLOCKWISE.indexOf(dir) - CLOCKWISE.indexOf(facing) + 4) % 4;
+  if (delta === 2) return { ok: false, reason: 'behind' };
+  const turn: 'left' | 'right' | null = delta === 0 ? null : delta === 1 ? 'right' : 'left';
+  const distance = Math.abs(target.x - from.x) + Math.abs(target.y - from.y);
+
+  const stars = new Set(script.stars.map(cellKey));
+  const collected = new Set(trace.collected.map(cellKey));
+  const prefix = (options.idPrefix ?? 'route').slice(0, 16);
+  const blocks: ProgramBlock[] = [];
+  let serial = 0;
+  const push = (op: ProgramBlock['op']): void => {
+    serial += 1;
+    blocks.push({ id: prefix + '-' + serial, op });
+  };
+
+  if (turn) push(turn);
+  let x = from.x;
+  let y = from.y;
+  let collects = 0;
+  for (let step = 0; step < distance; step += 1) {
+    if (dir === 'north') y += 1;
+    else if (dir === 'south') y -= 1;
+    else if (dir === 'east') x += 1;
+    else x -= 1;
+    if (x < 0 || y < 0 || x >= script.grid.width || y >= script.grid.height) {
+      return { ok: false, reason: 'blocked' };
+    }
+    if (script.walls.some((wall) => wall.x === x && wall.y === y)) return { ok: false, reason: 'blocked' };
+    const key = x + ',' + y;
+    push('forward');
+    if (stars.has(key) && !collected.has(key)) {
+      push('collect');
+      collects += 1;
+    }
+  }
+
+  if (countBlocks(program) + blocks.length > script.maxBlocks) return { ok: false, reason: 'budget' };
+  return {
+    ok: true,
+    plan: { from, facing, target, turn, distance, collects, blocks },
+  };
+}
+
 export const ruleVerifier: TemplateVerifier = {
   parseScript,
   validateArtifact,

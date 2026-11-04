@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clickCanvasCell, interactions, startInteractionMeter } from './shared';
+import { clickCanvasCell, clickRuleCell, interactions, startInteractionMeter } from './shared';
 
 /**
  * 交互次数预算（docs/12 §4 / §7-3）。
@@ -194,16 +194,11 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g13-algorithm-route',
-    // 17 块展开解（12 块重复解更短，但这里取内容里的黄金解，保证与 autoplay 同源）
-    target: 18,
+    // 画布点格画路线：5 次点格（引擎编译成展开版程序）+ 完成 = 6 击（docs/12 §4）
+    target: 6,
     async run(page) {
-      const ops = [
-        'forward', 'forward', 'collect', 'forward', 'forward', 'left',
-        'forward', 'forward', 'collect', 'forward', 'forward', 'left',
-        'forward', 'forward', 'collect', 'forward', 'forward',
-      ];
-      for (const op of ops) {
-        await page.getByTestId('rule-add-' + op).click();
+      for (const [x, y] of [[2, 0], [4, 0], [4, 2], [4, 4], [0, 4]] as const) {
+        await clickRuleCell(page, x, y);
       }
     },
   },

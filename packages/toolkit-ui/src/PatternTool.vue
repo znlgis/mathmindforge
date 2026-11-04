@@ -174,7 +174,10 @@ async function preview(): Promise<void> {
 
     <div>
       <p class="text-sm font-bold text-ink">{{ translate('pattern.cycle') }}</p>
-      <p class="mt-1 text-xs text-ink-soft">带子里重复的那几格就是答案，点一下选中。</p>
+      <p v-if="committed" class="mt-1 text-xs text-ink-soft">带子里重复的那几格就是答案，点一下选中。</p>
+      <p v-else class="mt-1 text-xs font-bold text-brass" data-testid="pattern-rule-hint">
+        先点一条候选规律，再补画布上的缺口（完成时要用到这条规律）。
+      </p>
       <div class="mt-2 flex flex-wrap gap-2">
         <button
           v-for="candidate in candidates"
@@ -184,7 +187,9 @@ async function preview(): Promise<void> {
           :disabled="busy"
           :aria-pressed="selectedKey === candidate.key"
           class="min-h-11 rounded-2xl border px-3 text-sm font-bold active:scale-95 disabled:opacity-40"
-          :class="selectedKey === candidate.key ? 'border-teal bg-mint text-teal' : 'border-grid bg-paper text-ink'"
+          :class="selectedKey === candidate.key
+            ? 'border-teal bg-mint text-teal'
+            : (committed ? 'border-grid bg-paper text-ink' : 'border-brass bg-brass/10 text-ink')"
           @click="pickRule(candidate.tokens, candidate.transform)"
         >
           {{ candidate.label }}

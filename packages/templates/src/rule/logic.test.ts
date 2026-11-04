@@ -4,7 +4,7 @@ import detailJson from '../../../content/src/details/g13-algorithm-route.level.j
 import trainJson from '../../../content/src/details/k-algorithm-train.level.json';
 import { executeProgram } from './engine';
 import {
-  BASE_VARIANT, FAILURE_CLASSES, actionsFor, applyVariant, countBlocks, parseScript,
+  BASE_VARIANT, FAILURE_CLASSES, actionsFor, applyVariant, countBlocks, parseScript, planRouteClick,
   reachableFailureClasses, ruleVerifier, validateArtifact,
 } from './logic';
 import type { RuleVariant } from './logic';
@@ -325,5 +325,106 @@ describe('交互次数口径（拼程序 + 完成）', () => {
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(result.verdict?.passed).toBe(true);
     expect(program.length + 1).toBe(13);
+  });
+});
+describe('画布点格画路线（rule/place 追加展开版程序）', () => {
+  function runtimeOf(source: LevelDetail) {
+    return createRuleRuntime(source, {
+      seed: 101, now: () => 1_700_000_000_000, locale: 'zh-CN', reducedMotion: true,
+    });
+  }
+
+  /** 复刻 scene.ts 的一次画布点击：计划 → 逐块 rule/place 追加到末尾。 */
+  async function clickRoute(
+    runtime: ReturnType<typeof runtimeOf>,
+    routeScript: RuleScript,
+    target: { x: number; y: number },
+    prefix: string,
+  ): Promise<{ ok: boolean; reason?: string; blocks: ProgramBlock[] }> {
+    const program = runtime.snapshot().toolState.rule?.program ?? [];
+    const plan = planRouteClick(routeScript, program, target, { idPrefix: prefix });
+    if (!plan.ok) return { ok: false, reason: plan.reason, blocks: [] };
+    for (const [offset, block] of plan.plan.blocks.entries()) {
+      const result = await runtime.dispatch({
+        type: 'rule/place',
+        payload: { block, at: program.length + offset },
+      });
+      expect(result.ok, 'append ' + block.op + ' @' + offset).toBe(true);
+    }
+    return { ok: true, blocks: plan.plan.blocks };
+  }
+
+  it('g13-algorithm-route：5 次画布点格走完全程 + 完成 = 6 击，产物是展开版 17 块', async () => {
+    const runtime = runtimeOf(detail);
+    const targets = [{ x: 2, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 2 }, { x: 4, y: 4 }, { x: 0, y: 4 }];
+    let clicks = 0;
+    for (const target of targets) {
+      const result = await clickRoute(runtime, script, target, 'c' + (clicks + 1));
+      expect(result.ok, 'click ' + (clicks + 1) + ' -> ' + target.x + ',' + target.y).toBe(true);
+      clicks += 1;
+    }
+    const program = runtime.snapshot().toolState.rule?.program ?? [];
+    // 不自动压缩：画路线得到的是展开版（17 块、没有 repeat / if-wall）。
+    expect(program).toHaveLength(17);
+    expect(program.every((block) => block.op !== 'repeat' && block.op !== 'if-wall')).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    clicks += 1;
+    expect(result.verdict?.passed).toBe(true);
+    // 简洁印章仍归手拼压缩版：17 块 > 14，画路线拿不到 simple。
+    expect(result.verdict?.stamps).not.toContain('simple');
+    expect(result.verdict?.stamps).toContain('constraint');
+    expect(clicks).toBe(6);
+  });
+
+  it('画路线只追加展开版：手拼的重复解才拿简洁印章', async () => {
+    const runtime = runtimeOf(detail);
+    const program = REPEAT;
+    for (const [index, block] of program.entries()) {
+      await runtime.dispatch({ type: 'rule/place', payload: { block, at: index } });
+    }
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+    expect(program.length).toBe(12);
+    expect(result.verdict?.stamps).toContain('simple');
+  });
+
+  it('编译规则：正前方=前进、左右=先转再走、路过星星自动收集', () => {
+    const first = planRouteClick(script, [], { x: 2, y: 0 }, { idPrefix: 'a' });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.plan.turn).toBe(null);
+    expect(first.plan.blocks.map((block) => block.op)).toEqual(['forward', 'forward', 'collect']);
+
+    const turn = planRouteClick(script, [], { x: 0, y: 2 }, { idPrefix: 'b' });
+    expect(turn.ok).toBe(true);
+    if (!turn.ok) return;
+    // 起点朝东，北边是左手边：left ×1 + forward ×2。
+    expect(turn.plan.turn).toBe('left');
+    expect(turn.plan.blocks.map((block) => block.op)).toEqual(['left', 'forward', 'forward']);
+  });
+
+  it('不可达点击不发动作，并给出可区分的原因', () => {
+    const same = planRouteClick(script, [], { x: 0, y: 0 });
+    expect(same.ok ? '' : same.reason).toBe('same-cell');
+    const diagonal = planRouteClick(script, [], { x: 2, y: 2 });
+    expect(diagonal.ok ? '' : diagonal.reason).toBe('not-straight');
+    // 出界 = 撞墙。
+    const outOfBoard = planRouteClick(script, [], { x: 9, y: 0 });
+    expect(outOfBoard.ok ? '' : outOfBoard.reason).toBe('blocked');
+    // 朝东时正后方（西）相邻格不接：倒车要 3 块，不符合一次点击 1~2 块的规则。
+    const program = (detail.solutions[1]?.artifact as { program: ProgramBlock[] }).program;
+    const behind = planRouteClick(script, program, { x: 3, y: 4 });
+    expect(behind.ok ? '' : behind.reason).toBe('behind');
+  });
+
+  it('k-algorithm-train：一次点击到终点（自动收集），2 击通关', async () => {
+    const train = trainJson as unknown as LevelDetail;
+    const trainScript = parseScript(train.levelScript);
+    const runtime = runtimeOf(train);
+    const clicked = await clickRoute(runtime, trainScript, { x: 4, y: 0 }, 'k1');
+    expect(clicked.ok).toBe(true);
+    expect(clicked.blocks.map((block) => block.op)).toEqual(['forward', 'forward', 'collect', 'forward', 'forward']);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { SHIPPED_LEVEL_IDS } from '../packages/content/src/ids';
-import { clickCanvasCell, openTool, saveSnapshot, waitEvent } from './shared';
+import { clickCanvasCell, clickRuleCell, openTool, saveSnapshot, startInteractionMeter, interactions, waitEvent } from './shared';
 
 const M1_LEVELS = SHIPPED_LEVEL_IDS.filter((id) => id !== 'k-structure-pattern-path');
 
@@ -118,6 +118,35 @@ test('真实点击：对称补墙在画布上点三格', async ({ page }) => {
   await clickCanvasCell(page, 5);
   await page.getByTestId('level-submit').click();
   await expect(page.getByTestId('completion-panel')).toBeVisible();
+});
+
+test('真实点击：规则关在画布上点格子画路线（≤6 击）', async ({ page }) => {
+  await page.goto('/#/play/g13-algorithm-route');
+  await expect(page.getByTestId('rule-tool')).toBeVisible();
+  await startInteractionMeter(page);
+
+  // 起点 (0,0) 朝东：点 5 个拐点，引擎编译成展开版程序（不自动压缩成重复块）
+  for (const [x, y] of [[2, 0], [4, 0], [4, 2], [4, 4], [0, 4]] as const) {
+    await clickRuleCell(page, x, y);
+  }
+  await expect(page.getByTestId('rule-program')).not.toContainText('还没有积木');
+
+  await page.getByTestId('level-submit').click();
+  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  const used = await interactions(page);
+  // 5 次点格 + 1 次完成 = 6 击（docs/12 §4）
+  expect(used).toBeLessThanOrEqual(6);
+});
+
+test('真实点击：规则关画布点格产出展开版程序，不自动压缩', async ({ page }) => {
+  await page.goto('/#/play/g13-algorithm-route');
+  await expect(page.getByTestId('rule-tool')).toBeVisible();
+
+  await clickRuleCell(page, 2, 0);
+  await expect(page.getByTestId('rule-program')).toContainText('前进');
+  // 画路线只给展开版：程序列表里不会凭空出现"重复"块（简洁印章仍归手拼版）
+  await expect(page.getByTestId('rule-program')).not.toContainText('重复');
 });
 
 test('完成面板显示变体通行证（换表征迁移门）', async ({ page }) => {

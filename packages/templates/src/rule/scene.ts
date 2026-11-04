@@ -1,11 +1,14 @@
 import type Phaser from 'phaser';
-import type { LevelContext, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
+import type {
+  LevelAction, LevelContext, LevelRuntime, ProgramBlock, RunSnapshot,
+} from '@mmf/game-kit';
 import {
-  BaseScene, PALETTE, centeredLabel, circle, label, roundRect, toColor,
+  BaseScene, PALETTE, centeredLabel, circle, dashLine, label, roundRect, toColor,
 } from '@mmf/canvas-kit';
 import { cellKey, executeProgram } from './engine';
 import type { RuleTrace } from './engine';
-import { parseScript } from './logic';
+import { parseScript, planRouteClick } from './logic';
+import type { RouteClickPlan } from './logic';
 import type { Cell, RuleScript } from './schema';
 
 const CELL = 100;
@@ -31,7 +34,9 @@ const ARROW_ANGLE = { north: -Math.PI / 2, east: 0, south: Math.PI / 2, west: Ma
 
 /**
  * 规则关画布：一张 5×5 的路线图纸。
- * 只读 runtime 快照重绘；没有任何指针处理，所有动作都从 ToolDock 派发。
+ * 快照驱动重绘；同时是一条输入路径：点同排/同列的格子会把路线编译成
+ * 展开版程序块（rule/place 追加到末尾），与右侧积木按钮产出同一个 program。
+ * 右侧按钮全部保留：手拼重复块、无指针设备时仍然走 ToolDock。
  */
 class RuleScene extends BaseScene {
   private readonly runtime: LevelRuntime;
@@ -41,6 +46,13 @@ class RuleScene extends BaseScene {
   private lastSignature = '';
   private originX = 0;
   private originY = 0;
+  /** 悬停预览层：点这里会发生什么（虚线 + 箭头 + 转向弧），与重绘层分开。 */
+  private hover: Phaser.GameObjects.Graphics | null = null;
+  /** 点不中时的短暂高亮层（不弹模态，只闪一下）。 */
+  private flash: Phaser.GameObjects.Graphics | null = null;
+  /** 一次点击会连发多个 rule/place；派发期间忽略新点击，避免 at 下标打架。 */
+  private dispatching = false;
+  private clickSeq = 0;
 
   constructor(ctx: LevelContext, runtime: LevelRuntime) {
     super(ctx.manifest.id, ctx);
@@ -63,11 +75,23 @@ class RuleScene extends BaseScene {
     this.originX = (this.W - spanOf(this.script.grid.width)) / 2;
     this.originY = this.headerHeight + 26;
     this.layer = this.add.container(0, 0).setDepth(10);
+    this.hover = this.add.graphics().setDepth(12);
+    this.flash = this.add.graphics().setDepth(13);
+
+    this.input.on('pointerdown', this.handlePointerDown, this);
+    this.input.on('pointermove', this.handlePointerMove, this);
+    this.input.on('gameout', this.clearHover, this);
 
     this.unsubscribe = this.runtime.subscribe((snapshot) => this.render(snapshot));
     this.onShutdownCleanup(() => {
       this.unsubscribe?.();
       this.unsubscribe = null;
+      this.input.off('pointerdown', this.handlePointerDown, this);
+      this.input.off('pointermove', this.handlePointerMove, this);
+      this.input.off('gameout', this.clearHover, this);
+      this.hover = null;
+      this.flash = null;
+      this.setCanvasCursor(false);
     });
 
     this.render(this.runtime.snapshot());
@@ -81,6 +105,167 @@ class RuleScene extends BaseScene {
       x: this.originX + cell.x * (CELL + GAP) + CELL / 2,
       y: this.originY + (height - 1 - cell.y) * (CELL + GAP) + CELL / 2,
     };
+  }
+
+  /** 屏幕点 → 格子：命中格内矩形，点缝里也算最近的格子之外一律 null。 */
+  private cellAt(worldX: number, worldY: number): Cell | null {
+    const script = this.script;
+    if (!script) return null;
+    for (let y = 0; y < script.grid.height; y += 1) {
+      for (let x = 0; x < script.grid.width; x += 1) {
+        const point = this.centerOf({ x, y });
+        if (Math.abs(worldX - point.x) <= CELL / 2 + 2 && Math.abs(worldY - point.y) <= CELL / 2 + 2) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  }
+
+  /** 从当前快照把「点这一格」编译成路线；悬停和点击用同一份计划，规则自解释。 */
+  private planAt(cell: Cell, idPrefix: string): {
+    program: ProgramBlock[];
+    result: ReturnType<typeof planRouteClick>;
+  } | null {
+    const script = this.script;
+    if (!script) return null;
+    const snapshot = this.runtime.snapshot();
+    const program = snapshot.toolState.rule?.program ?? [];
+    return { program, result: planRouteClick(script, program, cell, { idPrefix }) };
+  }
+
+  private handlePointerDown(pointer: Phaser.Input.Pointer): void {
+    const cell = this.cellAt(pointer.worldX, pointer.worldY);
+    if (!cell || this.dispatching) return;
+    this.clickSeq += 1;
+    const planned = this.planAt(cell, 'c' + this.clickSeq);
+    if (!planned || !planned.result.ok) {
+      // 点车头/不可达：不发动作，只闪一下红环 + 叉（不弹模态）。
+      this.flashReject(cell);
+      return;
+    }
+    if (planned.result.plan.blocks.length === 0) return;
+    const base = planned.program.length;
+    const blocks = planned.result.plan.blocks;
+    this.dispatching = true;
+    this.hover?.clear();
+    void (async () => {
+      try {
+        for (const [offset, block] of blocks.entries()) {
+          const action: LevelAction = {
+            type: 'rule/place',
+            payload: { block, at: base + offset },
+          };
+          const result = await this.runtime.dispatch(action);
+          if (!result.ok) break;
+        }
+      } finally {
+        this.dispatching = false;
+      }
+    })();
+  }
+
+  private handlePointerMove(pointer: Phaser.Input.Pointer): void {
+    const hover = this.hover;
+    if (!hover) return;
+    const cell = this.cellAt(pointer.worldX, pointer.worldY);
+    this.setCanvasCursor(cell !== null);
+    hover.clear();
+    if (!cell) return;
+    const planned = this.planAt(cell, 'p');
+    if (!planned) return;
+    if (!planned.result.ok) {
+      this.drawRejectHint(hover, cell);
+      return;
+    }
+    this.drawRoutePreview(hover, planned.result.plan);
+  }
+
+  /** 指针离开画布：收掉悬停预览与手型光标。 */
+  private clearHover(): void {
+    this.hover?.clear();
+    this.setCanvasCursor(false);
+  }
+
+  /** 让「可点」在鼠标上看得见；触屏没有指针样式，不影响。 */
+  private setCanvasCursor(pointer: boolean): void {
+    const canvas = this.input.manager?.canvas;
+    if (canvas) canvas.style.cursor = pointer ? 'pointer' : 'default';
+  }
+
+  /** 悬停预览：虚线 + 箭头 + 转向弧 + 距离，告诉玩家这一下会追加什么。 */
+  private drawRoutePreview(g: Phaser.GameObjects.Graphics, plan: RouteClickPlan): void {
+    const start = this.centerOf(plan.from);
+    const end = this.centerOf(plan.target);
+    const tint = plan.turn ? PALETTE.brass : PALETTE.teal;
+    dashLine(g, start.x, start.y, end.x, end.y, {
+      color: tint,
+      lineWidth: 4,
+      dash: 9,
+      gap: 6,
+      alpha: 0.55,
+    });
+    const angle = Math.atan2(end.y - start.y, end.x - start.x);
+    const tipX = end.x - Math.cos(angle) * 18;
+    const tipY = end.y - Math.sin(angle) * 18;
+    g.fillStyle(toColor(tint), 0.75);
+    g.fillTriangle(
+      tipX + Math.cos(angle) * 12, tipY + Math.sin(angle) * 12,
+      tipX + Math.cos(angle + 2.5) * 12, tipY + Math.sin(angle + 2.5) * 12,
+      tipX + Math.cos(angle - 2.5) * 12, tipY + Math.sin(angle - 2.5) * 12,
+    );
+    circle(g, end.x, end.y, 16, {
+      fill: tint,
+      fillAlpha: 0.14,
+      stroke: tint,
+      lineWidth: 2,
+    });
+    if (plan.turn) {
+      g.lineStyle(3, toColor(PALETTE.brass), 0.7);
+      g.beginPath();
+      g.arc(start.x, start.y, 24, angle - Math.PI / 2, angle - Math.PI / 2 + (plan.turn === 'right' ? Math.PI / 2 : -Math.PI / 2), plan.turn === 'left');
+      g.strokePath();
+    }
+  }
+
+  /** 不可达提示：红色虚线环 + 叉，和悬停预览同一个视觉语言。 */
+  private drawRejectHint(g: Phaser.GameObjects.Graphics, cell: Cell): void {
+    const point = this.centerOf(cell);
+    for (let index = 0; index < 12; index += 1) {
+      const from = (index / 12) * Math.PI * 2;
+      const to = ((index + 0.55) / 12) * Math.PI * 2;
+      g.lineStyle(3, toColor(PALETTE.red), 0.5);
+      g.beginPath();
+      g.arc(point.x, point.y, 34, from, to);
+      g.strokePath();
+    }
+    g.lineStyle(4, toColor(PALETTE.red), 0.65);
+    g.lineBetween(point.x - 12, point.y - 12, point.x + 12, point.y + 12);
+    g.lineBetween(point.x - 12, point.y + 12, point.x + 12, point.y - 12);
+  }
+
+  /** 点不中时闪一下：红环 + 叉，520ms 淡出。 */
+  private flashReject(cell: Cell): void {
+    const flash = this.flash;
+    if (!flash) return;
+    this.tweens.killTweensOf(flash);
+    flash.clear();
+    flash.setAlpha(1);
+    this.drawRejectHint(flash, cell);
+    // 场景卸载后 self.flash 会被清理成 null；回调统一走这个守卫，避免操作已销毁的显示对象。
+    const clearFlash = (): void => { this.flash?.clear(); };
+    if (this.reducedMotion) {
+      this.time.delayedCall(520, clearFlash);
+      return;
+    }
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 520,
+      delay: 120,
+      ease: 'Sine.easeIn',
+      onComplete: clearFlash,
+    });
   }
 
   private render(snapshot: RunSnapshot): void {

@@ -152,7 +152,7 @@ const canMoveDown = computed(() => (
     <div>
       <p class="text-sm font-bold text-ink">拼一条程序</p>
       <p class="mt-1 text-xs text-ink-soft">
-        从上往下执行；重复格会把里面的积木执行多次。
+        从上往下执行；重复格会把里面的积木执行多次。也可以直接在画布上点格子铺路线。
       </p>
       <div class="mt-2 grid grid-cols-2 gap-2">
         <button

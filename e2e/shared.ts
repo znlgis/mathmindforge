@@ -47,23 +47,47 @@ export async function interactions(page: Page): Promise<number> {
 }
 
 /**
- * 点击 Phaser 画布上的第 index 个格子（0-based）。
+ * 把设计坐标映射到屏幕像素。
  *
- * 画布是 900×560 设计坐标按容器等比缩放的 <canvas>，所以先把设计坐标
- * （PATH_LAYOUT：startX=70 / y=320 / cellW=56 / gap=8）映射到实际像素。
- * pattern 关的"填答案"就走这里：点空格 = 填一格，点已填格 = 换下一个字母。
+ * 每个模板的设计画布尺寸不同（pattern 900×560、rule 720×720），Phaser 用 FIT + CENTER_BOTH
+ * 等比缩放后居中，所以必须按**实际 canvas 元素**的矩形换算，不能写死一套尺寸。
  */
+async function designToScreen(
+  page: Page,
+  design: { width: number; height: number },
+  x: number,
+  y: number,
+): Promise<{ x: number; y: number }> {
+  const canvas = page.locator('[data-testid="level-canvas"] canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('level-canvas 里的 canvas 还没有渲染出来');
+  const scale = Math.min(box.width / design.width, box.height / design.height);
+  const offsetX = box.x + (box.width - design.width * scale) / 2;
+  const offsetY = box.y + (box.height - design.height * scale) / 2;
+  return { x: offsetX + x * scale, y: offsetY + y * scale };
+}
+
+/** pattern 关：点带子上的第 index 个格子（0-based）。点空格=填一格，点已填格=换下一个字母。 */
 export async function clickCanvasCell(page: Page, index: number): Promise<void> {
-  const box = await page.getByTestId('level-canvas').boundingBox();
-  if (!box) throw new Error('level-canvas 还没有渲染出来');
-  const DESIGN_W = 900;
-  const DESIGN_H = 560;
-  const scale = Math.min(box.width / DESIGN_W, box.height / DESIGN_H);
-  const offsetX = box.x + (box.width - DESIGN_W * scale) / 2;
-  const offsetY = box.y + (box.height - DESIGN_H * scale) / 2;
-  const worldX = 70 + index * (56 + 8) + 56 / 2;
-  const worldY = 320 + 76 / 2;
-  await page.mouse.click(offsetX + worldX * scale, offsetY + worldY * scale);
+  const point = await designToScreen(page, { width: 900, height: 560 }, 70 + index * (56 + 8) + 56 / 2, 320 + 76 / 2);
+  await page.mouse.click(point.x, point.y);
+}
+
+/**
+ * rule 关：点地图上的格子 (x, y)。场景布局见 packages/templates/src/rule/scene.ts：
+ * CELL=100 / GAP=10 / 5×5，origin 居中、y 轴向上（屏幕行 = height-1-y）。
+ */
+export async function clickRuleCell(page: Page, x: number, y: number): Promise<void> {
+  const grid = { width: 5, height: 5 };
+  const cell = 100;
+  const gap = 10;
+  const span = grid.width * cell + (grid.width - 1) * gap;
+  const originX = (720 - span) / 2;
+  const originY = 84 + 26;
+  const worldX = originX + x * (cell + gap) + cell / 2;
+  const worldY = originY + (grid.height - 1 - y) * (cell + gap) + cell / 2;
+  const point = await designToScreen(page, { width: 720, height: 720 }, worldX, worldY);
+  await page.mouse.click(point.x, point.y);
 }
 
 export async function events(page: Page): Promise<string[]> {
