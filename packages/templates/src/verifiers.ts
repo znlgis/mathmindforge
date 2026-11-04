@@ -54,8 +54,6 @@ const argueVerifierShape: TemplateVerifier = {
   actionsFor: (detail, variant, artifact) => argueVerifier.actionsFor(detail, variant, artifact),
   applyVariant: (detail, variant) => argueVerifier.applyVariant(detail, variant),
   reachableFailureClasses: (detail) => argueVerifier.reachableFailureClasses(detail),
-  transferVariants: (detail) => argueVerifier.transferVariants(detail),
-  transferFailureClass: (detail) => argueVerifier.transferFailureClass(detail),
 };
 
 const experimentVerifier: TemplateVerifier = {

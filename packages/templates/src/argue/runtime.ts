@@ -7,7 +7,7 @@ import type { AdapterResult, RuntimeAdapter } from '../shared/runtime';
 import { boardCells, boardCounts, impossibleByInvariant } from './engine';
 import type { BoardCounts } from './engine';
 import {
-  actionsFor, parseScript, summarizeArgument, transferFailureClass, transferVariants, validateArtifact,
+  actionsFor, parseScript, summarizeArgument, validateArtifact,
 } from './logic';
 import type { ArgueScript } from './schema';
 
@@ -247,9 +247,7 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
     // 只留一个事实来源：黄金动作序列与迁移门都委托给 logic.ts。
     actionsFor: (detail, variant, artifact) => actionsFor(detail, variant, artifact),
 
-    transferVariants: (detail) => transferVariants(detail),
 
-    transferFailureClass: (detail) => transferFailureClass(detail),
   };
 }
 

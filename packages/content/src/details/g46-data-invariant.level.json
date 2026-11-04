@@ -291,11 +291,6 @@
       "messageKey": "适用范围写错了。",
       "hintKey": "这是 1×2 多米诺铺满。",
       "focus": "scope"
-    },
-    "argue-not-general": {
-      "messageKey": "棋盘转过之后，你的论证没跟上。",
-      "hintKey": "不变量要在旋转后的棋盘上也成立。",
-      "focus": "variant"
     }
   },
   "badges": [

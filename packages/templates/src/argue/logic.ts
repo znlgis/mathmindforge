@@ -5,7 +5,7 @@ import { digest } from '@mmf/toolkit/shared';
 import type { RuntimeVariant } from '../shared/types';
 import { argueScriptSchema } from './schema';
 import type { ArgueScript } from './schema';
-import { boardCounts, rotateRemoved, rotationFlipsColoring, warrantDecides } from './engine';
+import { boardCounts, rotateRemoved, warrantDecides } from './engine';
 import type { BoardCounts } from './engine';
 
 export const FAILURE_CLASSES = [
@@ -14,7 +14,6 @@ export const FAILURE_CLASSES = [
   'argue-invariant-false',
   'argue-evidence-missing',
   'argue-scope-wrong',
-  'argue-not-general',
 ] as const;
 export type ArgueFailureClass = (typeof FAILURE_CLASSES)[number];
 
@@ -154,24 +153,14 @@ export function reachableFailureClasses(_input?: ArgueScript | LevelDetail): str
   return [...FAILURE_CLASSES];
 }
 
-/**
- * 迁移门只收「不改变棋盘染色」的旋转。
+/*
+ * 迁移门：**故意不做**（2026-11 收口，见 docs/12 §11）。
  *
- * 90°/270° 在偶数边棋盘上会把整张棋盘的棋盘染色翻转（黑白计数互换），任何计数型证书都会
- * 因为坐标系换色而失配——那是几何事实，不是论证不够一般。所以偶数边棋盘只留 180°
- * （它把 (x,y) 送到 (width-1-x, height-1-y)，奇偶差是偶数）。
+ * 论证证书的内容是黑白计数，而任何保持棋盘染色的旋转都不改变计数——校验器重算计数后
+ * 必然仍相等，所以这类旋转在这个模板里恒真，是一道同义反复的门。
+ * 换棋盘几何或换变体类型才可能有判别力，但那是内容设计决策，不是判定层能凭空补的。
+ * 因此 argue 不发 transfer 印章；真正的迁移门由 pattern 的换表征（符号/颜色重标）承担。
  */
-export function transferVariants(detail: LevelDetail): RuntimeVariant[] {
-  const script = parseScript(detail.levelScript);
-  const quarters: (1 | 2)[] = [1, 2];
-  return quarters
-    .filter((quarter) => !rotationFlipsColoring(script, quarter))
-    .map((quarter) => ({ id: 'v-rotate-' + quarter * 90, axis: 'structure', patch: { rotate: quarter * 90 } }));
-}
-
-export function transferFailureClass(_detail: LevelDetail): string {
-  return 'argue-not-general';
-}
 
 export const argueVerifier = {
   parseScript,
@@ -179,6 +168,5 @@ export const argueVerifier = {
   actionsFor,
   applyVariant,
   reachableFailureClasses,
-  transferVariants,
-  transferFailureClass,
+
 };

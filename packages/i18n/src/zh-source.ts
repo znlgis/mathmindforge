@@ -113,8 +113,6 @@ export const zhSourceEn: Record<string, string> = {
   '先统计，再把数据挂到论证上。': 'Count first, then attach the data to the argument.',
   '适用范围写错了。': 'The scope is wrong.',
   '这是 1×2 多米诺铺满。': 'This is a 1×2 domino tiling.',
-  '棋盘转过之后，你的论证没跟上。': 'Your argument does not survive rotating the board.',
-  '不变量要在旋转后的棋盘上也成立。': 'The invariant must also hold on the rotated board.',
   '先真的铺一块试试': 'Actually place a tile first',
   '统计黑白格或总格数': 'Count black/white cells or total cells',
   '在论证板上点一条依据': 'Pick one warrant on the argument board',
@@ -194,7 +192,6 @@ export const zhSourceEn: Record<string, string> = {
   '证据和图形对不上，或这个量其实不能排除铺满。': 'The evidence does not match the board, or this quantity cannot actually rule out a tiling.',
   '重新数一遍，并检查每次铺一块这个量会怎么变。': 'Recount, and check how this quantity changes with each tile.',
   '这是 1×2 多米诺铺满，不是任意铺砌。': 'This is a 1×2 domino tiling, not an arbitrary tiling.',
-  '棋盘转过之后，你的论证没有跟上。': 'Your argument does not hold once the board is rotated.',
 
   // ── g1012-algorithm-frontier（construct · frontier）──────────────────
   '还没有给边设代价。': 'No edge costs set yet.',

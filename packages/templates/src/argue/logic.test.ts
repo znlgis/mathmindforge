@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LEVEL_DETAILS } from '@mmf/content/full';
 import type { ShippedLevelId } from '@mmf/content/full';
 import { createArgueRuntime } from './runtime';
-import { actionsFor, applyVariant, parseScript, transferVariants, validateArtifact } from './logic';
+import { actionsFor, applyVariant, parseScript, validateArtifact } from './logic';
 import { boardCounts, rotationFlipsColoring, warrantDecides } from './engine';
 import type { RuntimeVariant } from '../shared/types';
 
@@ -37,13 +37,13 @@ describe('argue template', () => {
     }
   });
 
-  it('certificate survives the transfer gate', () => {
+  it('does not pretend to have a transfer gate', () => {
+    // 论证证书的内容是黑白计数，任何保持棋盘染色的旋转都不改变计数（见 docs/12 §11），
+    // 所以这里故意没有迁移门：模板不导出 transferVariants，也就不发 transfer 印章。
     for (const id of ARGUE_LEVELS) {
-      for (const variant of transferVariants(LEVEL_DETAILS[id])) {
-        const verdict = validateArtifact(LEVEL_DETAILS[id], variant, LEVEL_DETAILS[id].solutions[0].artifact);
-        expect(verdict.passed, id + ' ' + variant.id + ' ' + verdict.failure?.class).toBe(true);
-        expect(verdict.stamps).toContain('transfer');
-      }
+      const verdict = validateArtifact(LEVEL_DETAILS[id], base, LEVEL_DETAILS[id].solutions[0].artifact);
+      expect(verdict.passed, id).toBe(true);
+      expect(verdict.stamps).not.toContain('transfer');
     }
   });
 
@@ -142,15 +142,15 @@ describe('argue template', () => {
     }
   });
 
-  it('drops the parity-flipping rotation from the transfer gate', () => {
+  it('rotation never changes the counting evidence (why there is no transfer gate)', () => {
     const eight = parseScript(tiling.levelScript);
-    // 偶数边棋盘转 90° 会把棋盘染色整体翻转：黑白计数互换。
+    // 8×8 转 90° 会把棋盘染色整体翻转：黑白计数互换，但"是否相等"这个判断不变。
     expect(rotationFlipsColoring(eight, 1)).toBe(true);
     const rotated = applyVariant(eight, { id: 'v-rotate-90', axis: 'structure', patch: { rotate: 90 } });
     expect(boardCounts(rotated)).toEqual({ black: 32, white: 30, cells: 62 });
-    // 所以 8×8 的迁移门只收 180°；奇数边棋盘照旧保留 90° + 180°。
-    expect(transferVariants(tiling).map((variant) => variant.id)).toEqual(['v-rotate-180']);
-    expect(transferVariants(detail).map((variant) => variant.id)).toEqual(['v-rotate-90', 'v-rotate-180']);
+    // 奇数格棋盘转 90° 连计数都不变 —— 两种情况下证书都"自动成立"，所以这道门没有判别力。
+    const rotatedOdd = applyVariant(parseScript(detail.levelScript), { id: 'v-rotate-90', axis: 'structure', patch: { rotate: 90 } });
+    expect(boardCounts(rotatedOdd)).toEqual(boardCounts(parseScript(detail.levelScript)));
   });
 
   it('keeps the probe sample size aligned with the board cell count', () => {
