@@ -116,6 +116,111 @@ const BUDGETS: Budget[] = [
       await page.getByTestId('argue-warrant-coloring').click();
     },
   },
+  {
+    id: 'g13-modeling-pack',
+    target: 6,
+    async run(page) {
+      // 每盒三类各一件的黄金解：先配第一个盒子，再一键照分
+      await page.getByTestId('dist-plus-0-block').click();
+      await page.getByTestId('dist-plus-0-ball').click();
+      await page.getByTestId('dist-plus-0-book').click();
+      await page.getByTestId('dist-copy-first').click();
+    },
+  },
+  {
+    id: 'g46-algorithm-payment',
+    target: 11,
+    async run(page) {
+      await page.getByTestId('payment-add-3').click();
+      await page.getByTestId('payment-add-3').click();
+      await page.getByTestId('tool-card-toggle-counter-1').click();
+      const target = page.getByTestId('counter-target');
+      await target.fill('10');
+      await target.blur();
+      for (const denom of ['1', '3', '4']) {
+        await page.getByTestId('counter-denom-' + denom).click();
+      }
+      await page.getByTestId('counter-premise-greedy-optimal').click();
+    },
+  },
+  {
+    id: 'g13-data-weather',
+    target: 8,
+    async run(page) {
+      await page.getByTestId('tally-dump').click();
+      for (const [id, count] of [['sunny', '5'], ['cloudy', '4'], ['rainy', '3'], ['snowy', '2']] as const) {
+        const input = page.getByTestId('tally-input-' + id);
+        await input.fill(count);
+        await input.blur();
+      }
+      await page.getByTestId('tally-claim-most-sunny').click();
+    },
+  },
+  {
+    id: 'g1012-modeling-winrate',
+    target: 7,
+    async run(page) {
+      // 3 个数字框填 50/50/0，再跑满 1000 局并下结论
+      for (const [key, value] of [['attack', '50'], ['defense', '50'], ['economy', '0']] as const) {
+        const input = page.getByTestId('knob-' + key);
+        await input.fill(value);
+        await input.blur();
+      }
+      await page.getByTestId('knob-run').click();
+      // 结论按钮在第二张卡（数据采集器）里，先展开再点——这是 1 次真实交互
+      await page.getByTestId('tool-card-toggle-probe-1').click();
+      await page.getByTestId('sample-claim').click();
+    },
+  },
+  {
+    id: 'g46-modeling-queue',
+    target: 5,
+    async run(page) {
+      const serviceTime = page.getByTestId('knob-serviceTime');
+      await serviceTime.fill('2');
+      await serviceTime.blur();
+      await page.getByTestId('knob-run').click();
+    },
+  },
+  {
+    id: 'g79-modeling-dispatch',
+    target: 5,
+    async run(page) {
+      const vehicles = page.getByTestId('knob-vehicles');
+      await vehicles.fill('3');
+      await vehicles.blur();
+      await page.getByTestId('knob-run').click();
+    },
+  },
+  {
+    id: 'g13-algorithm-route',
+    // 17 块展开解（12 块重复解更短，但这里取内容里的黄金解，保证与 autoplay 同源）
+    target: 18,
+    async run(page) {
+      const ops = [
+        'forward', 'forward', 'collect', 'forward', 'forward', 'left',
+        'forward', 'forward', 'collect', 'forward', 'forward', 'left',
+        'forward', 'forward', 'collect', 'forward', 'forward',
+      ];
+      for (const op of ops) {
+        await page.getByTestId('rule-add-' + op).click();
+      }
+    },
+  },
+  {
+    id: 'g46-data-invariant',
+    target: 5,
+    async run(page) {
+      await page.getByTestId('argue-warrant-coloring').click();
+    },
+  },
+  {
+    id: 'g46-structure-tiling',
+    target: 5,
+    async run(page) {
+      await page.getByTestId('argue-warrant-coloring').click();
+    },
+  },
 ];
 
 for (const budget of BUDGETS) {
