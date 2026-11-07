@@ -14,7 +14,7 @@ export function defineExperimentLevel(manifest: LevelManifest): LevelModule {
       return createExperimentRuntime(detail, opts);
     },
     async mount(_ctx: LevelContext, _runtime: LevelRuntime): Promise<void> {
-      // 无画布：宿主会把 ToolDock 拉满宽度，这里不需要渲染任何东西。
+      // 无画布：宿主会把作答面板拉满宽度，这里不需要渲染任何东西。
     },
     async unmount(): Promise<void> {
       // 无资源需要释放。

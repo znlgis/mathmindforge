@@ -98,7 +98,7 @@ describe('pattern template', () => {
     expect(verdict.artifacts.map((item) => item.kind)).toEqual(['repair-set']);
   });
 
-  it('plays the gaps without declaring a rule and reports missing rule evidence', async () => {
+  it('derives the rule from the filled gaps: no separate "declare rule" step left', async () => {
     const runtime = runtimeAt();
     for (const item of (detail.solutions[0]?.artifact as { repair: { index: number; token: string }[] }).repair) {
       await runtime.dispatch({
@@ -106,12 +106,15 @@ describe('pattern template', () => {
         payload: { piece: { id: 'repair-' + item.index, shape: item.token, x: item.index, y: 0 } },
       });
     }
-    expect(runtime.snapshot().checkpoints.repair).toBe(true);
-    expect(runtime.snapshot().checkpoints.hypothesis ?? false).toBe(false);
+    const snapshot = runtime.snapshot();
+    // 画布填满后规律被自动反推出来（ABB / none），证据链里的 hypothesis 也随之成立。
+    expect(snapshot.toolState.pattern?.cycle?.join('')).toBe('ABB');
+    expect(snapshot.toolState.pattern?.transform).toBe('none');
+    expect(snapshot.checkpoints.repair).toBe(true);
+    expect(snapshot.checkpoints.hypothesis ?? false).toBe(true);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
-    // 补对了也得先声明一次规律（迁移门要求产物本身携带可翻译的规律）；这里必须给出缺证据。
-    expect(result.verdict?.passed).toBe(false);
-    expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual(['hypothesis']);
+    expect(result.verdict?.passed).toBe(true);
+    expect(result.verdict?.artifacts.map((item) => item.kind)).toEqual(['pattern-rule', 'repair-set']);
   });
 
   it('rejects an empty artifact with a structural failure instead of an empty verdict', () => {
@@ -189,24 +192,23 @@ describe('pattern 换表征迁移门', () => {
     }
   });
 
-  it('rejects the shell artifact at real submit with a user-facing failure class', async () => {
+  it('auto-derives the mirrored reading and passes the transfer gate from canvas clicks alone', async () => {
     const runtime = runtimeAt(symmetry);
-    // 玩家只点画布补三格（没点候选规律）——母本判定是通过的。
+    // 玩家把缺口补成镜像读法 CBA：反推出来的规则是 ABC / reflect，迁移门照常能翻译。
     for (const [index, token] of [[3, 'C'], [4, 'B'], [5, 'A']] as const) {
       await runtime.dispatch({
         type: 'construct/place',
         payload: { piece: { id: 'tile-' + index, shape: token, x: index, y: 0 } },
       });
     }
+    const snapshot = runtime.snapshot();
+    expect(snapshot.toolState.pattern?.cycle?.join('')).toBe('ABC');
+    expect(snapshot.toolState.pattern?.transform).toBe('reflect');
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
-    expect(result.verdict?.passed).toBe(false);
-    expect(result.verdict?.failure?.class).toBe('pattern-transfer-failed');
-    expect(result.snapshot.phase).toBe('failed');
-    // 反馈走内容 JSON 的 pattern-transfer-failed 文案，应当能指导玩家去模式卡声明规律。
-    expect(symmetry.feedback['pattern-transfer-failed']?.messageKey).toBe('level.pattern.hypothesis');
-    console.log('[relabel-shell-submit]', JSON.stringify({
+    expect(result.verdict?.passed).toBe(true);
+    expect(result.verdict?.stamps).toContain('transfer');
+    console.log('[relabel-auto-derived]', JSON.stringify({
       passed: result.verdict?.passed,
-      class: result.verdict?.failure?.class,
       results: result.verdict?.variantResults,
     }));
   });
@@ -307,53 +309,36 @@ describe('画布点击序列（交互次数口径）', () => {
     return runtime.snapshot().toolState.construct?.pieces.find((piece) => piece.x === index)?.shape;
   }
 
-  /** 候选 chip 的一次点击 = setCycle + commit（PatternTool.pickRule 的内部动作）。 */
-  async function pickCandidate(runtime: ReturnType<typeof runtimeAt>, rule: PatternRule): Promise<void> {
-    await runtime.dispatch({
-      type: 'pattern/setCycle',
-      payload: { cycle: [...rule.tokens], transform: rule.transform },
-    });
-    await runtime.dispatch({ type: 'pattern/commit', payload: {} });
-  }
-
-  it('k-structure-pattern-path：1 次候选规律 + 3 次画布补格 + 1 次完成 = 5 击', async () => {
+  it('k-structure-pattern-path：3 次画布补格就是全部输入，规律自动反推', async () => {
     const runtime = runtimeAt();
     const order = tokenOrderOf(detail);
-    const candidate = candidateRules(script)[0];
-    expect(candidate).toBeDefined();
     let clicks = 0;
-    if (candidate) await pickCandidate(runtime, candidate);
-    clicks += 1;
     for (const index of [6, 7, 8]) {
       await clickGap(runtime, order, index);
       clicks += 1;
     }
     expect([shapeAt(runtime, 6), shapeAt(runtime, 7), shapeAt(runtime, 8)]).toEqual(['A', 'B', 'B']);
+    expect(runtime.snapshot().answerComplete).toBe(true);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
-    clicks += 1;
     expect(result.verdict?.passed).toBe(true);
-    expect(clicks).toBe(5);
+    expect(clicks).toBe(3);
   });
 
-  it('g13-structure-symmetry：1 次候选规律 + 3 次画布补格 + 1 次完成 = 5 击', async () => {
+  it('g13-structure-symmetry：3 次画布补格，规律自动反推成重复读法', async () => {
     const runtime = runtimeAt(symmetry);
     const order = tokenOrderOf(symmetry);
-    const candidate = candidateRules(symmetryScript).find((rule) => rule.transform === 'reflect');
-    expect(candidate).toBeDefined();
     let clicks = 0;
-    if (candidate) await pickCandidate(runtime, candidate);
-    clicks += 1;
     for (const index of [3, 4, 5]) {
       await clickGap(runtime, order, index);
       clicks += 1;
     }
-    expect([shapeAt(runtime, 3), shapeAt(runtime, 4), shapeAt(runtime, 5)]).toEqual(['C', 'B', 'A']);
+    expect([shapeAt(runtime, 3), shapeAt(runtime, 4), shapeAt(runtime, 5)]).toEqual(['A', 'B', 'C']);
+    expect(runtime.snapshot().answerComplete).toBe(true);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
-    clicks += 1;
-    // 迁移门要求产物带规律；这条路径与 e2e 的「先点候选 chip」一致。
+    // 自动反推出的规律同样要通过迁移门（换表征后仍成立）。
     expect(result.verdict?.passed).toBe(true);
     expect(result.verdict?.artifacts.map((item) => item.kind)).toEqual(['pattern-rule', 'repair-set']);
-    expect(clicks).toBe(5);
+    expect(clicks).toBe(3);
   });
 });
 
@@ -363,20 +348,6 @@ describe('画布点击序列（交互次数口径）', () => {
  * 因为迁移门还缺可翻译的规律。
  */
 describe('answerComplete（自动判题口径）', () => {
-  async function commitCandidate(
-    runtime: ReturnType<typeof runtimeAt>,
-    levelScript: ReturnType<typeof parseScript>,
-  ): Promise<void> {
-    const candidate = candidateRules(levelScript)[0];
-    expect(candidate).toBeDefined();
-    if (!candidate) return;
-    await runtime.dispatch({
-      type: 'pattern/setCycle',
-      payload: { cycle: [...candidate.tokens], transform: candidate.transform },
-    });
-    await runtime.dispatch({ type: 'pattern/commit', payload: {} });
-  }
-
   async function place(runtime: ReturnType<typeof runtimeAt>, index: number, shape: string): Promise<void> {
     const placed = await runtime.dispatch({
       type: 'construct/place',
@@ -385,12 +356,8 @@ describe('answerComplete（自动判题口径）', () => {
     expect(placed.ok).toBe(true);
   }
 
-  it('k-structure-pattern-path：空 → 只声明规律 → 补一半 → 补满，逐步从 false 变 true', async () => {
+  it('k-structure-pattern-path：补一半不算填完 → 补满那一刻变 true', async () => {
     const runtime = runtimeAt();
-    expect(runtime.snapshot().answerComplete).toBe(false);
-
-    await commitCandidate(runtime, script);
-    // 规律有了、缺口没补：还没填完，不能判。
     expect(runtime.snapshot().answerComplete).toBe(false);
 
     await place(runtime, 6, 'A');
@@ -405,37 +372,43 @@ describe('answerComplete（自动判题口径）', () => {
     expect(result.verdict?.passed).toBe(true);
   });
 
-  it('k-structure-pattern-path：只补块不声明规律 → 一直是 false（空壳答案不算填完）', async () => {
+  it('k-structure-pattern-path：填满了就算填完，规律由填法自动反推（没有"声明"这一步）', async () => {
     const runtime = runtimeAt();
     for (const [index, shape] of [[6, 'A'], [7, 'B'], [8, 'B']] as const) {
       await place(runtime, index, shape);
     }
     expect(runtime.snapshot().checkpoints.repair).toBe(true);
-    expect(runtime.snapshot().answerComplete).toBe(false);
+    expect(runtime.snapshot().toolState.pattern?.cycle?.join('')).toBe('ABB');
+    expect(runtime.snapshot().answerComplete).toBe(true);
   });
 
-  it('g13-structure-symmetry：先补满缺口再声明规律，声明完成的那一刻变 true', async () => {
+  it('g13-structure-symmetry：补满即判，重复读法/镜像读法都能自动反推出规律', async () => {
     const runtime = runtimeAt(symmetry);
     expect(runtime.snapshot().answerComplete).toBe(false);
-    // 按「重复」读法补 ABC（s-repeat-abc）；换镜像读法 CBA 时同样成立，只是这里取第一条候选。
     for (const [index, shape] of [[3, 'A'], [4, 'B'], [5, 'C']] as const) {
       await place(runtime, index, shape);
     }
-    // 缺口补齐但还没声明规律：仍然不能自动判。
-    expect(runtime.snapshot().answerComplete).toBe(false);
-    await commitCandidate(runtime, symmetryScript);
     expect(runtime.snapshot().answerComplete).toBe(true);
+    expect(runtime.snapshot().toolState.pattern?.transform).toBe('none');
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(result.verdict?.passed).toBe(true);
+
+    const mirrored = runtimeAt(symmetry);
+    for (const [index, shape] of [[3, 'C'], [4, 'B'], [5, 'A']] as const) {
+      await place(mirrored, index, shape);
+    }
+    expect(mirrored.snapshot().toolState.pattern?.transform).toBe('reflect');
+    expect((await mirrored.dispatch({ type: 'submit', payload: {} })).verdict?.passed).toBe(true);
   });
 
   it('answerComplete 不替 validate 判对错：补错了也是 true，submit 照样失败', async () => {
     const runtime = runtimeAt();
-    await commitCandidate(runtime, script);
     await place(runtime, 6, 'A');
     await place(runtime, 7, 'A'); // 第 7 格按 ABB 该是 B，故意补错
     await place(runtime, 8, 'B');
     expect(runtime.snapshot().answerComplete).toBe(true);
+    // 填法对不上任何候选规律：反推不出规则，submit 走 repair-only 报具体错格。
+    expect(runtime.snapshot().toolState.pattern?.cycle).toBeUndefined();
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(result.verdict?.passed).toBe(false);
     expect(result.verdict?.failure?.class).toBe('pattern-mismatch');

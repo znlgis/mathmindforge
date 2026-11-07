@@ -59,7 +59,7 @@ interface SimRunRecord {
 
 interface SimState {
   values: KnobValues;
-  /** 最近 10 次运行，给 MetricsTool 的表格用。 */
+  /** 最近 10 次运行，给作答面板显示指标用。 */
   history: SimRunRecord[];
   lastRun: SimRunRecord | null;
   focusId: string;

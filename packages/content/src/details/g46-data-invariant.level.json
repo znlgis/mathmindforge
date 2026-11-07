@@ -5,7 +5,7 @@
   "thread": "data",
   "template": "argue",
   "thinkingTarget": "用不变量说明 7×7 去角棋盘为什么铺不满",
-  "intro": "这张 7×7 棋盘少了两个同色角。先铺几块，再找那个不随摆放改变的量。",
+  "intro": "这张 7×7 棋盘少了两个同色角。想一想：哪个量不管怎么摆都不会变？",
   "prompt": "证明它不能被 1×2 多米诺铺满：选一条能排除它的依据。",
   "done": "你找到的不变量能排除整类铺法，而不只是这一种摆法。",
   "retry": "数一数黑白格或总格数，看看每次铺一块这个量会怎么变。",
@@ -304,7 +304,7 @@
   },
   "titleEn": "Invariant Detective",
   "thinkingTargetEn": "Use an invariant to explain why a 7×7 board with two same-color corners removed cannot be tiled.",
-  "introEn": "Two same-color corners are gone. Place a few dominoes, then find the invariant.",
+  "introEn": "Two same-color corners are gone from this 7×7 board. Think: which quantity never changes?",
   "promptEn": "Prove it cannot be covered by 1×2 dominoes: pick a warrant that rules it out.",
   "doneEn": "Your invariant ruled out every tiling, not just the one you tried.",
   "retryEn": "Recount black and white cells after placing a domino."

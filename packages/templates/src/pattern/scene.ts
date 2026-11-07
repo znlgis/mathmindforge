@@ -493,7 +493,7 @@ class PatternScene extends BaseScene {
       }
     }
 
-    // 下标贴纸：ToolDock 的 index 与画布一一对应
+    // 下标贴纸：与判定用的缺口下标一一对应
     const indexText = centeredLabel(this, box.cx, box.y + box.h + 16, String(index + 1), {
       size: 11,
       color: PALETTE.inkSoft,

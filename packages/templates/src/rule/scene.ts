@@ -36,7 +36,7 @@ const ARROW_ANGLE = { north: -Math.PI / 2, east: 0, south: Math.PI / 2, west: Ma
  * 规则关画布：一张 5×5 的路线图纸。
  * 快照驱动重绘；同时是一条输入路径：点同排/同列的格子会把路线编译成
  * 展开版程序块（rule/place 追加到末尾），与右侧积木按钮产出同一个 program。
- * 右侧按钮全部保留：手拼重复块、无指针设备时仍然走 ToolDock。
+ * 本轮去卡片化后只保留这一条输入路径：不再有积木面板。
  */
 class RuleScene extends BaseScene {
   private readonly runtime: LevelRuntime;
@@ -496,7 +496,7 @@ class RuleScene extends BaseScene {
     const collected = trace.collected.length;
     const parts: string[] = [];
     if (blockCount === 0) {
-      parts.push('先在工具台拼一段程序');
+      parts.push('先在图纸上点格子画路线');
     } else {
       parts.push('已走 ' + trace.steps + ' 步');
       parts.push('星星 ' + collected + '/' + script.stars.length);

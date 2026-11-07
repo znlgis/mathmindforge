@@ -6,7 +6,7 @@ import { LEVEL_SUMMARIES, getLevelSummary, loadLevel, localizedDetail } from '@m
 import type { LevelDetail } from '@mmf/content';
 import { evaluateBadges } from '@mmf/evidence';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
-import ToolDock, { ArgumentBoard } from '@mmf/toolkit-ui';
+import AnswerDock, { ArgumentBoard } from '@mmf/toolkit-ui';
 import { navigate } from '../router';
 import { registry } from '../registry';
 import { createLevelContext, readDebugOptions } from '../shell/createLevelContext';
@@ -64,6 +64,17 @@ const successMessage = computed(() => (nextId.value ? t('complete.autoNext') : t
 const ready = computed(() => (
   !loading.value && error.value === null && runtime.value !== null && detail.value !== null
 ));
+/**
+ * 本轮简化：关卡里不再有「工具卡」这一层。
+ * pattern / rule 的答案就在画布上，右侧只留失败提示与动作条；
+ * 其余模板的答案面板直接平铺（argue 用论证板）。
+ */
+const hasAnswerArea = computed(() => {
+  const template = detail.value?.template;
+  return template !== undefined && template !== 'pattern' && template !== 'rule';
+});
+/** 画布 + 作答面板并排；pattern / rule 只有画布，整块宽度留给它。 */
+const splitLayout = computed(() => module.value?.manifest.hasCanvas === true && hasAnswerArea.value);
 
 const progress = useProgress();
 const settings = useSettings();
@@ -78,7 +89,7 @@ const usageNow = computed(() => usageTotal(liveSnapshot.value));
 
 /**
  * 失败提示只属于"刚刚那次提交"：提交后玩家一旦再动工具，旧提示立刻消失。
- * ToolDock 里原来常驻读 snapshot.verdict，导致补齐步骤后横幅还粘着旧文案。
+ * 作答面板里原来常驻读 snapshot.verdict，导致补齐步骤后横幅还粘着旧文案。
  */
 const failureCopy = computed<{ message: string; hint: string | null } | null>(() => {
   const snapshot = liveSnapshot.value;
@@ -537,7 +548,7 @@ watch(completed, async (value) => {
       <p class="text-xs font-semibold text-ink-soft">{{ display.prompt }}</p>
     </div>
 
-    <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+    <div class="flex min-h-0 flex-1" :class="splitLayout ? 'flex-col lg:flex-row' : 'flex-col'">
       <section
         v-if="module?.manifest.hasCanvas"
         class="relative min-h-[38vh] flex-1 min-w-0 border-b border-grid bg-paper lg:min-h-0 lg:border-b-0 lg:border-r"
@@ -547,9 +558,12 @@ watch(completed, async (value) => {
 
       <aside
         class="flex min-h-0 w-full flex-col"
-        :class="module?.manifest.hasCanvas ? 'lg:w-[420px] lg:flex-none' : ''"
+        :class="[
+          splitLayout ? 'lg:w-[420px] lg:flex-none' : '',
+          module?.manifest.hasCanvas ? '' : 'flex-1',
+        ]"
       >
-        <!-- 失败提示：移出滚动容器，钉在工具面板上方，永远不会被滚出视野 -->
+        <!-- 失败提示：移出滚动容器，钉在作答面板上方，永远不会被滚出视野 -->
         <div
           v-if="failureCopy"
           data-testid="failure-banner"
@@ -570,9 +584,16 @@ watch(completed, async (value) => {
           <p class="text-sm font-bold text-red">{{ actionError }}</p>
         </div>
 
-        <div ref="host" data-testid="level-dock" class="min-h-0 flex-1 overflow-y-auto p-2.5">
-          <div :class="module?.manifest.hasCanvas ? '' : 'mx-auto w-full max-w-3xl'">
-            <ToolDock
+        <!-- pattern / rule：答案在画布上，这里不渲染卡片；保留 host 容器给模板挂载上下文用。 -->
+        <div v-else ref="host" class="hidden" aria-hidden="true" />
+        <div
+          v-if="hasAnswerArea"
+          ref="host"
+          data-testid="level-dock"
+          class="min-h-0 flex-1 overflow-y-auto p-2.5"
+        >
+          <div :class="splitLayout ? '' : 'mx-auto w-full max-w-3xl'">
+            <AnswerDock
               v-if="runtime && detail"
               :tools="detail.tools"
               :runtime="runtime"

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { SHIPPED_LEVEL_IDS } from '../packages/content/src/ids';
-import { clickCanvasCell, clickRuleCell, openTool, saveSnapshot, startInteractionMeter, interactions, waitAdvance, waitEvent } from './shared';
+import { clickCanvasCell, clickRuleCell, saveSnapshot, startInteractionMeter, interactions, waitAdvance, waitEvent } from './shared';
 
 const M1_LEVELS = SHIPPED_LEVEL_IDS.filter((id) => id !== 'k-structure-pattern-path');
 
@@ -18,9 +18,13 @@ for (const levelId of M1_LEVELS) {
 test('20 关都没有「完成」按钮，只显示自动判题提示', async ({ page }) => {
   for (const levelId of SHIPPED_LEVEL_IDS) {
     await page.goto('/#/play/' + levelId);
-    await expect(page.getByTestId('level-dock')).toBeVisible();
+    await expect(page.getByTestId('workshop-view')).toBeVisible();
     await expect(page.getByTestId('level-submit')).toHaveCount(0);
     await expect(page.getByTestId('level-auto-judge')).toBeVisible();
+    // 本轮简化：玩家看不到任何「工具卡」这一层
+    await expect(page.getByTestId('tool-card-toggle-pattern-0')).toHaveCount(0);
+    await expect(page.getByTestId('tool-card-toggle-rule-0')).toHaveCount(0);
+    await expect(page.getByTestId('tool-card-toggle-construct-0')).toHaveCount(0);
   }
 });
 
@@ -32,8 +36,7 @@ test('真实点击：最少枚数支付 + 反例 → 自动判题自动进下一
   await page.getByTestId('payment-add-3').click();
   await expect(page.getByTestId('payment-total')).toContainText('2 枚');
 
-  // 反例卡：填目标金额 + 勾面额 + 点失效前提 chip（编辑即自动测试，没有"测试/提交"按钮）
-  await openTool(page, 'counter', 1);
+  // 反例面板直接平铺在作答区：填目标金额 + 勾面额 + 点失效前提（编辑即自动测试，没有"测试/提交"按钮）
   await page.getByTestId('counter-target').fill('10');
   await page.getByTestId('counter-target').blur();
   await page.getByTestId('counter-denom-1').click();
@@ -50,7 +53,7 @@ test('真实点击：分类小站进入即倒出，填数字 + 选答案 → 自
   await page.goto('/#/play/k-data-tally');
   await expect(page.getByTestId('tally-tool')).toBeVisible();
 
-  // 进入工具卡就自动把整筐倒出来（没有"全部倒出来/采集一把"按钮）
+  // 面板平铺后自动把整筐倒出来（没有"全部倒出来/采集一把"按钮）
   await expect(page.getByTestId('tally-count')).toHaveText('20');
   for (const [id, count] of [['circle', '6'], ['square', '5'], ['triangle', '6'], ['star', '3']] as const) {
     const input = page.getByTestId('tally-input-' + id);
@@ -67,7 +70,7 @@ test('真实点击：结构不变量只需点一条依据 → 自动进下一关
   await page.goto('/#/play/g1012-structure-invariant');
   await expect(page.getByTestId('argument-board')).toBeVisible();
 
-  // 一行组装：点「黑白染色」= 选依据 + 自动挂证据 + 自动推结论 + 自动填范围
+  // 论证板是这一关唯一作答面：点「黑白染色」= 自动挂证据 + 自动推结论 + 自动填范围
   await page.getByTestId('argue-warrant-coloring').click();
   await expect(page.getByTestId('argue-claim')).toContainText('不可能铺满');
   await expect(page.getByTestId('argue-evidence')).toBeVisible();
@@ -88,26 +91,22 @@ test('真实点击：公平分点心配一盘后一键照分 → 自动进下一
   expect(await waitAdvance(page, 'k-modeling-share')).toBe(true);
 });
 
-test('真实点击：规则小火车拼好最后一块 → 自动进下一关', async ({ page }) => {
+test('真实点击：规则小火车在画布上点两格 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/k-algorithm-train');
-  await expect(page.getByTestId('rule-tool')).toBeVisible();
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
 
-  await page.getByTestId('rule-add-forward').click();
-  await page.getByTestId('rule-add-forward').click();
-  await page.getByTestId('rule-add-collect').click();
-  await page.getByTestId('rule-add-forward').click();
-  await page.getByTestId('rule-add-forward').click();
+  // 没有积木面板：画布是唯一作答面。点星星格（自动收集）→ 点终点格。
+  await clickRuleCell(page, 2, 0);
+  await clickRuleCell(page, 4, 0);
 
   expect(await waitAdvance(page, 'k-algorithm-train')).toBe(true);
 });
 
 test('真实点击：对称补墙在画布上点三格 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g13-structure-symmetry');
-  await expect(page.getByTestId('pattern-tool')).toBeVisible();
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
 
-  // 点候选 chip 一次＝声明规律；之后画布缺口各点一次直接落答案
-  await page.getByTestId('pattern-candidate-ABC-reflect').click();
-  await expect(page.getByTestId('pattern-committed')).toBeVisible();
+  // 没有规律候选卡：点三格补缺口，规律由填法自动反推（先 A/B/C 的重复读法）。
   await clickCanvasCell(page, 3);
   await clickCanvasCell(page, 4);
   await clickCanvasCell(page, 5);
@@ -117,14 +116,13 @@ test('真实点击：对称补墙在画布上点三格 → 自动进下一关', 
 
 test('真实点击：规则关在画布上点格子画路线 → 自动进下一关（≤6 击）', async ({ page }) => {
   await page.goto('/#/play/g13-algorithm-route');
-  await expect(page.getByTestId('rule-tool')).toBeVisible();
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
   await startInteractionMeter(page);
 
   // 起点 (0,0) 朝东：点 5 个拐点，引擎编译成展开版程序（不自动压缩成重复块）
   for (const [x, y] of [[2, 0], [4, 0], [4, 2], [4, 4], [0, 4]] as const) {
     await clickRuleCell(page, x, y);
   }
-  await expect(page.getByTestId('rule-program')).not.toContainText('还没有积木');
 
   expect(await waitAdvance(page, 'g13-algorithm-route')).toBe(true);
 
@@ -133,18 +131,8 @@ test('真实点击：规则关在画布上点格子画路线 → 自动进下一
   expect(used).toBeLessThanOrEqual(6);
 });
 
-test('规则关画布点格产出展开版程序，不自动压缩', async ({ page }) => {
-  await page.goto('/#/play/g13-algorithm-route');
-  await expect(page.getByTestId('rule-tool')).toBeVisible();
-
-  await clickRuleCell(page, 2, 0);
-  await expect(page.getByTestId('rule-program')).toContainText('前进');
-  // 画路线只给展开版：程序列表里不会凭空出现"重复"块（简洁印章仍归手拼版）
-  await expect(page.getByTestId('rule-program')).not.toContainText('重复');
-});
-
 test('过关遮罩记迁移门结果（换表征变体）', async ({ page }) => {
-  // pattern 关有真的换表征迁移门：A/B 换成形状之后规律仍要成立（docs/12 遗留项 1）
+  // pattern 关有真的换表征迁移门：A/B 换成形状之后规律仍要成立
   await page.goto('/#/play/k-structure-pattern-path?autoplay=1');
   await expect(page.getByTestId('level-success')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('variant-passport')).toContainText('v-relabel-shapes');
@@ -155,7 +143,7 @@ test('真实点击：抽样调查员进入即抽两批，点结论 → 自动进
   await page.goto('/#/play/g79-data-sampling');
   await expect(page.getByTestId('sampling-tool')).toBeVisible();
 
-  // 进入工具卡就自动抽两批（没有"抽两批/再抽 N 个"按钮）
+  // 面板一出现就自动抽两批（没有"抽两批/再抽 N 个"按钮）
   await expect(page.getByTestId('sampling-count')).toContainText('40');
   await expect(page.getByTestId('sampling-batch-2')).toBeVisible();
   await expect(page.getByTestId('sampling-ci')).toBeVisible();
@@ -240,13 +228,14 @@ test('真实点击：胜率实验室填满 100 点 + 下结论就过关', async 
     await input.fill(value);
     await input.blur();
   }
-  // 参数一凑满 100 点就自动跑出采样结果；结论仍要玩家自己点
-  await openTool(page, 'probe', 1);
-  await expect(page.getByTestId('sample-claim')).toBeVisible();
-  await page.getByTestId('sample-claim').click();
+  // 参数一凑满 100 点就自动跑出采样结果；结论面板直接平铺在下面
+  const claim = page.getByTestId('sample-claim');
+  await expect(claim).toBeEnabled();
+  await claim.click();
 
   expect(await waitAdvance(page, 'g1012-modeling-winrate')).toBe(true);
 });
+
 /**
  * 错误原因必须"直出"（docs/13 §3）：答错不是一个泛泛的"还差一点"，
  * 而是写明哪条判定没过、下一步该看什么。
@@ -276,16 +265,4 @@ test('错误原因直出：network 不连通 → 横幅说还有站点没连进�
   const banner = page.getByTestId('failure-banner');
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('还有站点没有连进路网');
-});
-
-test('错误原因直出：rule 到终点但漏收星星 → 横幅提示把收集放在经过星星时', async ({ page }) => {
-  await page.goto('/#/play/k-algorithm-train');
-  await expect(page.getByTestId('rule-tool')).toBeVisible();
-  // 起点 (0,0) 朝东、星星在 (2,0)、终点在 (4,0)：只前进 4 格会到终点但漏收。
-  for (let index = 0; index < 4; index += 1) {
-    await page.getByTestId('rule-add-forward').click();
-  }
-  const banner = page.getByTestId('failure-banner');
-  await expect(banner).toBeVisible({ timeout: 10_000 });
-  await expect(banner).toContainText('星星还没收集');
 });

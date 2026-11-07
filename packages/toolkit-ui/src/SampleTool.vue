@@ -90,7 +90,7 @@ async function submitClaim(): Promise<void> {
         <p class="mt-1 text-xs text-ink-soft">胜场 {{ wins }} ／ {{ stats.n }}（平局各记半场）</p>
       </template>
       <p v-else class="text-xs text-ink-soft">
-        还没有数据：在旋钮卡里把点数分满，参数一改就自动跑出结果。
+        还没有数据：把三个数字填满分，参数一改就自动跑出结果。
       </p>
     </div>
 

@@ -15,9 +15,17 @@ test('工坊首页可以进入首关', async ({ page }) => {
 
 test('宿主没有「完成」按钮：填完自动判题', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
-  await expect(page.getByTestId('level-dock')).toBeVisible();
-  await expect(page.getByTestId('level-submit')).toHaveCount(0);
   await expect(page.getByTestId('level-auto-judge')).toBeVisible();
+  await expect(page.getByTestId('level-submit')).toHaveCount(0);
+});
+
+test('关卡里没有工具卡：模式关只留画布 + 动作条', async ({ page }) => {
+  await page.goto('/#/play/' + LEVEL_ID);
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
+  // 旧的「模式卡 / 构造块 / 规则卡」卡片已经整层移除
+  await expect(page.getByTestId('tool-card')).toHaveCount(0);
+  await expect(page.getByTestId('pattern-tool')).toHaveCount(0);
+  await expect(page.getByTestId('level-dock')).toHaveCount(0);
 });
 
 test('autoplay 通关并写入存档', async ({ page }) => {
@@ -33,7 +41,7 @@ test('autoplay 通关并写入存档', async ({ page }) => {
 
 test('没作答时不会自动判题，也不会过关', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
-  await expect(page.getByTestId('level-dock')).toBeVisible();
+  await expect(page.getByTestId('level-auto-judge')).toBeVisible();
   await page.waitForTimeout(1500);
   await expect(page.getByTestId('level-success')).toHaveCount(0);
   await expect(page.getByTestId('failure-banner')).toHaveCount(0);
@@ -41,16 +49,12 @@ test('没作答时不会自动判题，也不会过关', async ({ page }) => {
   expect(save?.levels?.[LEVEL_ID]?.completed ?? false).toBe(false);
 });
 
-test('真实点击：候选规律 + 画布点三格 → 自动判题自动进下一关（≤5 次交互）', async ({ page }) => {
+test('真实点击：画布点三个空格 → 自动判题自动进下一关（≤4 次交互）', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
-  await expect(page.getByTestId('pattern-tool')).toBeVisible();
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
   await startInteractionMeter(page);
 
-  // 一次点击声明规律（原来要点 3 个字母 + 1 次提交）
-  await page.getByTestId('pattern-candidate-ABB-none').click();
-  await expect(page.getByTestId('pattern-committed')).toBeVisible();
-
-  // 画布点三个缺口，点一次填一格（原来每格要 2 击：选槽 + 点色板）
+  // 没有「先声明规律」这一步：点空格补字母，规律由填法自动反推。
   await clickCanvasCell(page, 6);
   await clickCanvasCell(page, 7);
   await clickCanvasCell(page, 8);
@@ -59,8 +63,8 @@ test('真实点击：候选规律 + 画布点三格 → 自动判题自动进下
   expect(await waitAdvance(page, LEVEL_ID)).toBe(true);
 
   const used = await interactions(page);
-  // 4 次答案输入（1 候选规律 + 3 格）+ 1 次余量
-  expect(used).toBeLessThanOrEqual(5);
+  // 3 次画布点击就是全部答案输入；留 1 次余量
+  expect(used).toBeLessThanOrEqual(4);
   await expect.poll(async () => {
     const save = await saveSnapshot(page);
     return save?.levels?.[LEVEL_ID]?.completed === true;
@@ -76,7 +80,7 @@ test('只补一格（答案没填完）不会判题', async ({ page }) => {
   await expect(page.getByTestId('level-success')).toHaveCount(0);
 });
 
-test('运行时不发外网请求，断网后工具仍可操作', async ({ page, context }) => {
+test('运行时不发外网请求，断网后仍可作答', async ({ page, context }) => {
   const external: string[] = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
@@ -84,10 +88,9 @@ test('运行时不发外网请求，断网后工具仍可操作', async ({ page,
   });
 
   await page.goto('/#/play/' + LEVEL_ID);
-  await expect(page.getByTestId('pattern-tool')).toBeVisible();
+  await expect(page.getByTestId('level-canvas')).toBeVisible();
   await context.setOffline(true);
-  await page.getByTestId('pattern-candidate-ABB-none').click();
-  await expect(page.getByTestId('pattern-committed')).toBeVisible();
+  await clickCanvasCell(page, 6);
   await context.setOffline(false);
   expect(external).toEqual([]);
 });

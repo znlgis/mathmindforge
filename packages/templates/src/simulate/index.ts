@@ -15,7 +15,7 @@ export { simulateScriptSchema, simulateArtifactSchema } from './schema';
 
 /**
  * g79 城市调度：无画布关卡。
- * 交互全在 ToolDock（KnobTool + MetricsTool）里，宿主把工具区拉满宽度即可，
+ * 交互全在作答区（KnobTool）里，宿主把面板区拉满宽度即可，
  * 所以 mount 故意什么都不挂，只保留 LevelModule 的形状。
  */
 export function defineSimulateLevel(manifest: LevelManifest): LevelModule {

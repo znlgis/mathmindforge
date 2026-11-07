@@ -4,7 +4,7 @@
   "band": "g1012",
   "thread": "structure",
   "template": "argue",
-  "intro": "这张棋盘少了两个角。先试着铺几块，再找一个不随摆放改变的量。",
+  "intro": "这张棋盘少了两个角。想一想：哪个量不管怎么摆都不会变？",
   "prompt": "说明它为什么不能被 1×2 多米诺铺满：选一条能排除它的依据。",
   "done": "你用染色、奇偶或面积不变量排除了整类铺砌，而不是只试了几种摆法。",
   "retry": "先数黑白格或总格数，再问：每次铺一块，这个量会怎么变？",
@@ -285,7 +285,7 @@
   "thinkingTarget": "用一个不随操作改变的量，说明某类铺砌为什么不可能",
   "titleEn": "Structural Invariant",
   "thinkingTargetEn": "Use an invariant to explain why a 5×5 board with two corners removed cannot be tiled.",
-  "introEn": "Two corners are gone. Place a few dominoes, then find a quantity that never changes.",
+  "introEn": "Two corners are gone. Think: which quantity never changes no matter how you place the dominoes?",
   "promptEn": "Explain why 1×2 dominoes cannot cover it: pick a warrant that rules it out.",
   "doneEn": "Your invariant ruled out a whole family of tilings, not just one attempt.",
   "retryEn": "Count black and white cells, then ask how each domino changes the counts."

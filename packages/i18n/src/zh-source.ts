@@ -4,7 +4,7 @@
  * 背景：关卡内容（details/*.level.json 的 feedback.messageKey / hintKey、
  * evidencePlan.descriptionKey）与部分模板的失败文案，历史上直接把**中文句子**当
  * key 传（docs/05 §9"与 M1 计划的偏差"第 6 条，待办里写作"内容 i18n 化"）。
- * ToolDock 用 t(key) 渲染，zh 表查不到就回退 key 本身——中文下可读，
+ * 作答面板用 t(key) 渲染，zh 表查不到就回退 key 本身——中文下可读，
  * 但英文界面会漏出中文。
  *
  * 彻底做法是把这些 key 换成正式 i18n key（docs/05 列的 v0.9 待办）。在那之前，
@@ -264,7 +264,7 @@ export const zhSourceEn: Record<string, string> = {
 
   // ── templates：失败/动作提示（整句）──────────────────────────────────
   // 说明：模板通过 ActionResult.message / cause.messageKey 把中文句子交给 UI，
-  // ToolDock 与各工具面板现在统一走 t()，所以这里必须给整句英文；
+  // 作答面板现在统一走 t()，所以这里必须给整句英文；
   // 纯拼接片段（如 " / 守 "、" 条边 · 成本 "）不在此表——它们随模板改为整句模板后再补。
   '这条主张不在这一关的选项里。': "That claim is not one of this level's options.",
   '这条依据不在这一关的选项里。': "That warrant is not one of this level's options.",
@@ -355,7 +355,7 @@ export const zhSourceEn: Record<string, string> = {
   '一条被踩乱的积木路': 'A scrambled block path',
   '路线图纸': 'Route blueprint',
   '收齐星星 · 开到终点': 'Collect every star · reach the goal',
-  '先在工具台拼一段程序': 'Build a program in the tool dock first',
+  '先在图纸上点格子画路线': 'Tap cells on the map to draw a route first',
   '步数用完了，程序可能在绕圈': 'Out of steps; the program may be looping',
   '路线跑通，还能更短': 'Route works — and it can be shorter',
   '路线跑通': 'Route works',

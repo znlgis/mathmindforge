@@ -103,17 +103,6 @@ export async function lastError(page: Page): Promise<string | undefined> {
 }
 
 /**
- * 工具卡是手风琴：同一时刻只展开一张，其余面板 display:none。
- * 点非首张卡的控件前必须先把卡头点开，否则 Playwright 会等到超时（元素不可见）。
- * 已经展开时点卡头会把它收起来，所以先读 aria-expanded 再决定点不点。
- */
-export async function openTool(page: Page, kind: string, index: number): Promise<void> {
-  const toggle = page.getByTestId('tool-card-toggle-' + kind + '-' + index);
-  if ((await toggle.getAttribute('aria-expanded')) === 'true') return;
-  await toggle.click();
-}
-
-/**
  * 自动判定 + 自动过关（docs/13）：答案填完宿主自己判，答对直接进下一关。
  * 等的是"这一关完成事件 + 已经离开这一关的地址"，不依赖点「完成」按钮。
  */

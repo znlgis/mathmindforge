@@ -2,11 +2,11 @@ import { expect, test } from '@playwright/test';
 import { clickCanvasCell, clickRuleCell, interactions, startInteractionMeter, waitAdvance } from './shared';
 
 /**
- * 交互次数预算（docs/12 §4 / §7-3，docs/13 自动判题后重算）。
+ * 交互次数预算（docs/12 §4 / §7-3，docs/13 自动判题后重算，本轮去卡片化后再次压缩）。
  *
  * 目的：把"每关最少几次点击"钉成门禁，防止以后又长回仪式步骤或死按钮。
  * 口径：Playwright 真实派发的 click + change 事件（fill/selectOption 都会触发 change）。
- * 自动判题之后不再有「完成」这一击，所以预算整体比上一轮少 1。
+ * 自动判题之后不再有「完成」这一击；工具卡外壳去掉之后，也没有"展开卡片"这一击。
  * 余量：目标值 +1，容纳音效/焦点等实现差异；超出即说明交互退化。
  */
 
@@ -19,9 +19,9 @@ interface Budget {
 const BUDGETS: Budget[] = [
   {
     id: 'k-structure-pattern-path',
-    target: 4,
+    target: 3,
     async run(page) {
-      await page.getByTestId('pattern-candidate-ABB-none').click();
+      // 画布点三个空格；规律由填法自动反推，没有"先点候选规律"这一步
       await clickCanvasCell(page, 6);
       await clickCanvasCell(page, 7);
       await clickCanvasCell(page, 8);
@@ -29,9 +29,8 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g13-structure-symmetry',
-    target: 4,
+    target: 3,
     async run(page) {
-      await page.getByTestId('pattern-candidate-ABC-reflect').click();
       await clickCanvasCell(page, 3);
       await clickCanvasCell(page, 4);
       await clickCanvasCell(page, 5);
@@ -39,11 +38,11 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'k-algorithm-train',
-    target: 5,
+    target: 2,
     async run(page) {
-      for (const block of ['forward', 'forward', 'collect', 'forward', 'forward']) {
-        await page.getByTestId('rule-add-' + block).click();
-      }
+      // 画布是唯一作答面：点星星格（自动收集）→ 点终点格
+      await clickRuleCell(page, 2, 0);
+      await clickRuleCell(page, 4, 0);
     },
   },
   {
@@ -83,7 +82,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'k-data-tally',
-    // 进入工具卡自动倒出；4 次数字框输入 + 1 次结论 chip = 5
+    // 面板平铺后自动倒出；4 次数字框输入 + 1 次结论 chip = 5
     target: 5,
     async run(page) {
       for (const [id, count] of [['circle', '6'], ['square', '5'], ['triangle', '6'], ['star', '3']] as const) {
@@ -98,7 +97,7 @@ const BUDGETS: Budget[] = [
     id: 'g79-data-sampling',
     target: 1,
     async run(page) {
-      // 进入工具卡自动抽两批，只点一次结论
+      // 面板平铺后自动抽两批，只点一次结论
       await page.getByTestId('sampling-claim').click();
     },
   },
@@ -129,13 +128,12 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g46-algorithm-payment',
-    // 2 枚硬币 + 展开反例卡 + 填目标金额 + 3 个面额复选 + 点前提 = 8 次真实操作；
-    // 面额是 checkbox，click 之后浏览器还会派发一次 change，计量器各记一次 → 记 11。
-    target: 10,
+    // 2 枚硬币 + 填目标金额 + 3 个面额复选 + 点前提 = 8 次真实操作；
+    // 面额是 checkbox，click 之后浏览器还会派发一次 change，计量器各记一次 → 记 10。
+    target: 9,
     async run(page) {
       await page.getByTestId('payment-add-3').click();
       await page.getByTestId('payment-add-3').click();
-      await page.getByTestId('tool-card-toggle-counter-1').click();
       const target = page.getByTestId('counter-target');
       await target.fill('10');
       await target.blur();
@@ -159,7 +157,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g1012-modeling-winrate',
-    target: 6,
+    target: 4,
     async run(page) {
       // 3 个数字框填 50/50/0（凑满就自动跑出采样结果），再点结论
       for (const [key, value] of [['attack', '50'], ['defense', '50'], ['economy', '0']] as const) {
@@ -167,7 +165,6 @@ const BUDGETS: Budget[] = [
         await input.fill(value);
         await input.blur();
       }
-      await page.getByTestId('tool-card-toggle-probe-1').click();
       await page.getByTestId('sample-claim').click();
     },
   },
@@ -218,7 +215,7 @@ const BUDGETS: Budget[] = [
 for (const budget of BUDGETS) {
   test('交互预算：' + budget.id + ' ≤ ' + (budget.target + 1), async ({ page }) => {
     await page.goto('/#/play/' + budget.id);
-    await expect(page.getByTestId('level-dock')).toBeVisible();
+    await expect(page.getByTestId('level-auto-judge')).toBeVisible();
     await startInteractionMeter(page);
     await budget.run(page);
     // 没有「完成」这一击：答案填完宿主自动判题、答对自动进下一关

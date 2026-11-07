@@ -11,7 +11,7 @@ export function defineArgueLevel(manifest: LevelManifest): LevelModule {
       return createArgueRuntime(detail, opts);
     },
     async mount(_ctx: LevelContext, _runtime: LevelRuntime): Promise<void> {
-      // 无画布：论证板与棋盘都在 ToolDock/ArgumentBoard 里。
+      // 无画布：这一关的作答面就是论证板（ArgumentBoard）。
     },
     async unmount(): Promise<void> {},
     pause(): void {},

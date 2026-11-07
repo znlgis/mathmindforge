@@ -435,7 +435,7 @@ function percent1(value: number | undefined): string {
         >
           结论已记录
         </p>
-        <p v-else class="mt-1 text-ink-soft">还差一句结论：展开下面的「数据采集器」卡，点「用这次数据下结论」。</p>
+        <p v-else class="mt-1 text-ink-soft">还差一句结论：在下面点一句用这次数据写下的结论。</p>
       </div>
 
       <p v-else class="mt-1 text-xs text-ink-soft">

@@ -141,6 +141,29 @@ export function validateRepairOnly(script: PatternScript, repair: unknown): {
   return { passed: false, failureClass: 'pattern-cycle-wrong' };
 }
 
+/**
+ * 从已经填进去的缺口反推一条能解释它们的候选规律（画布自动声明规律用）。
+ * candidateRules 只由可见格推出，所以反推出来的规则天然满足迁移门的可翻译要求；
+ * 填法对不上任何候选时返回 null —— 交给 validateRepairOnly 去报具体错在哪。
+ */
+export function deriveRuleFromRepairs(
+  script: PatternScript,
+  repairs: ReadonlyMap<number, string>,
+): PatternRule | null {
+  if (repairs.size === 0) return null;
+  for (const rule of candidateRules(script)) {
+    let explains = true;
+    for (const [index, token] of repairs) {
+      if (!sameTokenShape(tokenAt(rule, index), token)) {
+        explains = false;
+        break;
+      }
+    }
+    if (explains) return rule;
+  }
+  return null;
+}
+
 /** 规则对整条带子的预测；长度取 scenario 与 visible 的较大值，和画布上画出的格数一致。 */
 export function previewCells(script: PatternScript, rule: PatternRule): PatternPreviewCell[] {
   const length = Math.max(script.scenario.length, script.scenario.visible.length);

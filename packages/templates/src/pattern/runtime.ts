@@ -6,8 +6,8 @@ import type { PatternRule } from '@mmf/toolkit/pattern';
 import { validateRule } from '@mmf/toolkit/pattern';
 import { patternDigest } from '@mmf/toolkit/pattern';
 import {
-  actionsFor, buildPreview, parseScript, patternRuleKey, toWorld, transferFailureClass, transferVariants,
-  validateArtifact,
+  actionsFor, buildPreview, deriveRuleFromRepairs, parseScript, patternRuleKey, toWorld,
+  transferFailureClass, transferVariants, validateArtifact,
 } from './logic';
 import type { PatternPreview, PatternScript, PatternToolStateView, PatternVariant } from './logic';
 
@@ -17,7 +17,7 @@ interface RuntimeState {
   committed: boolean;
   /** 「预览一下」的预测格；只给画布画 ghost，不参与判定。 */
   preview?: PatternPreview;
-  /** 预览序号单调递增：ToolDock 每次预览前都会重发 setCycle，不能拿 preview.seq 自增。 */
+  /** 预览序号单调递增：重复预览也要能重新跑一遍，不能拿 preview.seq 自增。 */
   previewSeq: number;
   placements: Map<number, string>;
   checkpoints: Record<string, boolean>;
@@ -124,6 +124,19 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
     state.checkpoints.repair = state.placements.size >= brokenIndices.length;
   }
 
+  /**
+   * 画布即答案（本轮简化）：玩家只往缺口里填字母，规律由已填内容自动反推并自动声明。
+   * 反推命中 —— 规律与补块一起进产物，迁移门照常可验；
+   * 反推不中 —— 规则清空，submit 走 repair-only 校验，报的仍是具体错在哪一格。
+   */
+  function refreshDerivedRule(): void {
+    const derived = deriveRuleFromRepairs(script, state.placements);
+    state.rule = derived;
+    state.committed = derived !== null;
+    if (derived) state.checkpoints.hypothesis = true;
+    state.preview = undefined;
+  }
+
   function missingEvidence(): Verdict['missingEvidence'] {
     const missing: Verdict['missingEvidence'] = [];
     for (const item of detail.evidencePlan) {
@@ -174,11 +187,10 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
       runs: [...state.runs],
       lastRun: state.lastRun,
       verdict: state.verdict,
-      // 自动判题口径（docs/13）：规律已提交 + 所有缺口补齐，才让宿主去判。
-      // 只回答「填完了没有」，对错仍由 validateArtifact 决定：repair-only 虽然母本能过，
-      // 但迁移门还缺可翻译的规律，所以没提交规律时不能算答案完整。
-      answerComplete: state.committed && state.rule !== null
-        && state.placements.size >= brokenIndices.length,
+      // 自动判题口径（docs/13 + 本轮去卡片化）：所有缺口都填上就让宿主判。
+      // 只回答「填完了没有」——规律由填法自动反推；对错仍由 validateArtifact 决定，
+      // 填错时反推不出规则，submit 会走 repair-only 报 pattern-mismatch。
+      answerComplete: state.placements.size >= brokenIndices.length,
       stamps: [...state.stamps],
       revision: state.revision,
       updatedAt: opts.now(),
@@ -329,6 +341,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         usage('construct').used += 1;
         usage('construct').lastAction = action.type;
         state.placements.set(piece.x, piece.shape);
+        refreshDerivedRule();
         refreshPlacementCheckpoints();
         state.phase = 'editing';
         emit({
@@ -345,6 +358,7 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
         if (!match) return fail('找不到这块。');
         const index = Number(match[1]);
         state.placements.delete(index);
+        refreshDerivedRule();
         refreshPlacementCheckpoints();
         usage('construct').used += 1;
         usage('construct').lastAction = action.type;

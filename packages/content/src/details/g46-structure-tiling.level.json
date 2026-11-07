@@ -5,7 +5,7 @@
   "thread": "structure",
   "template": "argue",
   "thinkingTarget": "用染色/奇偶不变量判断 8×8 去角棋盘能否被多米诺铺满",
-  "intro": "这张 8×8 棋盘少了两个同色角。先铺几块，再找那个不随摆放改变的量。",
+  "intro": "这张 8×8 棋盘少了两个同色角。想一想：哪个量不管怎么摆都不会变？",
   "prompt": "这张棋盘能不能被 1×2 多米诺铺满？选一条能给出结论的依据。",
   "done": "你用不变量排除了整类铺法，而不是只试了几种摆法。",
   "retry": "数一数黑白格或总格数，看看每次铺一块这个量会怎么变。",
@@ -285,7 +285,7 @@
   },
   "titleEn": "Tiling Boundary",
   "thinkingTargetEn": "Use a coloring or parity invariant to decide whether an 8×8 board with two corners removed can be tiled.",
-  "introEn": "Two same-color corners are gone. Place a few dominoes, then find the invariant.",
+  "introEn": "Two same-color corners are gone from this 8×8 board. Think: which quantity never changes?",
   "promptEn": "Can this board be tiled by 1×2 dominoes? Pick a warrant that settles it.",
   "doneEn": "Your invariant ruled out the whole tiling family.",
   "retryEn": "Count black and white cells or the total cell count."

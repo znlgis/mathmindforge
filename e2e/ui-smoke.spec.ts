@@ -64,12 +64,6 @@ const CASES: SmokeCase[] = [
       await serviceTime.blur();
     },
   },
-  {
-    level: 'k-algorithm-train',
-    panel: 'rule-tool',
-    label: '程序列表：加一块积木后列表必须变',
-    setup: async (page) => { await page.getByTestId('rule-add-forward').click(); },
-  },
 ];
 
 for (const smoke of CASES) {
