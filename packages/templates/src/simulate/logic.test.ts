@@ -179,8 +179,10 @@ describe('simulate · g79 城市调度', () => {
 
     const dataset = snapshot.toolState.probe?.dataset;
     expect(dataset?.id).toBe('sim-runs-v1');
-    expect(dataset?.n).toBe(1);
+    // 编辑即运行：第一次改参数就记了一条 run-1，显式 knob/run 又记一条 run-2。
+    expect(dataset?.n).toBe(2);
     expect(dataset?.groups?.['run-1']).toEqual([3, 1, 90, 0, 1, 16, 1, 17, 103, 1]);
+    expect(dataset?.groups?.['run-2']).toEqual([3, 1, 90, 0, 1, 16, 1, 17, 103, 1]);
 
     // 运行之后指标就在同一块面板上：compare 由运行自动满足（不是玩家必须点的按钮）。
     expect(snapshot.checkpoints.compare).toBe(true);
@@ -188,22 +190,45 @@ describe('simulate · g79 城市调度', () => {
     expect(submitted.verdict?.passed).toBe(true);
   });
 
-  it('改参数后旧运行失效，必须重跑', async () => {
+  it('改参数就自动重跑：旧运行不再代表当前配置，失败原因照报', async () => {
     const runtime = createSimulateRuntime(detail, options());
     await runtime.autoplay();
-    expect(runtime.snapshot().checkpoints.run).toBe(true);
-    await runtime.dispatch({ type: 'knob/set', payload: { key: 'vehicles', value: 4 } });
+    expect(runtime.snapshot().checkpoints).toEqual({ params: true, run: true, compare: true });
+    // 4 辆车 1 队 90 分钟：成本 128，超预算。改完的这一刻就已经用新参数跑过一次。
+    const changed = await runtime.dispatch({ type: 'knob/set', payload: { key: 'vehicles', value: 4 } });
+    expect(changed.ok).toBe(true);
     const snapshot = runtime.snapshot();
-    expect(snapshot.checkpoints.run).toBe(false);
-    expect(snapshot.checkpoints.params).toBe(false);
+    expect(snapshot.toolState.probe?.dataset?.groups?.['run-3']).toEqual([4, 1, 90, 0, 1, 12, 1, 13, 128, 0]);
+    expect(snapshot.checkpoints).toEqual({ params: true, run: true, compare: true });
+    expect(snapshot.answerComplete).toBe(true);
     const result = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(result.verdict?.passed).toBe(false);
-    // 参数一改，运行与对照都不再代表当前配置：三个检查点一起退回缺失。
-    expect(result.verdict?.missingEvidence.map((item) => item.checkpointId)).toEqual([
-      'params',
-      'run',
-      'compare',
-    ]);
+    expect(result.verdict?.failure?.class).toBe('sim-budget');
+  });
+
+  it('编辑即运行：改一个旋钮后 lastRun 立刻存在，answerComplete 变 true', async () => {
+    const runtime = createSimulateRuntime(detail, options());
+    const fresh = runtime.snapshot();
+    // 还没跑出结果：不能自动判。
+    expect(fresh.answerComplete).toBe(false);
+    expect(fresh.toolState.knob?.lastRunId).toBeUndefined();
+
+    const changed = await runtime.dispatch({ type: 'knob/set', payload: { key: 'vehicles', value: 3 } });
+    expect(changed.ok).toBe(true);
+    const snapshot = runtime.snapshot();
+    // 不用再点「运行」：改完的这一刻指标与产物就已经就绪。
+    expect(snapshot.toolState.knob?.lastRunId).toBe('run-1');
+    expect(snapshot.toolState.probe?.dataset?.n).toBe(1);
+    expect(snapshot.answerComplete).toBe(true);
+    expect(snapshot.artifacts.map((item) => item.id)).toEqual(['params', 'runs']);
+
+    // 点回同一档不重复记一条运行。
+    await runtime.dispatch({ type: 'knob/set', payload: { key: 'vehicles', value: 3 } });
+    expect(runtime.snapshot().toolState.probe?.dataset?.n).toBe(1);
+
+    // 重来之后回到「还没填完」，不会自动判一份空答案。
+    await runtime.dispatch({ type: 'knob/reset', payload: {} });
+    expect(runtime.snapshot().answerComplete).toBe(false);
   });
 
   it('autoplay 走公开动作路径通关', async () => {
@@ -305,9 +330,12 @@ describe('simulate · g46 排队规划（运行即锁定）', () => {
     ]);
   });
 
-  it('一次运行就锁定参数：三项检查点全满足，指标写进 queue-runs-v1', async () => {
+  it('改参数就自动跑：三项检查点全满足，指标写进 queue-runs-v1', async () => {
     const runtime = queueRuntime();
-    for (const [key, value] of [['servers', 2], ['serviceTime', 2], ['openMinutes', 30]] as const) {
+    // servers 与 openMinutes 本来就是默认值（2 / 30），只有 serviceTime 真的变了，
+    // 所以编辑即运行只记一条 run-1；后面的 knob/run 再记 run-2。
+    const defaults: [string, number][] = [['servers', 2], ['serviceTime', 2], ['openMinutes', 30]];
+    for (const [key, value] of defaults) {
       const result = await runtime.dispatch({ type: 'knob/set', payload: { key, value } });
       expect(result.ok, key).toBe(true);
     }
@@ -319,25 +347,37 @@ describe('simulate · g46 排队规划（运行即锁定）', () => {
     const dataset = snapshot.toolState.probe?.dataset;
     expect(dataset?.id).toBe(QUEUE_DATASET_ID);
     expect(dataset?.groups?.['run-1']).toEqual([2, 2, 30, 0, 0, 0, 16, 1]);
-    expect(snapshot.toolState.knob?.lastRunId).toBe('run-1');
+    expect(dataset?.groups?.['run-2']).toEqual([2, 2, 30, 0, 0, 0, 16, 1]);
+    expect(snapshot.toolState.knob?.lastRunId).toBe('run-2');
 
     const submitted = await runtime.dispatch({ type: 'submit', payload: {} });
     expect(submitted.verdict?.passed).toBe(true);
   });
 
-  it('参数一改，旧运行立刻作废（不再静默失败）', async () => {
+  it('编辑即运行：改一个旋钮后不用点运行，answerComplete 立刻变 true', async () => {
     const runtime = queueRuntime();
-    await runtime.dispatch({ type: 'knob/set', payload: { key: 'serviceTime', value: 2 } });
-    await runtime.dispatch({ type: 'knob/run', payload: {} });
-    const changed = await runtime.dispatch({ type: 'knob/set', payload: { key: 'servers', value: 3 } });
+    // 还没动过手：不能自动判（避免开局就判一份默认参数的答案）。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    const changed = await runtime.dispatch({ type: 'knob/set', payload: { key: 'serviceTime', value: 2 } });
     expect(changed.ok).toBe(true);
-    const snapshot = runtime.snapshot();
-    expect(snapshot.checkpoints).toEqual({ params: false, run: false, compare: false });
-    // 历史表还在（用于对照），但产物已经不可提交。
-    expect(snapshot.toolState.probe?.dataset?.groups?.['run-1']).toBeTruthy();
-    const submitted = await runtime.dispatch({ type: 'submit', payload: {} });
-    expect(submitted.verdict?.passed).toBe(false);
-    expect(submitted.verdict?.missingEvidence.length).toBeGreaterThan(0);
+    let snapshot = runtime.snapshot();
+    expect(snapshot.toolState.knob?.lastRunId).toBe('run-1');
+    expect(snapshot.checkpoints).toEqual({ params: true, run: true, compare: true });
+    expect(snapshot.answerComplete).toBe(true);
+
+    // 再改一个：旧运行自动被新参数的那次运行替换，产物永远跟着最新参数走。
+    const next = await runtime.dispatch({ type: 'knob/set', payload: { key: 'servers', value: 3 } });
+    expect(next.ok).toBe(true);
+    snapshot = runtime.snapshot();
+    expect(snapshot.toolState.knob?.lastRunId).toBe('run-2');
+    expect(snapshot.toolState.probe?.dataset?.groups?.['run-2']?.[0]).toBe(3);
+    expect(snapshot.checkpoints).toEqual({ params: true, run: true, compare: true });
+    expect(snapshot.answerComplete).toBe(true);
+
+    // 点回同一档不重复记一条运行。
+    await runtime.dispatch({ type: 'knob/set', payload: { key: 'servers', value: 3 } });
+    expect(runtime.snapshot().toolState.probe?.dataset?.n).toBe(2);
   });
 
   it('autoplay 走公开动作路径通关', async () => {

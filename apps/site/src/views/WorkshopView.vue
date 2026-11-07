@@ -27,8 +27,11 @@ const props = defineProps<{ levelId: ShippedLevelId }>();
 const MAX_EVIDENCE_QUEUE = 400;
 /** 同一批证据最多重试次数，超过就丢弃并记一条调试错误。 */
 const MAX_EVIDENCE_RETRY = 3;
-/** instant 模式（e2e）下完成面板停留多久再回星图；正常玩不自动跳。 */
-const INSTANT_EXIT_DELAY_MS = 300;
+/** 玩家停手多久后自动判题：太短会在"还在填"时误报，太长会让人觉得没反应。 */
+const AUTO_JUDGE_DELAY_MS = 500;
+/** 答对后成功遮罩停留多久再进下一关（instant 模式是 e2e 用的快进）。 */
+const AUTO_NEXT_DELAY_MS = 900;
+const INSTANT_NEXT_DELAY_MS = 120;
 
 const host = ref<HTMLDivElement | null>(null);
 const canvasHost = ref<HTMLDivElement | null>(null);
@@ -55,17 +58,9 @@ const display = computed(() => (detail.value ? localizedDetail(detail.value, loc
 const summary = computed(() => getLevelSummary(props.levelId));
 const bandLabel = computed(() => (summary.value ? t('band.' + summary.value.band) : ''));
 const threadLabel = computed(() => (summary.value ? t('thread.' + summary.value.thread) : ''));
-const usedTools = computed(() => {
-  const usage = finalSnapshot.value?.toolUsage;
-  if (!usage) return 0;
-  return Object.values(usage).filter((item) => item.used > 0).length;
-});
 const variantResults = computed(() => finalSnapshot.value?.verdict?.variantResults ?? []);
-const passedCheckpoints = computed(() => {
-  const checkpoints = finalSnapshot.value?.checkpoints;
-  if (!checkpoints) return 0;
-  return Object.values(checkpoints).filter(Boolean).length;
-});
+/** 过关遮罩上的那句话：自动跳下一关，还是回星图。 */
+const successMessage = computed(() => (nextId.value ? t('complete.autoNext') : t('complete.autoFinish')));
 const ready = computed(() => (
   !loading.value && error.value === null && runtime.value !== null && detail.value !== null
 ));
@@ -95,6 +90,10 @@ const failureCopy = computed<{ message: string; hint: string | null } | null>(()
   if (verdict.failure) {
     const copy = currentDetail.feedback[verdict.failure.class];
     if (copy) return { message: t(copy.messageKey), hint: t(copy.hintKey) };
+    // 内容里没写这一类的反馈时，直接用运行时算出来的原因（例如"第 3 步撞墙"），
+    // 不能只显示一句"还差一点"——玩家得知道错在哪。
+    const cause = verdict.failure.causes?.[0];
+    if (cause) return { message: t(cause.messageKey, cause.params), hint: currentDetail.retry };
     return { message: t('level.failed'), hint: currentDetail.retry };
   }
   const first = verdict.missingEvidence[0];
@@ -105,6 +104,8 @@ const failureCopy = computed<{ message: string; hint: string | null } | null>(()
 const nextId = computed(() => nextLevelId(progress.save, props.levelId));
 
 let disposed = false;
+/** 自动播放正在跑：它自己会 submit，不能让自动判题再插一脚。 */
+let autoplayRunning = false;
 let debugOptions: DebugOptions | undefined;
 let unsubscribe: (() => void) | null = null;
 let offPause: (() => void) | null = null;
@@ -112,7 +113,12 @@ let offResume: (() => void) | null = null;
 let evidenceQueue: EvidenceDraft[] = [];
 let evidenceTimer: number | null = null;
 let evidenceRetries = 0;
-let exitTimer: number | null = null;
+/** 自动判题的防抖计时器。 */
+let autoJudgeTimer: number | null = null;
+/** 过关后自动跳下一关的计时器。 */
+let advanceTimer: number | null = null;
+/** 上一次自动判题时的工具使用总数：没有新操作就不再重复判（防 snapshot 抖动导致判题循环）。 */
+let autoJudgedUsage = -1;
 const recordedEvidencePhases = new Set<string>();
 
 function scheduleEvidenceFlush(): void {
@@ -148,10 +154,17 @@ async function flushEvidence(): Promise<void> {
   }
 }
 
-function clearExitTimer(): void {
-  if (exitTimer !== null) {
-    window.clearTimeout(exitTimer);
-    exitTimer = null;
+function clearAutoJudge(): void {
+  if (autoJudgeTimer !== null) {
+    window.clearTimeout(autoJudgeTimer);
+    autoJudgeTimer = null;
+  }
+}
+
+function clearAdvanceTimer(): void {
+  if (advanceTimer !== null) {
+    window.clearTimeout(advanceTimer);
+    advanceTimer = null;
   }
 }
 
@@ -198,15 +211,20 @@ async function completeNow(stamps: StampId[], variantId: string): Promise<void> 
     recordDebugEvent('level:complete:' + levelId);
     recordDebugEvent('journal:add');
   }
-  // 不再 1.8 秒踢走玩家：面板停住等玩家选"下一关/再玩一次/回星图"。
-  // 只有 e2e 的 instant 模式保留自动回星图，免得每个用例都要多点一下。
-  if (debugOptions?.instant) {
-    clearExitTimer();
-    exitTimer = window.setTimeout(() => {
-      exitTimer = null;
-      navigate('/forge');
-    }, INSTANT_EXIT_DELAY_MS);
-  }
+  // 答对就直接进下一关（docs/13）：成功遮罩停一下让玩家看见"过了"，然后自动跳。
+  // 存档失败时停在面板上，别把"没存上"的警告一起带走。
+  if (!saveFailed.value) scheduleAdvance();
+}
+
+/** 过关后的自动推进：有下一关就进下一关，没有就回星图。 */
+function scheduleAdvance(): void {
+  clearAdvanceTimer();
+  const delay = debugOptions?.instant ? INSTANT_NEXT_DELAY_MS : AUTO_NEXT_DELAY_MS;
+  advanceTimer = window.setTimeout(() => {
+    advanceTimer = null;
+    if (disposed) return;
+    goNext();
+  }, delay);
 }
 
 async function submit(): Promise<void> {
@@ -235,6 +253,31 @@ async function submit(): Promise<void> {
   } finally {
     actionPending.value = false;
   }
+}
+
+/**
+ * 自动判题（docs/13）：答案一填完就判，玩家不用再点「完成」。
+ * - 只在玩家真的动过手之后触发（工具使用数增加）；挂载、自动播放都不算；
+ * - 每次操作后等 AUTO_JUDGE_DELAY_MS，连续操作只判最后一次；
+ * - 判定顺序仍是"先结构校验、再报缺步骤"，答错原因走 failure-banner；
+ * - 判过就不再重复判（autoJudgedUsage），玩家一改答案才会重新判。
+ */
+function scheduleAutoJudge(usage: number): void {
+  clearAutoJudge();
+  autoJudgeTimer = window.setTimeout(() => {
+    autoJudgeTimer = null;
+    void autoJudge(usage);
+  }, AUTO_JUDGE_DELAY_MS);
+}
+
+async function autoJudge(usage: number): Promise<void> {
+  const snapshot = liveSnapshot.value;
+  if (disposed || completed.value || actionPending.value || !snapshot) return;
+  if (!snapshot.answerComplete) return;
+  // 防抖期间玩家又改了答案：这一次作废，等下一次快照。
+  if (usageTotal(snapshot) !== usage) return;
+  autoJudgedUsage = usage;
+  await submit();
 }
 
 async function start(): Promise<void> {
@@ -305,12 +348,14 @@ async function start(): Promise<void> {
     bindLifecycle();
     registerSubmit(submit);
     if (debugOptions?.autoplay) {
+      autoplayRunning = true;
       const result = await runtimeRef.autoplay();
       await flushEvidence();
       finalSnapshot.value = result.snapshot;
       liveSnapshot.value = result.snapshot;
       verdictUsageAt.value = usageTotal(result.snapshot);
       setDebugSnapshot(result.snapshot);
+      autoplayRunning = false;
       if (result.verdict?.passed) await completeNow(result.verdict.stamps, result.snapshot.variantId);
     }
   } catch (cause) {
@@ -336,7 +381,8 @@ function bindLifecycle(): void {
 }
 
 async function teardown(): Promise<void> {
-  clearExitTimer();
+  clearAutoJudge();
+  clearAdvanceTimer();
   offPause?.();
   offResume?.();
   offPause = null;
@@ -361,6 +407,8 @@ async function teardown(): Promise<void> {
 }
 
 function leave(): void {
+  clearAutoJudge();
+  clearAdvanceTimer();
   platform.audio.stopSpeech();
   navigate('/forge');
 }
@@ -378,7 +426,9 @@ async function replay(): Promise<void> {
   newBadges.value = [];
   verdictUsageAt.value = null;
   actionError.value = null;
-  clearExitTimer();
+  autoJudgedUsage = -1;
+  clearAutoJudge();
+  clearAdvanceTimer();
   finalSnapshot.value = null;
   const rt = runtime.value;
   if (!rt) return;
@@ -401,6 +451,12 @@ let lastRunId: string | null = null;
 watch(liveSnapshot, (snapshot) => {
   // 玩家一动手就撤掉上一次的"操作被拒"消息，避免它粘在屏幕上。
   if (snapshot && actionError.value !== null) actionError.value = null;
+  // 自动判题：玩家动过手 + 答案填完了 → 等输入落定后自动提交（答对直接下一关）。
+  if (snapshot && !autoplayRunning) {
+    const usage = usageTotal(snapshot);
+    // usage > 0：挂载时的初始快照不算玩家操作，哪怕某个模板开局就"答案已完整"也不判。
+    if (usage > 0 && usage > autoJudgedUsage && snapshot.answerComplete) scheduleAutoJudge(usage);
+  }
   if (!snapshot || settings.muted) return;
   const total = usageTotal(snapshot);
   if (total > lastUsageTotal) platform.audio.play('tap');
@@ -538,15 +594,10 @@ watch(completed, async (value) => {
             class="flex flex-wrap gap-2"
             :class="module?.manifest.hasCanvas ? '' : 'mx-auto w-full max-w-3xl'"
           >
-            <button
-              type="button"
-              data-testid="level-submit"
-              class="min-h-12 flex-1 whitespace-nowrap rounded-2xl bg-teal px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-50"
-              :disabled="actionPending || completed"
-              @click="submit"
-            >
-              {{ t('level.submit') }}
-            </button>
+            <!-- 没有「完成」按钮：答案填完就自动判题（docs/13）。保留「重来」给走偏的玩家一键复位。 -->
+            <p data-testid="level-auto-judge" class="min-h-12 flex flex-1 items-center text-xs font-semibold text-ink-soft">
+              {{ t('level.autoJudgeHint') }}
+            </p>
             <button
               type="button"
               data-testid="level-reset"
@@ -587,25 +638,22 @@ watch(completed, async (value) => {
       </div>
     </div>
 
+    <!-- 过关成功：只停一下让玩家看见"过了"，然后自动进下一关（half second 级，点都不用点）。
+         存档失败时才退回可交互面板，不能把"没存上"的警告一起带走。 -->
     <div
-      v-if="completed"
+      v-if="completed && !saveFailed"
       ref="completionPanel"
-      data-testid="completion-panel"
+      data-testid="level-success"
       role="dialog"
       aria-modal="true"
       aria-labelledby="completion-title"
       tabindex="-1"
-      class="absolute inset-0 z-20 flex items-center justify-center bg-ink/60 p-4 focus:outline-none"
+      class="absolute inset-0 z-20 flex items-center justify-center bg-ink/35 p-4 focus:outline-none"
     >
-      <div class="w-full max-w-md rounded-3xl border border-grid bg-card p-6 text-center shadow-xl">
+      <div class="w-full max-w-sm rounded-3xl border border-grid bg-card px-6 py-5 text-center shadow-xl">
         <p class="text-4xl" aria-hidden="true">🎉</p>
-        <h2 id="completion-title" class="mt-2 text-2xl font-black text-blueprint">{{ t('complete.title') }}</h2>
-        <p class="mt-3 text-sm leading-6 text-ink">{{ display?.done || t('complete.done') }}</p>
-        <div class="mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold text-ink-soft">
-          <span class="rounded-full bg-paper px-3 py-1">用了 {{ usedTools }} 件工具</span>
-          <span class="rounded-full bg-paper px-3 py-1">通过 {{ passedCheckpoints }} 个检查点</span>
-          <span class="rounded-full bg-mint px-3 py-1 text-teal">印章 {{ finalSnapshot?.stamps.length ?? 0 }} 枚</span>
-        </div>
+        <h2 id="completion-title" class="mt-2 text-xl font-black text-blueprint">{{ t('complete.title') }}</h2>
+        <p data-testid="level-success-message" class="mt-1 text-sm font-bold text-teal">{{ successMessage }}</p>
         <ul
           v-if="newBadges.length > 0"
           data-testid="completion-badges"
@@ -616,35 +664,39 @@ watch(completed, async (value) => {
             :key="badge.id"
             class="rounded-full bg-brass/15 px-3 py-1 text-xs font-bold text-brass"
           >
-            🏅 新贴纸：{{ badge.title }}
+            🏅 {{ badge.title }}
           </li>
         </ul>
-        <p v-if="saveFailed" role="alert" class="mt-3 rounded-xl bg-red/10 px-3 py-2 text-xs font-bold text-red">
+        <p
+          v-if="variantResults.length > 0"
+          data-testid="variant-passport"
+          class="mt-2 text-[11px] font-semibold text-ink-soft"
+        >
+          {{ t('complete.passport') }}
+          <span v-for="variant in variantResults" :key="variant.id" class="ml-1">
+            {{ variant.id }} {{ variant.passed ? '✓' : '✗' }}
+          </span>
+        </p>
+      </div>
+    </div>
+
+    <!-- 存档失败：停在这里，让玩家看得到警告，并保留重玩/回星图。 -->
+    <div
+      v-if="completed && saveFailed"
+      ref="completionPanel"
+      data-testid="completion-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="completion-title-save"
+      tabindex="-1"
+      class="absolute inset-0 z-20 flex items-center justify-center bg-ink/60 p-4 focus:outline-none"
+    >
+      <div class="w-full max-w-md rounded-3xl border border-grid bg-card p-6 text-center shadow-xl">
+        <h2 id="completion-title-save" class="text-2xl font-black text-blueprint">{{ t('complete.title') }}</h2>
+        <p role="alert" class="mt-3 rounded-xl bg-red/10 px-3 py-2 text-xs font-bold text-red">
           这一关的进度没有写进存档，刷新后可能丢失。
         </p>
-        <div v-if="variantResults.length > 0" data-testid="variant-passport" class="mt-3 rounded-2xl bg-paper p-3 text-left">
-          <p class="text-xs font-bold text-ink">变体通行证</p>
-          <ul class="mt-1 flex flex-wrap gap-1.5">
-            <li
-              v-for="variant in variantResults"
-              :key="variant.id"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-              :class="variant.passed ? 'bg-mint text-teal' : 'bg-red/10 text-red'"
-            >
-              {{ variant.id }} {{ variant.passed ? '通过' : '失效' }}
-            </li>
-          </ul>
-        </div>
-        <div class="mt-6 flex flex-wrap justify-center gap-3">
-          <button
-            v-if="nextId"
-            type="button"
-            data-testid="completion-next"
-            class="min-h-12 rounded-2xl bg-teal px-5 text-sm font-bold text-white"
-            @click="goNext"
-          >
-            {{ t('complete.next') }} →
-          </button>
+        <div class="mt-5 flex flex-wrap justify-center gap-3">
           <button type="button" data-testid="completion-replay" class="min-h-12 rounded-2xl bg-card px-5 text-sm font-bold" @click="replay">
             {{ t('complete.replay') }}
           </button>

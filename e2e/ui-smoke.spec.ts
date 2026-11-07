@@ -3,11 +3,11 @@ import { expect, test } from '@playwright/test';
 /**
  * UI 冒烟门禁（docs/12 §7-7 / P1-3 遗留项）：
  * **关键动作之后，可见区必须发生变化**。目的是拦住两类问题：
- *   1. "死按钮"——点了屏幕完全不变（历史上 inference/metrics/queue 的"查看区间/指标"就是这样）；
+ *   1. "死按钮"——点了屏幕完全不变；
  *   2. "运行完没反馈"——调完参数点运行，指标区还是旧值。
  *
- * 做法：动作前后各取一次面板文本快照，断言两者不同。只看 DOM 文本/属性，
- * 不依赖截图，所以不会因为字体或渲染差异误报。
+ * 自动判题（docs/13）之后，"运行/倒出/抽两批"这些按钮都改成了自动执行：
+ * 这里改成断言"自动执行也要把结果真的画到面板上"，否则玩家看不到任何反馈。
  */
 
 async function panelSnapshot(page: import('@playwright/test').Page, testId: string): Promise<string> {
@@ -55,16 +55,14 @@ const CASES: SmokeCase[] = [
     setup: async (page) => { await page.getByTestId('frontier-plus-at').click(); },
   },
   {
-    level: 'k-data-tally',
-    panel: 'tally-tool',
-    label: '统计条：倒出后采集区必须变',
-    setup: async (page) => { await page.getByTestId('tally-dump').click(); },
-  },
-  {
-    level: 'g79-data-sampling',
-    panel: 'sampling-tool',
-    label: '抽样：抽两批后累计样本必须变',
-    setup: async (page) => { await page.getByTestId('sampling-two-batches').click(); },
+    level: 'g46-modeling-queue',
+    panel: 'knob-tool',
+    label: '排队：改一个旋钮后指标必须自动出现',
+    setup: async (page) => {
+      const serviceTime = page.getByTestId('knob-serviceTime');
+      await serviceTime.fill('2');
+      await serviceTime.blur();
+    },
   },
   {
     level: 'k-algorithm-train',

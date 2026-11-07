@@ -167,6 +167,18 @@ export function createRuleAdapter(detail: LevelDetail): RuntimeAdapter<RuleState
         },
       };
     },
+    /**
+     * 自动判题口径（docs/13）：程序非空，且执行结果已经「有话可说」——
+     * 撞墙/绕圈（failureClass 存在，已经能报错）或已经停在终点（漏收星星交给 validate 报）。
+     * 只回答「可以判了吗」，不回答对错；判定仍走 validateArtifact。
+     */
+    answerComplete(state: RuleState): boolean {
+      if (state.program.length === 0) return false;
+      const trace = executeProgram(script, state.program);
+      const goal = script.grid.goal;
+      return Boolean(trace.failureClass)
+        || (trace.end.x === goal.x && trace.end.y === goal.y);
+    },
     validate(_detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict {
       return validateArtifact(_detail, variant, artifact);
     },

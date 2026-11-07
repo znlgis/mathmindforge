@@ -68,7 +68,7 @@ function rowPass(row: MetricsRow) {
     </div>
 
     <div v-if="rows.length === 0" class="rounded-2xl border border-grid bg-paper p-3">
-      <p class="text-xs text-ink-soft">还没有运行记录。先回到旋钮那边跑一次，这里会列出每次运行的指标。</p>
+      <p class="text-xs text-ink-soft">还没有运行记录。改一个旋钮就会自动跑一次，这里会列出每次运行的指标。</p>
     </div>
 
     <div v-else class="overflow-x-auto rounded-2xl border border-grid bg-paper">

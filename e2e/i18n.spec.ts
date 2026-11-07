@@ -18,7 +18,9 @@ test('界面可切英文，并在刷新后记住选择', async ({ page }) => {
 
   await page.goto('/#/play/k-structure-pattern-path');
   await expect(page.getByText('Pattern Tinkerer').first()).toBeVisible();
-  await expect(page.getByTestId('level-submit')).toContainText('Finish');
+  // 没有「完成」按钮：答完自动判题（docs/13），只留一行英文提示
+  await expect(page.getByTestId('level-submit')).toHaveCount(0);
+  await expect(page.getByTestId('level-auto-judge')).toContainText('Checked automatically');
   // 宿主不再有独立的"运行"按钮：试一下与完成合并成同一个动作（docs/12 T0-3）
   await expect(page.getByTestId('level-run')).toHaveCount(0);
 

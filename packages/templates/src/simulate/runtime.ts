@@ -111,8 +111,8 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
 
   /**
    * 「运行即锁定」：一次运行同时锁定参数并产出两个种子日的指标。
-   * 参数一动，旧运行就不再代表当前配置（上面 knob/set 会清掉 lastRun），
-   * 所以产物只认「最近一次运行 + 参数没变」，不再需要单独的「锁定参数」按钮。
+   * 编辑即运行之后，knob/set 会直接用新参数跑一次，所以这里正常情况取「最近一次运行」；
+   * 但仍要校验「参数没变」，防止状态被旧动作或直接构造破坏。产物只认这一组事实。
    */
   function artifactOf(state: SimState): SimulateArtifact | null {
     if (!state.lastRun) return null;
@@ -120,12 +120,43 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
     return makeArtifact(paramsOf(script, state.lastRun.values), state.lastRun.seeds);
   }
 
+  /**
+   * 用当前参数跑一次，产出运行记录（knob/run 与 knob/set 共用）。
+   * 编辑即运行：改一个旋钮就等价于「设参数 + 跑一次」，不再需要「运行」按钮。
+   */
+  function computeRecord(state: SimState, values: KnobValues): SimRunRecord {
+    const params = paramsOf(script, values);
+    const seeds = runSimulation(script, params);
+    const cost = costOf(script, params);
+    const passed = withinBudget(script, cost)
+      && targetChecks(script, seeds).every((check) => check.coverageOk && check.waitOk);
+    const seq = state.seq + 1;
+    return {
+      id: 'run-' + seq,
+      at: now(),
+      values: { ...values },
+      params,
+      seeds,
+      cost,
+      passed,
+    };
+  }
+
+  function withRun(state: SimState, record: SimRunRecord): SimState {
+    return {
+      ...state,
+      history: [...state.history, record].slice(-10),
+      lastRun: record,
+      seq: state.seq + 1,
+    };
+  }
+
   function checkpointsOf(state: SimState): Record<string, boolean> {
     return {
       params: state.lastRun !== null && valuesEqual(state.lastRun.values, state.values),
       run: state.lastRun !== null,
       // 跑完指标就在同一张卡上：对照是事实，删掉「查看指标」死按钮（docs/12 T0-4）。
-      // 参数改过（lastRun 清空）时对照也一并作废，不能留下「看过旧指标」的假证据。
+      // 编辑即运行保证 lastRun 永远对应最新参数，所以对照不再会因为「改过参数」而作废。
       compare: state.lastRun !== null,
     };
   }
@@ -181,55 +212,40 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
         else draft.routeIndex = action.payload.value;
         const values = normalizeValues(script, draft);
         const changed = !valuesEqual(values, state.values);
+        // 编辑即运行：参数一动就立刻用新参数跑一次，指标与产物当场就绪，
+        // 玩家不需要再点「运行」。值没变（点回同一档）则不重复记一条运行。
+        const record = changed ? computeRecord(state, values) : null;
         return {
-          state: {
-            ...state,
-            values,
-            // 参数一动，上一次运行就不再代表这组参数：必须重跑。
-            lastRun: changed ? null : state.lastRun,
-          },
+          state: record
+            ? withRun({ ...state, values }, record)
+            : { ...state, values },
           evidence: {
-            phase: 'hypothesize',
+            phase: changed ? 'run' : 'hypothesize',
             tool: 'knob',
             action: action.type,
-            metrics: {
-              vehicles: values.vehicles,
-              teams: values.teams,
-              shift: values.shift,
-              route: values.routeIndex,
-            },
+            outcome: record ? (record.passed ? 'pass' : 'fail') : undefined,
+            metrics: record
+              ? runMetrics(record.seeds, record.cost)
+              : {
+                vehicles: values.vehicles,
+                teams: values.teams,
+                shift: values.shift,
+                route: values.routeIndex,
+              },
           },
         };
       }
       case 'knob/run': {
-        const params = paramsOf(script, state.values);
-        const seeds = runSimulation(script, params);
-        const cost = costOf(script, params);
-        const passed = withinBudget(script, cost)
-          && targetChecks(script, seeds).every((check) => check.coverageOk && check.waitOk);
-        const seq = state.seq + 1;
-        const record: SimRunRecord = {
-          id: 'run-' + seq,
-          at: now(),
-          values: { ...state.values },
-          params,
-          seeds,
-          cost,
-          passed,
-        };
+        // 动作保留给 autoplay 与旧单测：界面已经不再渲染「运行」按钮（编辑即运行）。
+        const record = computeRecord(state, state.values);
         return {
-          state: {
-            ...state,
-            history: [...state.history, record].slice(-10),
-            lastRun: record,
-            seq,
-          },
+          state: withRun(state, record),
           evidence: {
             phase: 'run',
             tool: 'knob',
             action: action.type,
-            outcome: passed ? 'pass' : 'fail',
-            metrics: runMetrics(seeds, cost),
+            outcome: record.passed ? 'pass' : 'fail',
+            metrics: runMetrics(record.seeds, record.cost),
           },
         };
       }
@@ -290,6 +306,9 @@ export function createSimulateRuntime(detail: LevelDetail, opts: RuntimeOptions)
     },
     checkpoints: (state) => checkpointsOf(state),
     toolState: toolStateOf,
+    // 自动判题口径：只要「最近一次运行 + 参数没变」就有产物，说明答案填完了（对错交给 validate）。
+    // 注意不能写成 state.lastRun !== null：改参数但还没重跑的中间态必须算未完成。
+    answerComplete: (state) => artifactOf(state) !== null,
     validate: (levelDetail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict => (
       validateArtifact(levelDetail, variant, artifact)
     ),

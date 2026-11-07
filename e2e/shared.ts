@@ -113,6 +113,25 @@ export async function openTool(page: Page, kind: string, index: number): Promise
   await toggle.click();
 }
 
+/**
+ * 自动判定 + 自动过关（docs/13）：答案填完宿主自己判，答对直接进下一关。
+ * 等的是"这一关完成事件 + 已经离开这一关的地址"，不依赖点「完成」按钮。
+ */
+export async function waitAdvance(page: Page, levelId: string, timeoutMs = 20_000): Promise<boolean> {
+  const completed = await waitEvent(page, 'level:complete:' + levelId, timeoutMs);
+  if (!completed) return false;
+  try {
+    await page.waitForFunction(
+      (id) => !window.location.hash.includes('/play/' + id),
+      levelId,
+      { timeout: timeoutMs, polling: 50 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function waitEvent(page: Page, name: string, timeoutMs = 20_000): Promise<boolean> {
   try {
     await page.waitForFunction(

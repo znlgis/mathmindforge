@@ -110,6 +110,10 @@ function createSamplingAdapter(script: SamplingScript): RuntimeAdapter<SamplingS
         claim: state.claim !== null,
       };
     },
+    answerComplete(state): boolean {
+      // 抽样关的答案 = 用样本比例与区间写下的结论；样本由进入工具卡时自动抽好，缺的只是结论。
+      return state.total > 0 && state.claim !== null;
+    },
     toolState(state): Partial<ToolStateMap> {
       return {
         probe: {

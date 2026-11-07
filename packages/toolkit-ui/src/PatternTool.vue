@@ -152,11 +152,6 @@ async function pickTransform(nextTransform: PatternTransform): Promise<void> {
   if (!cycle.value || cycle.value.length < 2) return;
   await pickRule([...cycle.value], nextTransform);
 }
-
-async function preview(): Promise<void> {
-  if (!cycle.value || cycle.value.length < 2) return;
-  await dispatch({ type: 'pattern/preview', payload: { cycle: [...cycle.value], transform: transform.value } });
-}
 </script>
 
 <template>
@@ -174,9 +169,9 @@ async function preview(): Promise<void> {
 
     <div>
       <p class="text-sm font-bold text-ink">{{ translate('pattern.cycle') }}</p>
-      <p v-if="committed" class="mt-1 text-xs text-ink-soft">带子里重复的那几格就是答案，点一下选中。</p>
+      <p v-if="committed" class="mt-1 text-xs text-ink-soft">带子里重复的那几格就是答案，点一下就是声明规律。</p>
       <p v-else class="mt-1 text-xs font-bold text-brass" data-testid="pattern-rule-hint">
-        先点一条候选规律，再补画布上的缺口（完成时要用到这条规律）。
+        点画布空格补字母；点候选规律 = 声明规律。规律和缺口都齐了才会自动判定。
       </p>
       <div class="mt-2 flex flex-wrap gap-2">
         <button
@@ -215,18 +210,6 @@ async function preview(): Promise<void> {
           {{ translate('pattern.transform.' + option) }}
         </button>
       </div>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        data-testid="pattern-preview"
-        :disabled="busy || !cycle || cycle.length < 2"
-        class="min-h-11 flex-1 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="preview"
-      >
-        {{ translate('pattern.preview') }}
-      </button>
     </div>
 
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>

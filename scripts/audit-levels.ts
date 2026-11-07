@@ -10,7 +10,9 @@ import type { EvidenceDraft, LevelAction } from '@mmf/game-kit';
  * A3 至少 2 条有效解且产物互不相同；
  * A4 负例触发声明的失败类、反馈覆盖可达类、≥3 个失败类有负例；
  * A6 变体补丁可解析、迁移门逐条可过；
- * A8 证据计划 ≥2 阶段，且黄金解 autoplay 真的走到 passed。
+ * A8 证据计划 ≥2 阶段，且黄金解 autoplay 真的走到 passed；
+ * A11 自动判题可达：autoplay 通关后 answerComplete 必须为 true，
+ *     否则玩家填完答案宿主也不会判题（会自动判题的关卡不能只有"点完成"这一条路）。
  * A5/A10 是人工项，脚本只检查 manualAudit 记录存在。
  */
 
@@ -140,6 +142,13 @@ for (const id of SHIPPED_LEVEL_IDS) {
     if (unmet.length > 0) fail(id + ' A8：通过后仍有未满足的证据检查点 ' + unmet.map((c) => c.id).join('、'));
     else if (drafts.length === 0) fail(id + ' A8：autoplay 全程没有产生证据草稿');
     else ok('A8 autoplay 走通（' + drafts.length + ' 条证据草稿，检查点全满足）');
+  }
+
+  // ---- A11 自动判题可达：宿主没有「完成」按钮了，answerComplete 必须真的会变 true ----
+  if (snapshot.answerComplete !== true) {
+    fail(id + ' A11：通关后 answerComplete=' + String(snapshot.answerComplete) + '（自动判题永远触发不了）');
+  } else {
+    ok('A11 自动判题可达（通关时 answerComplete=true）');
   }
 }
 

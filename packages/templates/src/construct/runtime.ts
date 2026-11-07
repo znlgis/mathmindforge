@@ -306,6 +306,18 @@ function createAdapter(script: PaymentScript): RuntimeAdapter<ConstructState> {
       };
     },
     toolState,
+    /**
+     * 答案填完整 = 反例已指出失效前提（annotate 即提交）+ 台面有硬币，
+     * 且已经够付（总额达标）或已经放满（枚数到上限，必然是超额答案，交给 validate 报 overpay）。
+     * 这里只决定「什么时候判」，对错仍由 validate 负责。
+     */
+    answerComplete(state: ConstructState): boolean {
+      const coins = coinsOf(state);
+      const total = coins.reduce((sum, coin) => sum + coin, 0);
+      return Boolean(state.counter?.committed)
+        && coins.length > 0
+        && (total >= script.target || coins.length >= script.maxCoins);
+    },
     validate(detail: LevelDetail, variant: RuntimeVariant, artifact: unknown): Verdict {
       return validateArtifact(detail, variant, artifact);
     },

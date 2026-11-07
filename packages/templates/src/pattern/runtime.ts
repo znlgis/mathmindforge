@@ -174,6 +174,11 @@ export function createPatternRuntime(detail: LevelDetail, opts: RuntimeOptions):
       runs: [...state.runs],
       lastRun: state.lastRun,
       verdict: state.verdict,
+      // 自动判题口径（docs/13）：规律已提交 + 所有缺口补齐，才让宿主去判。
+      // 只回答「填完了没有」，对错仍由 validateArtifact 决定：repair-only 虽然母本能过，
+      // 但迁移门还缺可翻译的规律，所以没提交规律时不能算答案完整。
+      answerComplete: state.committed && state.rule !== null
+        && state.placements.size >= brokenIndices.length,
       stamps: [...state.stamps],
       revision: state.revision,
       updatedAt: opts.now(),

@@ -84,6 +84,10 @@ function createInferenceAdapter(script: InferenceScript): RuntimeAdapter<Inferen
         claim: state.claim !== null,
       };
     },
+    answerComplete(state): boolean {
+      // 推断关的答案就是「哪组更高 / 差异不明确」这一句结论（= artifact 非空）。
+      return state.claim !== null;
+    },
     toolState(state): Partial<ToolStateMap> {
       const stats = inferenceStats(script);
       return {

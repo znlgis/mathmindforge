@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { LevelDetail } from '@mmf/content';
 import tallyDetailJson from '../../../content/src/details/k-data-tally.level.json';
 import winrateDetailJson from '../../../content/src/details/g1012-modeling-winrate.level.json';
+import samplingDetailJson from '../../../content/src/details/g79-data-sampling.level.json';
+import inferenceDetailJson from '../../../content/src/details/g1012-data-inference.level.json';
 import { simulateDuel, paramsValid } from './duel';
 import {
   actionsFor, applyVariant, measureDuel, parseScript, reachableFailureClasses,
@@ -9,19 +11,24 @@ import {
 } from './logic';
 import type { DuelScript, TallyScript } from './schema';
 import { createExperimentRuntime } from './runtime';
+import { createSamplingRuntime } from './sampling-runtime';
+import { createInferenceRuntime } from './inference-runtime';
 import { extremes, truthCounts } from './tally';
 
 const tallyDetail = tallyDetailJson as unknown as LevelDetail;
 const winrateDetail = winrateDetailJson as unknown as LevelDetail;
+const samplingDetail = samplingDetailJson as unknown as LevelDetail;
+const inferenceDetail = inferenceDetailJson as unknown as LevelDetail;
 const baseVariant = { id: 'base', axis: 'structure', patch: {} };
+const RUNTIME_OPTIONS = {
+  seed: 101,
+  now: () => 1_700_000_000_000,
+  locale: 'zh-CN' as const,
+  reducedMotion: true,
+};
 
 function runtimeOf(detail: LevelDetail) {
-  return createExperimentRuntime(detail, {
-    seed: 101,
-    now: () => 1_700_000_000_000,
-    locale: 'zh-CN',
-    reducedMotion: true,
-  });
+  return createExperimentRuntime(detail, RUNTIME_OPTIONS);
 }
 
 describe('experiment template · tally', () => {
@@ -123,6 +130,25 @@ describe('experiment template · tally', () => {
     expect(result.ok).toBe(true);
     expect(result.snapshot.toolState.probe?.items).toHaveLength(20);
     expect(result.snapshot.checkpoints.sample).toBe(true);
+  });
+
+  it('answerComplete：采满 + 统计条 + 结论三件齐了才是 true（只表达填完，不判对错）', async () => {
+    const runtime = runtimeOf(tallyDetail);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({ type: 'probe/sample', payload: { n: 20 } });
+    // 采满了，但统计条还是空的：还没填完。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({ type: 'probe/tally', payload: { counts: truthCounts(script) } });
+    // 统计条记下了，但结论没选：还没填完。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'probe/claim',
+      payload: { claim: { kind: 'count-compare', category: 'circle', direction: 'most', tiedWith: ['triangle'], n: 20 } },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
   });
 
   it('界面读的两份配置与关卡脚本不漂移（整筐总数、批次大小）', () => {
@@ -294,6 +320,47 @@ describe('experiment template · duel', () => {
     expect(extras.targets?.baselineB).toBe(script.targets.baselineB);
   });
 
+  it('answerComplete：参数 + 采样 + 结论都齐了才是 true', async () => {
+    const runtime = runtimeOf(winrateDetail);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({ type: 'knob/set', payload: { key: 'attack', value: 50 } });
+    await runtime.dispatch({ type: 'knob/set', payload: { key: 'defense', value: 50 } });
+    // 50 + 50 + 40 还没凑满：自动运行不会启动，也不该报错。
+    expect(runtime.snapshot().toolState.probe?.dataset).toBeUndefined();
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({ type: 'knob/set', payload: { key: 'economy', value: 0 } });
+    // 凑满 100 点：编辑即运行，采样结果立刻出现，但还差结论。
+    expect(runtime.snapshot().toolState.probe?.dataset?.n).toBe(1000);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'probe/claim',
+      payload: { claim: { kind: 'stat', statistic: 'proportion', value: 0.851, n: 1000 } },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+
+  it('三参数一凑满就自动跑出采样结果（编辑即运行，不用点「运行」）', async () => {
+    const runtime = runtimeOf(winrateDetail);
+    const sets = [
+      { key: 'attack', value: 50 },
+      { key: 'defense', value: 50 },
+      { key: 'economy', value: 0 },
+    ] as const;
+    for (const payload of sets) {
+      const result = await runtime.dispatch({ type: 'knob/set', payload });
+      expect(result.ok, payload.key).toBe(true);
+    }
+    const snapshot = runtime.snapshot();
+    expect(snapshot.checkpoints.strategy).toBe(true);
+    expect(snapshot.checkpoints.run).toBe(true);
+    expect(snapshot.toolState.probe?.dataset?.n).toBe(1000);
+    // 和旧「跑满 1000 局」的黄金结果一致：自动运行复用了同一套 simulateDuel。
+    expect(snapshot.toolState.probe?.dataset?.counts?.wins).toBe(851);
+  });
+
   it('exposes every declared action through actionsFor（单一运行入口）', () => {
     const actions = actionsFor(winrateDetail, baseVariant, winrateDetail.solutions[0]?.artifact);
     expect(actions.filter((action) => action.type === 'knob/set')).toHaveLength(3);
@@ -326,5 +393,40 @@ describe('experiment template · duel', () => {
     const verdict = validateArtifact(winrateDetail, baseVariant, artifact);
     expect(verdict.passed).toBe(false);
     expect(verdict.failure?.class).toBe('exp-not-run');
+  });
+});
+
+describe('experiment template · sampling', () => {
+  it('answerComplete：有样本但没写结论时是 false，记录结论后才是 true', async () => {
+    const runtime = createSamplingRuntime(samplingDetail, RUNTIME_OPTIONS);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({ type: 'probe/sample', payload: { n: 20 } });
+    await runtime.dispatch({ type: 'probe/sample', payload: { n: 20 } });
+    expect(runtime.snapshot().toolState.probe?.dataset?.counts?.batches).toBe(2);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'probe/claim',
+      payload: {
+        claim: {
+          kind: 'stat', statistic: 'proportion', value: 0.55, n: 40, ci: [0.3983, 0.6929],
+        },
+      },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+});
+
+describe('experiment template · inference', () => {
+  it('answerComplete：没选结论是 false，点一个结论就是 true', async () => {
+    const runtime = createInferenceRuntime(inferenceDetail, RUNTIME_OPTIONS);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'probe/claim',
+      payload: { claim: { kind: 'difference', delta: 0.4, ci: [0.12, 0.68], n: 100 } },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
   });
 });

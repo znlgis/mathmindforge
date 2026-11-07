@@ -91,6 +91,29 @@ describe('argue template', () => {
     expect(verdict.passed, verdict.failure?.class).toBe(true);
   });
 
+  it('answerComplete 只在依据选定后变 true（自动判题口径）', async () => {
+    const runtime = runtimeFor('g1012-structure-invariant');
+    // 空手开局：没有证书，不能自动判。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    // 只数了黑白格、还没选依据：证据有了但证书没成立，仍然不能判。
+    await runtime.dispatch({ type: 'probe/sample', payload: {} });
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    // 选一条依据 = 选完依据，主张/范围/证据由运行时派生，答案已填完。
+    const picked = await runtime.dispatch({ type: 'argue/setWarrant', payload: { warrant: 'coloring' } });
+    expect(picked.ok).toBe(true);
+    expect(picked.snapshot.argument?.committed).toBe(true);
+    expect(picked.snapshot.answerComplete).toBe(true);
+  });
+
+  it('autoplay 之后 answerComplete 为 true（快照可直接交给宿主自动判题）', async () => {
+    const runtime = runtimeFor('g46-structure-tiling');
+    const result = await runtime.autoplay();
+    expect(result.verdict?.passed).toBe(true);
+    expect(result.snapshot.answerComplete).toBe(true);
+  });
+
   it('re-attaches evidence when the warrant changes (no ordering trap)', async () => {
     const runtime = runtimeFor('g1012-structure-invariant');
     await runtime.dispatch({ type: 'argue/setWarrant', payload: { warrant: 'parity' } });

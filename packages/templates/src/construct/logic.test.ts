@@ -4,12 +4,18 @@ import paymentDetailRaw from '../../../content/src/details/g46-algorithm-payment
 import paymentSummaryRaw from '../../../content/src/levels/g46-algorithm-payment.json';
 import packDetailRaw from '../../../content/src/details/g13-modeling-pack.level.json';
 import networkLevelRaw from '../../../content/src/details/g79-structure-network.level.json';
+import scheduleDetailRaw from '../../../content/src/details/g79-algorithm-schedule.level.json';
+import frontierDetailRaw from '../../../content/src/details/g1012-algorithm-frontier.level.json';
 import { constructVerifier } from './verifier';
 import { greedyCoins, optimalCoins } from './engine';
 import { actionsFor, parseScript, reachableFailureClasses, validateArtifact } from './logic';
 import { networkScriptSchema, selectedEdges, validateNetworkArtifact } from './network';
 import type { RuntimeVariant } from '../shared/types';
 import { createConstructRuntime } from './runtime';
+import { createDistributionRuntime } from './distribution';
+import { createNetworkRuntime } from './network-runtime';
+import { createScheduleRuntime } from './schedule-runtime';
+import { createFrontierRuntime } from './frontier-runtime';
 
 const detail = LevelDetailSchema.parse(paymentDetailRaw);
 const script = parseScript(detail.levelScript);
@@ -322,5 +328,109 @@ describe('construct/distribution validation', () => {
     ]));
     expect(verdict.passed).toBe(false);
     expect(verdict.failure?.class).toBe('distribution-overflow');
+  });
+});
+
+describe('construct answerComplete 自动判题口径', () => {
+  it('payment：硬币够付且反例前提已指出才算填完（对错仍交给 validate）', async () => {
+    const runtime = createConstructRuntime(detail, RUN_CONFIG);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    // 只放了硬币、反例还没指出前提：还没填完。
+    for (const coin of [4, 1, 1]) {
+      await runtime.dispatch({ type: 'construct/place', payload: { piece: { id: 'c-' + coin, shape: String(coin), x: 0, y: 0 } } });
+    }
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'counter/edit',
+      payload: { patch: { ruleId: 'greedy', instance: { target: 10, denominations: [1, 3, 4] } } },
+    });
+    await runtime.dispatch({ type: 'counter/test', payload: {} });
+    await runtime.dispatch({ type: 'counter/annotate', payload: { premiseId: 'greedy-optimal' } });
+
+    // 4+1+1 凑齐了 6 元、前提也选了：算"填完"，尽管它不是最优答案。
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const wrong = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(wrong.verdict?.passed).toBe(false);
+    expect(wrong.verdict?.failure?.class).toBe('construct-not-optimal');
+
+    // 拿掉一枚硬币，金额不够了，立刻退回"没填完"。
+    const first = runtime.snapshot().toolState.construct?.pieces[0];
+    await runtime.dispatch({ type: 'construct/remove', payload: { pieceId: first?.id ?? '' } });
+    expect(runtime.snapshot().answerComplete).toBe(false);
+  });
+
+  it('distribution：每一类物品都分完才算填完', async () => {
+    const packDetail = LevelDetailSchema.parse(packDetailRaw);
+    const runtime = createDistributionRuntime(packDetail, RUN_CONFIG);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    // 8 件：block×3、ball×3、book×2，还差一件书。
+    const seq: [string, number][] = [
+      ['block', 0], ['block', 1], ['block', 2],
+      ['ball', 0], ['ball', 1], ['ball', 2],
+      ['book', 0], ['book', 1],
+    ];
+    for (const [itemId, containerIndex] of seq) {
+      await runtime.dispatch({
+        type: 'construct/place',
+        payload: { piece: { id: 'd-' + itemId + '-' + containerIndex, shape: itemId, x: containerIndex, y: 0 } },
+      });
+    }
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'construct/place',
+      payload: { piece: { id: 'd-last', shape: 'book', x: 2, y: 0 } },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+
+  it('network：选够"站点数 - 1"条边才算填完', async () => {
+    const networkDetail = LevelDetailSchema.parse(networkLevelRaw);
+    const runtime = createNetworkRuntime(networkDetail, RUN_CONFIG);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    for (const edgeId of ['ab', 'bc', 'bd']) {
+      await runtime.dispatch({ type: 'construct/place', payload: { piece: { id: edgeId, shape: edgeId, x: 0, y: 0 } } });
+    }
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({ type: 'construct/place', payload: { piece: { id: 'ce', shape: 'ce', x: 0, y: 0 } } });
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+
+  it('schedule：每个课次都排进时段才算填完', async () => {
+    const scheduleDetail = LevelDetailSchema.parse(scheduleDetailRaw);
+    const runtime = createScheduleRuntime(scheduleDetail, RUN_CONFIG);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    const placed: [string, number][] = [['l1', 0], ['l2', 1], ['l3', 2]];
+    for (const [lessonId, slotIndex] of placed) {
+      await runtime.dispatch({
+        type: 'construct/place',
+        payload: { piece: { id: lessonId, shape: lessonId, x: slotIndex, y: 0 } },
+      });
+    }
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'construct/place',
+      payload: { piece: { id: 'l4', shape: 'l4', x: 2, y: 0 } },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+
+  it('frontier：没动过边不算填完，改过一条就算', async () => {
+    const frontierDetail = LevelDetailSchema.parse(frontierDetailRaw);
+    const runtime = createFrontierRuntime(frontierDetail, RUN_CONFIG);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await runtime.dispatch({
+      type: 'construct/place',
+      payload: { piece: { id: 'sa', shape: 'sa', x: 0, y: 1 } },
+    });
+    expect(runtime.snapshot().answerComplete).toBe(true);
   });
 });

@@ -41,7 +41,7 @@ function percent(value: number): string {
   return (Math.round(value * 1000) / 10).toFixed(1) + '%';
 }
 
-/** 唯一运行入口是旋钮卡的「跑满 N 局」；这张卡只负责把数据翻译成结论。 */
+/** 采样结果由旋钮卡的「凑满参数即自动运行」产出；这张卡只负责把数据翻译成结论。 */
 async function submitClaim(): Promise<void> {
   const current = stats.value;
   if (busy.value || !current) return;
@@ -90,7 +90,7 @@ async function submitClaim(): Promise<void> {
         <p class="mt-1 text-xs text-ink-soft">胜场 {{ wins }} ／ {{ stats.n }}（平局各记半场）</p>
       </template>
       <p v-else class="text-xs text-ink-soft">
-        还没有数据：先在旋钮卡里把 100 点分配好，再点「跑满 1000 局」。
+        还没有数据：在旋钮卡里把点数分满，参数一改就自动跑出结果。
       </p>
     </div>
 

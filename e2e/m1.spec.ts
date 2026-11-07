@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { SHIPPED_LEVEL_IDS } from '../packages/content/src/ids';
-import { clickCanvasCell, clickRuleCell, openTool, saveSnapshot, startInteractionMeter, interactions, waitEvent } from './shared';
+import { clickCanvasCell, clickRuleCell, openTool, saveSnapshot, startInteractionMeter, interactions, waitAdvance, waitEvent } from './shared';
 
 const M1_LEVELS = SHIPPED_LEVEL_IDS.filter((id) => id !== 'k-structure-pattern-path');
 
@@ -13,18 +13,18 @@ for (const levelId of M1_LEVELS) {
       return save?.levels?.[levelId]?.completed === true;
     }, { timeout: 20_000 }).toBe(true);
   });
-
-  test('M1 无工具提交被拒：' + levelId, async ({ page }) => {
-    await page.goto('/#/play/' + levelId);
-    await expect(page.getByTestId('level-dock')).toBeVisible();
-    await page.getByTestId('level-submit').click();
-    await expect(page.getByTestId('failure-banner')).toBeVisible();
-    const save = await saveSnapshot(page);
-    expect(save?.levels?.[levelId]?.completed ?? false).toBe(false);
-  });
 }
 
-test('真实点击：最少枚数支付 + 反例可以通关', async ({ page }) => {
+test('20 关都没有「完成」按钮，只显示自动判题提示', async ({ page }) => {
+  for (const levelId of SHIPPED_LEVEL_IDS) {
+    await page.goto('/#/play/' + levelId);
+    await expect(page.getByTestId('level-dock')).toBeVisible();
+    await expect(page.getByTestId('level-submit')).toHaveCount(0);
+    await expect(page.getByTestId('level-auto-judge')).toBeVisible();
+  }
+});
+
+test('真实点击：最少枚数支付 + 反例 → 自动判题自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g46-algorithm-payment');
   await expect(page.getByTestId('payment-tool')).toBeVisible();
 
@@ -40,18 +40,18 @@ test('真实点击：最少枚数支付 + 反例可以通关', async ({ page }) 
   await page.getByTestId('counter-denom-3').click();
   await page.getByTestId('counter-denom-4').click();
   await expect(page.getByTestId('counter-live')).toContainText('贪心');
+  // 点失效前提就是最后一步答案：点完自动判题
   await page.getByTestId('counter-premise-greedy-optimal').click();
 
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+  expect(await waitAdvance(page, 'g46-algorithm-payment')).toBe(true);
 });
 
-test('真实点击：分类小站一次倒出、填数字、选答案可以通关', async ({ page }) => {
+test('真实点击：分类小站进入即倒出，填数字 + 选答案 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/k-data-tally');
   await expect(page.getByTestId('tally-tool')).toBeVisible();
 
-  // 一次倒出整筐（不再连点 4 次采集），然后用 4 个数字框填统计条（不再点 20 次 +1）
-  await page.getByTestId('tally-dump').click();
+  // 进入工具卡就自动把整筐倒出来（没有"全部倒出来/采集一把"按钮）
+  await expect(page.getByTestId('tally-count')).toHaveText('20');
   for (const [id, count] of [['circle', '6'], ['square', '5'], ['triangle', '6'], ['star', '3']] as const) {
     const input = page.getByTestId('tally-input-' + id);
     await input.fill(count);
@@ -59,13 +59,11 @@ test('真实点击：分类小站一次倒出、填数字、选答案可以通�
   }
   // 结论是一个 chip：点哪一类最多就是一次作答
   await page.getByTestId('tally-claim-most-circle').click();
-  await expect(page.getByTestId('tally-claim-ready')).toBeVisible();
 
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+  expect(await waitAdvance(page, 'k-data-tally')).toBe(true);
 });
 
-test('真实点击：结构不变量只需点一条依据即可通关', async ({ page }) => {
+test('真实点击：结构不变量只需点一条依据 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g1012-structure-invariant');
   await expect(page.getByTestId('argument-board')).toBeVisible();
 
@@ -74,11 +72,10 @@ test('真实点击：结构不变量只需点一条依据即可通关', async ({
   await expect(page.getByTestId('argue-claim')).toContainText('不可能铺满');
   await expect(page.getByTestId('argue-evidence')).toBeVisible();
 
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+  expect(await waitAdvance(page, 'g1012-structure-invariant')).toBe(true);
 });
 
-test('真实点击：公平分点心配一盘后一键照分', async ({ page }) => {
+test('真实点击：公平分点心配一盘后一键照分 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/k-modeling-share');
   await expect(page.getByTestId('distribute-tool')).toBeVisible();
 
@@ -88,25 +85,23 @@ test('真实点击：公平分点心配一盘后一键照分', async ({ page }) 
   await page.getByTestId('dist-copy-first').click();
   await expect(page.getByTestId('dist-container-3')).toContainText('3 / 4');
 
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+  expect(await waitAdvance(page, 'k-modeling-share')).toBe(true);
 });
 
-test('真实点击：规则小火车拼好后直接完成', async ({ page }) => {
+test('真实点击：规则小火车拼好最后一块 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/k-algorithm-train');
   await expect(page.getByTestId('rule-tool')).toBeVisible();
 
-  // 没有"提交程序"按钮了：程序拼好就是答案
   await page.getByTestId('rule-add-forward').click();
   await page.getByTestId('rule-add-forward').click();
   await page.getByTestId('rule-add-collect').click();
   await page.getByTestId('rule-add-forward').click();
   await page.getByTestId('rule-add-forward').click();
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'k-algorithm-train')).toBe(true);
 });
 
-test('真实点击：对称补墙在画布上点三格', async ({ page }) => {
+test('真实点击：对称补墙在画布上点三格 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g13-structure-symmetry');
   await expect(page.getByTestId('pattern-tool')).toBeVisible();
 
@@ -116,11 +111,11 @@ test('真实点击：对称补墙在画布上点三格', async ({ page }) => {
   await clickCanvasCell(page, 3);
   await clickCanvasCell(page, 4);
   await clickCanvasCell(page, 5);
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'g13-structure-symmetry')).toBe(true);
 });
 
-test('真实点击：规则关在画布上点格子画路线（≤6 击）', async ({ page }) => {
+test('真实点击：规则关在画布上点格子画路线 → 自动进下一关（≤6 击）', async ({ page }) => {
   await page.goto('/#/play/g13-algorithm-route');
   await expect(page.getByTestId('rule-tool')).toBeVisible();
   await startInteractionMeter(page);
@@ -131,15 +126,14 @@ test('真实点击：规则关在画布上点格子画路线（≤6 击）', asy
   }
   await expect(page.getByTestId('rule-program')).not.toContainText('还没有积木');
 
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+  expect(await waitAdvance(page, 'g13-algorithm-route')).toBe(true);
 
   const used = await interactions(page);
-  // 5 次点格 + 1 次完成 = 6 击（docs/12 §4）
+  // 5 次点格就是全部答案输入（没有「完成」）
   expect(used).toBeLessThanOrEqual(6);
 });
 
-test('真实点击：规则关画布点格产出展开版程序，不自动压缩', async ({ page }) => {
+test('规则关画布点格产出展开版程序，不自动压缩', async ({ page }) => {
   await page.goto('/#/play/g13-algorithm-route');
   await expect(page.getByTestId('rule-tool')).toBeVisible();
 
@@ -149,29 +143,28 @@ test('真实点击：规则关画布点格产出展开版程序，不自动压�
   await expect(page.getByTestId('rule-program')).not.toContainText('重复');
 });
 
-test('完成面板显示变体通行证（换表征迁移门）', async ({ page }) => {
-  // pattern 关现在有真的换表征迁移门：A/B 换成形状之后规律仍要成立（docs/12 遗留项 1）
+test('过关遮罩记迁移门结果（换表征变体）', async ({ page }) => {
+  // pattern 关有真的换表征迁移门：A/B 换成形状之后规律仍要成立（docs/12 遗留项 1）
   await page.goto('/#/play/k-structure-pattern-path?autoplay=1');
-  await expect(page.getByTestId('completion-panel')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('variant-passport')).toBeVisible();
+  await expect(page.getByTestId('level-success')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('variant-passport')).toContainText('v-relabel-shapes');
-  await expect(page.getByTestId('variant-passport')).toContainText('通过');
+  await expect(page.getByTestId('variant-passport')).toContainText('✓');
 });
 
-test('真实点击：抽样调查员一次抽两批', async ({ page }) => {
+test('真实点击：抽样调查员进入即抽两批，点结论 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g79-data-sampling');
   await expect(page.getByTestId('sampling-tool')).toBeVisible();
 
-  await page.getByTestId('sampling-two-batches').click();
+  // 进入工具卡就自动抽两批（没有"抽两批/再抽 N 个"按钮）
   await expect(page.getByTestId('sampling-count')).toContainText('40');
   await expect(page.getByTestId('sampling-batch-2')).toBeVisible();
   await expect(page.getByTestId('sampling-ci')).toBeVisible();
   await page.getByTestId('sampling-claim').click();
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'g79-data-sampling')).toBe(true);
 });
 
-test('真实点击：路网规划师在图上点四条边', async ({ page }) => {
+test('真实点击：路网规划师在图上点四条边 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g79-structure-network');
   await expect(page.getByTestId('network-tool')).toBeVisible();
 
@@ -180,20 +173,20 @@ test('真实点击：路网规划师在图上点四条边', async ({ page }) => 
   }
   await expect(page.getByTestId('network-cost')).toContainText('6');
   await expect(page.getByTestId('network-components')).toContainText('1');
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'g79-structure-network')).toBe(true);
 });
 
-test('真实点击：证据裁判点一个结论', async ({ page }) => {
+test('真实点击：证据裁判点一个结论 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g1012-data-inference');
   await expect(page.getByTestId('inference-tool')).toBeVisible();
 
   await page.getByTestId('inference-a-higher').click();
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'g1012-data-inference')).toBe(true);
 });
 
-test('真实点击：课表编排师点四个格子', async ({ page }) => {
+test('真实点击：课表编排师点四个格子 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g79-algorithm-schedule');
   await expect(page.getByTestId('schedule-tool')).toBeVisible();
 
@@ -201,17 +194,98 @@ test('真实点击：课表编排师点四个格子', async ({ page }) => {
     await page.getByTestId('schedule-cell-' + lesson + '-' + slot).click();
   }
   await expect(page.getByTestId('schedule-bonus')).toContainText('2');
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'g79-algorithm-schedule')).toBe(true);
 });
 
-test('真实点击：贪心边界点一下边权', async ({ page }) => {
+test('真实点击：贪心边界点一下边权 → 自动进下一关', async ({ page }) => {
   await page.goto('/#/play/g1012-algorithm-frontier');
   await expect(page.getByTestId('frontier-tool')).toBeVisible();
 
   // 默认全 5；把「甲→终点」那条边加一格，贪心就不再最优
   await page.getByTestId('frontier-plus-at').click();
   await expect(page.getByTestId('frontier-live')).toContainText('贪心');
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+
+  expect(await waitAdvance(page, 'g1012-algorithm-frontier')).toBe(true);
+});
+
+test('真实点击：排队规划师填一个旋钮就自动运行并过关', async ({ page }) => {
+  await page.goto('/#/play/g46-modeling-queue');
+  await expect(page.getByTestId('knob-tool')).toBeVisible();
+
+  const serviceTime = page.getByTestId('knob-serviceTime');
+  await serviceTime.fill('2');
+  await serviceTime.blur();
+
+  expect(await waitAdvance(page, 'g46-modeling-queue')).toBe(true);
+});
+
+test('真实点击：调度员填一个旋钮就自动运行并过关', async ({ page }) => {
+  await page.goto('/#/play/g79-modeling-dispatch');
+  await expect(page.getByTestId('knob-tool')).toBeVisible();
+
+  const vehicles = page.getByTestId('knob-vehicles');
+  await vehicles.fill('3');
+  await vehicles.blur();
+
+  expect(await waitAdvance(page, 'g79-modeling-dispatch')).toBe(true);
+});
+
+test('真实点击：胜率实验室填满 100 点 + 下结论就过关', async ({ page }) => {
+  await page.goto('/#/play/g1012-modeling-winrate');
+  await expect(page.getByTestId('knob-tool')).toBeVisible();
+
+  for (const [key, value] of [['attack', '50'], ['defense', '50'], ['economy', '0']] as const) {
+    const input = page.getByTestId('knob-' + key);
+    await input.fill(value);
+    await input.blur();
+  }
+  // 参数一凑满 100 点就自动跑出采样结果；结论仍要玩家自己点
+  await openTool(page, 'probe', 1);
+  await expect(page.getByTestId('sample-claim')).toBeVisible();
+  await page.getByTestId('sample-claim').click();
+
+  expect(await waitAdvance(page, 'g1012-modeling-winrate')).toBe(true);
+});
+/**
+ * 错误原因必须"直出"（docs/13 §3）：答错不是一个泛泛的"还差一点"，
+ * 而是写明哪条判定没过、下一步该看什么。
+ */
+test('错误原因直出：tally 统计条填错 → 横幅点名统计条对不上', async ({ page }) => {
+  await page.goto('/#/play/k-data-tally');
+  await expect(page.getByTestId('tally-tool')).toBeVisible();
+  await expect(page.getByTestId('tally-count')).toHaveText('20');
+  for (const [id, count] of [['circle', '1'], ['square', '1'], ['triangle', '1'], ['star', '1']] as const) {
+    const input = page.getByTestId('tally-input-' + id);
+    await input.fill(count);
+    await input.blur();
+  }
+  await page.getByTestId('tally-claim-most-circle').click();
+  const banner = page.getByTestId('failure-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('统计条和筐里的图形对不上');
+});
+
+test('错误原因直出：network 不连通 → 横幅说还有站点没连进路网', async ({ page }) => {
+  await page.goto('/#/play/g79-structure-network');
+  await expect(page.getByTestId('network-tool')).toBeVisible();
+  // 4 条边（= 站点数 - 1）才会触发自动判题；这一组成本 6 ≤ 预算 9，但 A 站孤立。
+  for (const edge of ['bd', 'cd', 'de', 'ce']) {
+    await page.getByTestId('network-edge-' + edge).click();
+  }
+  const banner = page.getByTestId('failure-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('还有站点没有连进路网');
+});
+
+test('错误原因直出：rule 到终点但漏收星星 → 横幅提示把收集放在经过星星时', async ({ page }) => {
+  await page.goto('/#/play/k-algorithm-train');
+  await expect(page.getByTestId('rule-tool')).toBeVisible();
+  // 起点 (0,0) 朝东、星星在 (2,0)、终点在 (4,0)：只前进 4 格会到终点但漏收。
+  for (let index = 0; index < 4; index += 1) {
+    await page.getByTestId('rule-add-forward').click();
+  }
+  const banner = page.getByTestId('failure-banner');
+  await expect(banner).toBeVisible({ timeout: 10_000 });
+  await expect(banner).toContainText('星星还没收集');
 });

@@ -251,6 +251,12 @@ export interface RunSnapshot {
   verdict?: Verdict;
   /** argue 模板的结构化论证证书；其他模板不出现 */
   argument?: ArgumentSnapshot;
+  /**
+   * 玩家答案是否已经"填完整"（模板自己判定）。
+   * 宿主据此自动判题：为 true 且玩家刚动过手，就自动提交，答对直接进下一关，
+   * 所以玩家不需要再点「完成」（docs/13）。缺省/false = 还不能判。
+   */
+  answerComplete?: boolean;
   stamps: StampId[];
   revision: number;
   updatedAt: number;

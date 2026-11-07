@@ -74,25 +74,6 @@ async function removeCoin(piece: PiecePlacementInput): Promise<void> {
   }
 }
 
-async function clearCoins(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  try {
-    for (const piece of [...coins.value].reverse()) {
-      const result = await props.runtime.dispatch({
-        type: 'construct/remove',
-        payload: { pieceId: piece.id },
-      });
-      if (!result.ok) {
-        error.value = result.message ? translate(result.message) : null;
-        return;
-      }
-    }
-  } finally {
-    busy.value = false;
-  }
-}
 </script>
 
 <template>
@@ -139,18 +120,6 @@ async function clearCoins(): Promise<void> {
         </li>
       </ul>
       <p v-else class="mt-1 text-xs text-ink-soft">柜台还空着。</p>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        data-testid="payment-clear"
-        :disabled="busy || coins.length === 0"
-        class="min-h-12 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="clearCoins"
-      >
-        清空硬币
-      </button>
     </div>
 
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>

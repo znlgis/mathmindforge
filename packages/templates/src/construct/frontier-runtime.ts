@@ -84,6 +84,10 @@ function createFrontierAdapter(script: FrontierScript): RuntimeAdapter<FrontierS
         },
       };
     },
+    /** 答案填完整 = 玩家真的动过至少一条边；反例成不成立交给 validate。 */
+    answerComplete(state: FrontierState): boolean {
+      return state.edited;
+    },
     validate(_detail, variant, artifact) {
       const result = validateFrontierArtifact(script, artifact);
       if (result.passed) {

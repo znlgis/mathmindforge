@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clickCanvasCell, events, interactions, saveSnapshot, startInteractionMeter, waitEvent } from './shared';
+import { clickCanvasCell, events, interactions, saveSnapshot, startInteractionMeter, waitAdvance, waitEvent } from './shared';
 
 const LEVEL_ID = 'k-structure-pattern-path';
 
@@ -13,6 +13,13 @@ test('工坊首页可以进入首关', async ({ page }) => {
   await expect(page.getByTestId('level-canvas')).toBeVisible();
 });
 
+test('宿主没有「完成」按钮：填完自动判题', async ({ page }) => {
+  await page.goto('/#/play/' + LEVEL_ID);
+  await expect(page.getByTestId('level-dock')).toBeVisible();
+  await expect(page.getByTestId('level-submit')).toHaveCount(0);
+  await expect(page.getByTestId('level-auto-judge')).toBeVisible();
+});
+
 test('autoplay 通关并写入存档', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID + '?autoplay=1&instant=1');
   expect(await waitEvent(page, 'level:complete:' + LEVEL_ID)).toBe(true);
@@ -24,16 +31,17 @@ test('autoplay 通关并写入存档', async ({ page }) => {
   expect(names).toContain('level:complete:' + LEVEL_ID);
 });
 
-test('没有使用工具时提交会被拒绝', async ({ page }) => {
+test('没作答时不会自动判题，也不会过关', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
   await expect(page.getByTestId('level-dock')).toBeVisible();
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('failure-banner')).toBeVisible();
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId('level-success')).toHaveCount(0);
+  await expect(page.getByTestId('failure-banner')).toHaveCount(0);
   const save = await saveSnapshot(page);
   expect(save?.levels?.[LEVEL_ID]?.completed ?? false).toBe(false);
 });
 
-test('真实点击：候选规律 + 画布点三格 + 完成（≤6 次交互）', async ({ page }) => {
+test('真实点击：候选规律 + 画布点三格 → 自动判题自动进下一关（≤5 次交互）', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
   await expect(page.getByTestId('pattern-tool')).toBeVisible();
   await startInteractionMeter(page);
@@ -47,27 +55,25 @@ test('真实点击：候选规律 + 画布点三格 + 完成（≤6 次交互）
   await clickCanvasCell(page, 7);
   await clickCanvasCell(page, 8);
 
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('completion-panel')).toBeVisible();
+  // 没有「完成」：填完就自动判，答对直接进下一关
+  expect(await waitAdvance(page, LEVEL_ID)).toBe(true);
 
   const used = await interactions(page);
-  // 目标 5~6 次（docs/12 §4）；留 1 次余量给音效/焦点等实现差异
-  expect(used).toBeLessThanOrEqual(6);
+  // 4 次答案输入（1 候选规律 + 3 格）+ 1 次余量
+  expect(used).toBeLessThanOrEqual(5);
   await expect.poll(async () => {
     const save = await saveSnapshot(page);
     return save?.levels?.[LEVEL_ID]?.completed === true;
   }, { timeout: 15_000 }).toBe(true);
 });
 
-test('画布点空格会立刻填上字母（一次点击 = 一次输入）', async ({ page }) => {
+test('只补一格（答案没填完）不会判题', async ({ page }) => {
   await page.goto('/#/play/' + LEVEL_ID);
   await expect(page.getByTestId('level-canvas')).toBeVisible();
-  await startInteractionMeter(page);
   await clickCanvasCell(page, 6);
-  // 点完立刻派发一次 tool 使用；不依赖截图，用交互计数与"提交被拒理由"变化证明它生效
-  expect(await interactions(page)).toBeGreaterThanOrEqual(1);
-  await page.getByTestId('level-submit').click();
-  await expect(page.getByTestId('failure-banner')).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(await waitEvent(page, 'level:complete:' + LEVEL_ID, 300)).toBe(false);
+  await expect(page.getByTestId('level-success')).toHaveCount(0);
 });
 
 test('运行时不发外网请求，断网后工具仍可操作', async ({ page, context }) => {

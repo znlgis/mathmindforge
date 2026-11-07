@@ -168,11 +168,6 @@ const duelPass = computed(() => {
   };
 });
 
-const runLabel = computed(() => {
-  if (config.value.runLabel) return config.value.runLabel;
-  return translate(config.value.runLabelKey ?? 'knob.run');
-});
-
 const allocated = computed(() => Object.values(values.value).reduce((sum, value) => sum + value, 0));
 const presets = computed(() => config.value.presets ?? []);
 
@@ -259,10 +254,6 @@ function presetLabel(preset: Record<string, number>): string {
   return config.value.keys
     .map((key) => keyLabel(key.key) + (preset[key.key] ?? ''))
     .join(' · ');
-}
-
-async function runSimulation(): Promise<void> {
-  await dispatchAction({ type: 'knob/run', payload: {} });
 }
 
 async function resetParams(): Promise<void> {
@@ -448,29 +439,22 @@ function percent1(value: number | undefined): string {
       </div>
 
       <p v-else class="mt-1 text-xs text-ink-soft">
-        还没有运行记录：先调好参数，再点下面的「{{ runLabel }}」。
-      </p>
-
-      <p v-if="latestIsCurrent === false && ((mode === 'dispatch' && latestRun) || (mode === 'queue' && latestQueueRun))" class="mt-2 text-xs font-semibold text-red">
-        参数改过了，点「{{ runLabel }}」刷新指标。
+        <template v-if="mode === 'duel' && sumTo !== null && allocated !== sumTo">
+          三个旋钮还差 {{ sumTo - allocated }} 点没分完，凑满 {{ sumTo }} 点就会自动跑出结果。
+        </template>
+        <template v-else>还没有运行结果：参数一改就自动运行，这里会立刻显示指标。</template>
       </p>
     </div>
 
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        data-testid="knob-run"
-        :disabled="busy"
-        class="min-h-12 flex-1 rounded-2xl bg-blueprint px-4 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
-        @click="runSimulation"
-      >
-        {{ runLabel }}
-      </button>
+    <div class="flex flex-wrap items-center gap-2">
+      <p data-testid="knob-auto-run" class="min-w-0 flex-1 text-xs font-semibold text-ink-soft">
+        参数一改就自动运行，不用再点「运行」。
+      </p>
       <button
         type="button"
         data-testid="knob-reset"
         :disabled="busy"
-        class="min-h-12 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
+        class="min-h-12 shrink-0 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
         @click="resetParams"
       >
         {{ config.resetLabel ?? '重置' }}

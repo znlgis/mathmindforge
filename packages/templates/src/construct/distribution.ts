@@ -239,6 +239,14 @@ function createDistributionAdapter(script: DistributionScript): RuntimeAdapter<D
         },
       };
     },
+    /**
+     * 答案填完整 = 每一类物品都分完了（各容器算术之和 == 物品总数）。
+     * 是否等量、每盒种类是否够，交给 validate；这里只回答「还有没有剩下的」。
+     */
+    answerComplete(state) {
+      const counts = countsOf(state);
+      return script.items.every((item) => (counts.totals[item.id] ?? 0) === item.count);
+    },
     validate(detail, variant, artifact) {
       return validateArtifact(detail, variant, artifact);
     },

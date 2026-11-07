@@ -184,7 +184,7 @@ async function onDenominationChange(coin: number, event: Event): Promise<void> {
   }
 }
 
-/** 失效前提是一排 chip：点一下就指出（不需要下拉展开、也不需要再点提交）。 */
+/** 失效前提是一排 chip：点一下就指出（不需要下拉展开，也不需要额外的提交动作）。 */
 async function choosePremise(id: string): Promise<void> {
   if (busy.value || !lastTest.value?.passed) return;
   premise.value = id;
@@ -290,7 +290,7 @@ watch(snapDraft, (next) => {
           {{ premiseLabel(item) }}
         </button>
       </div>
-      <p class="mt-2 text-[11px] text-ink-soft">选中的那一刻就是最终答案，不用再点提交。</p>
+      <p class="mt-2 text-[11px] text-ink-soft">选中的那一刻就是最终答案，系统会自动判定。</p>
     </div>
 
     <p v-if="error" class="text-xs font-bold text-red">{{ error }}</p>

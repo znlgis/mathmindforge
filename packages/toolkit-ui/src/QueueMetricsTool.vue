@@ -48,7 +48,7 @@ const rows = computed<QueueRow[]>(() => {
   <section data-testid="queue-metrics-tool" class="mt-3 flex flex-col gap-3">
     <p class="text-sm font-bold text-ink">排队指标</p>
     <div v-if="rows.length === 0" class="rounded-2xl border border-grid bg-paper p-3 text-xs text-ink-soft">
-      还没有运行记录。回旋钮面板跑一次，这里会列出等待、加班与成本。
+      还没有运行记录。改一个旋钮就会自动跑一次，这里会列出等待、加班与成本。
     </div>
     <div v-else class="overflow-x-auto rounded-2xl border border-grid bg-paper">
       <table class="w-full min-w-96 border-collapse text-left text-xs" data-testid="queue-table">

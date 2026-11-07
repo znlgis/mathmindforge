@@ -146,7 +146,7 @@ const canMoveDown = computed(() => (
       <p class="text-xs font-semibold text-ink-soft">
         程序格 {{ blockTotal }}/{{ maxBlocks }}（重复里的块也算）
       </p>
-      <span class="text-xs font-semibold text-ink-soft">拼好程序后直接点下面的「完成」</span>
+      <span class="text-xs font-semibold text-ink-soft">每改一块都会自动重跑；跑到终点或撞墙就会自动判定</span>
     </div>
 
     <div>

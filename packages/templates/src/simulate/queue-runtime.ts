@@ -40,9 +40,43 @@ function defaults(script: QueueScript): QueueParams {
 function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
   /**
    * 「运行即锁定」：一次运行就是这组参数的结论。
-   * 参数一动（下面 knob/set 会清 lastRun），旧运行不再代表当前配置，
-   * 所以产物只认「最近一次运行 + 参数没变」，不再需要单独的「锁定参数」按钮。
+   * 编辑即运行之后，knob/set 会直接用新参数跑一次，产物照旧只认「最近一次运行 + 参数没变」。
    */
+
+  /**
+   * 用一组参数跑一次，产出运行记录（knob/run 与 knob/set 共用）。
+   * 编辑即运行：改一个旋钮就等价于「设参数 + 跑一次」，指标当场就绪。
+   */
+  function computeRecord(state: QueueState, params: QueueParams): QueueRunRecord {
+    const run = runQueue(script, params);
+    return {
+      id: 'run-' + (state.seq + 1),
+      params: { ...params },
+      run,
+      passed: run.passed,
+    };
+  }
+
+  function withRun(state: QueueState, record: QueueRunRecord): QueueState {
+    return {
+      ...state,
+      seq: state.seq + 1,
+      lastRun: record,
+      history: [...state.history, record].slice(-10),
+      compared: false,
+    };
+  }
+
+  function runEvidence(action: string, record: QueueRunRecord) {
+    return {
+      phase: 'run' as const,
+      tool: 'knob' as const,
+      action,
+      metrics: { avgWait: record.run.avgWait, overtime: record.run.overtime, cost: record.run.cost },
+      outcome: record.passed ? 'pass' as const : 'fail' as const,
+    };
+  }
+
   function artifactOf(state: QueueState): unknown | null {
     if (!state.lastRun) return null;
     if (!same(state.lastRun.params, state.params)) return null;
@@ -97,39 +131,23 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
           const value = range.min + Math.round((clamped - range.min) / range.step) * range.step;
           const params: QueueParams = { ...state.params, [key]: value };
           const changed = !same(params, state.params);
+          // 编辑即运行：参数一动就立刻用新参数跑一次，指标与产物当场就绪，
+          // 玩家不需要再点「运行」。值没变（点回同一档）则不重复记一条运行。
+          const record = changed ? computeRecord(state, params) : null;
+          const next = record ? withRun({ ...state, params }, record) : { ...state, params };
           return {
-            state: {
-              ...state,
-              params,
-              // 参数一动，上一次运行就不再代表这组参数：指标与产物都必须重跑（与 dispatch 一致）。
-              lastRun: changed ? null : state.lastRun,
-            },
-            evidence: { phase: 'construct', tool: 'knob', action: action.type, metrics: { [key]: value } },
+            state: next,
+            evidence: record
+              ? runEvidence(action.type, record)
+              : { phase: 'construct', tool: 'knob', action: action.type, metrics: { [key]: value } },
           };
         }
         case 'knob/run': {
-          const run = runQueue(script, state.params);
-          const record: QueueRunRecord = {
-            id: 'run-' + (state.seq + 1),
-            params: { ...state.params },
-            run,
-            passed: run.passed,
-          };
+          // 动作保留给 autoplay 与旧单测：界面已经不再渲染「运行」按钮（编辑即运行）。
+          const record = computeRecord(state, state.params);
           return {
-            state: {
-              ...state,
-              seq: state.seq + 1,
-              lastRun: record,
-              history: [...state.history, record].slice(-10),
-              compared: false,
-            },
-            evidence: {
-              phase: 'run',
-              tool: 'knob',
-              action: action.type,
-              metrics: { avgWait: run.avgWait, overtime: run.overtime, cost: run.cost },
-              outcome: run.passed ? 'pass' : 'fail',
-            },
+            state: withRun(state, record),
+            evidence: runEvidence(action.type, record),
           };
         }
         case 'knob/commit': {
@@ -156,6 +174,8 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
       }
     },
     artifact: artifactOf,
+    // 自动判题口径：最近一次运行存在且参数没变（= 有产物）就说明答案填完了，对错交给 validate。
+    answerComplete: (state) => artifactOf(state) !== null,
     artifactSummaries(state): ArtifactSummary[] {
       if (!state.lastRun) return [];
       const run = state.lastRun.run;
@@ -171,7 +191,7 @@ function createQueueAdapter(script: QueueScript): RuntimeAdapter<QueueState> {
         params: state.lastRun !== null && same(state.lastRun.params, state.params),
         run: state.lastRun !== null,
         // 运行之后指标就在同一张卡上：对照是事实，不需要再点一次「查看排队指标」。
-        // 参数改过（lastRun 清空）时对照也一并作废，不能留下「看过旧指标」的假证据。
+        // 编辑即运行保证 lastRun 总对应最新参数，对照不再会因为「改过参数」而作废。
         compare: state.lastRun !== null,
       };
     },

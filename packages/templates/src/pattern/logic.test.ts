@@ -356,3 +356,95 @@ describe('画布点击序列（交互次数口径）', () => {
     expect(clicks).toBe(5);
   });
 });
+
+/**
+ * answerComplete（docs/13）：只回答「答案填完了没有」，对错仍由 validate 决定。
+ * pattern 的口径 = 规律已提交且所有缺口补齐；repair-only（只填不声明）不算填完，
+ * 因为迁移门还缺可翻译的规律。
+ */
+describe('answerComplete（自动判题口径）', () => {
+  async function commitCandidate(
+    runtime: ReturnType<typeof runtimeAt>,
+    levelScript: ReturnType<typeof parseScript>,
+  ): Promise<void> {
+    const candidate = candidateRules(levelScript)[0];
+    expect(candidate).toBeDefined();
+    if (!candidate) return;
+    await runtime.dispatch({
+      type: 'pattern/setCycle',
+      payload: { cycle: [...candidate.tokens], transform: candidate.transform },
+    });
+    await runtime.dispatch({ type: 'pattern/commit', payload: {} });
+  }
+
+  async function place(runtime: ReturnType<typeof runtimeAt>, index: number, shape: string): Promise<void> {
+    const placed = await runtime.dispatch({
+      type: 'construct/place',
+      payload: { piece: { id: 'repair-' + index, shape, x: index, y: 0 } },
+    });
+    expect(placed.ok).toBe(true);
+  }
+
+  it('k-structure-pattern-path：空 → 只声明规律 → 补一半 → 补满，逐步从 false 变 true', async () => {
+    const runtime = runtimeAt();
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await commitCandidate(runtime, script);
+    // 规律有了、缺口没补：还没填完，不能判。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await place(runtime, 6, 'A');
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await place(runtime, 7, 'B');
+    expect(runtime.snapshot().answerComplete).toBe(false);
+
+    await place(runtime, 8, 'B');
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+  });
+
+  it('k-structure-pattern-path：只补块不声明规律 → 一直是 false（空壳答案不算填完）', async () => {
+    const runtime = runtimeAt();
+    for (const [index, shape] of [[6, 'A'], [7, 'B'], [8, 'B']] as const) {
+      await place(runtime, index, shape);
+    }
+    expect(runtime.snapshot().checkpoints.repair).toBe(true);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+  });
+
+  it('g13-structure-symmetry：先补满缺口再声明规律，声明完成的那一刻变 true', async () => {
+    const runtime = runtimeAt(symmetry);
+    expect(runtime.snapshot().answerComplete).toBe(false);
+    // 按「重复」读法补 ABC（s-repeat-abc）；换镜像读法 CBA 时同样成立，只是这里取第一条候选。
+    for (const [index, shape] of [[3, 'A'], [4, 'B'], [5, 'C']] as const) {
+      await place(runtime, index, shape);
+    }
+    // 缺口补齐但还没声明规律：仍然不能自动判。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+    await commitCandidate(runtime, symmetryScript);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+  });
+
+  it('answerComplete 不替 validate 判对错：补错了也是 true，submit 照样失败', async () => {
+    const runtime = runtimeAt();
+    await commitCandidate(runtime, script);
+    await place(runtime, 6, 'A');
+    await place(runtime, 7, 'A'); // 第 7 格按 ABB 该是 B，故意补错
+    await place(runtime, 8, 'B');
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(false);
+    expect(result.verdict?.failure?.class).toBe('pattern-mismatch');
+  });
+
+  it('autoplay 通关后 answerComplete 仍为 true（宿主据此走成功遮罩）', async () => {
+    const runtime = runtimeAt();
+    const result = await runtime.autoplay();
+    expect(result.verdict?.passed).toBe(true);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+});

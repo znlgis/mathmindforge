@@ -116,7 +116,7 @@ async function pick(next: string): Promise<void> {
   <section data-testid="argument-board" class="mt-3 rounded-3xl border border-grid bg-card p-3">
     <div class="flex items-baseline justify-between gap-2">
       <h2 class="text-base font-black text-blueprint">论证板</h2>
-      <p class="text-[11px] font-semibold text-ink-soft">选一条依据，其余自动补齐；再点下面的「完成」</p>
+      <p class="text-[11px] font-semibold text-ink-soft">选一条依据，其余自动补齐；选完就自动判定</p>
     </div>
 
     <!-- 一行组装：依据是唯一的输入，其余三格是运行时时推出来的结论 -->

@@ -87,6 +87,33 @@ function toArgument(state: ArgueState): ArgumentSnapshot {
   };
 }
 
+/**
+ * 论证证书 = 「依据 + 证据 + 棋盘计数」都齐了，且主张与范围由依据推得出来。
+ * artifact 与 answerComplete 共用这一处判定，避免两套口径漂移。
+ */
+function artifactOf(state: ArgueState): {
+  counts: BoardCounts;
+  argument: {
+    claim: string;
+    warrant: string;
+    scope: string;
+    evidence: ArgumentDraft['evidence'];
+  };
+} | null {
+  if (!state.counts || !isCommitted(state)) return null;
+  const argument = toArgument(state);
+  if (!argument.claim || !argument.warrant || !argument.scope) return null;
+  return {
+    counts: state.counts,
+    argument: {
+      claim: argument.claim,
+      warrant: argument.warrant,
+      scope: argument.scope,
+      evidence: argument.evidence,
+    },
+  };
+}
+
 function createArgueAdapter(): RuntimeAdapter<ArgueState> {
   return {
     initialState(detail: LevelDetail): ArgueState {
@@ -180,18 +207,7 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
     },
 
     artifact(state) {
-      if (!state.counts || !isCommitted(state)) return null;
-      const argument = toArgument(state);
-      if (!argument.claim || !argument.scope) return null;
-      return {
-        counts: state.counts,
-        argument: {
-          claim: argument.claim,
-          warrant: argument.warrant,
-          scope: argument.scope,
-          evidence: argument.evidence,
-        },
-      };
+      return artifactOf(state);
     },
 
     artifactSummaries(state) {
@@ -238,6 +254,12 @@ function createArgueAdapter(): RuntimeAdapter<ArgueState> {
 
     argumentState(state) {
       return toArgument(state);
+    },
+
+    // 自动判题口径：依据一选，证据/主张/范围都由运行时派生，证书当场成立 → 该判了。
+    // 这里只回答「填完了没有」，依据选错（例如偶数格棋盘上选奇偶）仍由 validate 判错。
+    answerComplete(state) {
+      return artifactOf(state) !== null;
     },
 
     validate(detail, variant, artifact) {

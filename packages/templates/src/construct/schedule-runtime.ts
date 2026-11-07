@@ -83,6 +83,10 @@ function createScheduleAdapter(script: ScheduleScript): RuntimeAdapter<ScheduleS
         },
       };
     },
+    /** 答案填完整 = 每个课次都排进了某个时段；冲不冲突交给 validate。 */
+    answerComplete(state: ScheduleState): boolean {
+      return state.placements.size === script.lessons.length;
+    },
     validate(_detail, variant, artifact) {
       const result = validateScheduleArtifact(script, artifact);
       if (result.passed) {

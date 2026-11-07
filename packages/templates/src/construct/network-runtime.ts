@@ -92,6 +92,13 @@ function createNetworkAdapter(script: NetworkScript): RuntimeAdapter<NetworkStat
         },
       };
     },
+    /**
+     * 答案填完整 = 已选边数够撑起一棵生成树（>= 站点数 - 1）。
+     * 到达这个数只说明「能连起来了」，连没连通、超没超预算仍由 validate 判。
+     */
+    answerComplete(state: NetworkState): boolean {
+      return state.edges.length >= script.nodes.length - 1;
+    },
     validate(_detail, variant, artifact) {
       const result = validateNetworkArtifact(script, artifact);
       if (result.passed) {

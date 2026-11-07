@@ -2,7 +2,7 @@
 import type { ClaimInput, LevelAction, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { Translator } from '@mmf/i18n';
 import { wilsonInterval } from '@mmf/toolkit/shared';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
@@ -48,29 +48,9 @@ function percent(value: number): string {
   return (Math.round(value * 1000) / 10).toFixed(1) + '%';
 }
 
-async function dispatch(action: LevelAction): Promise<boolean> {
-  if (busy.value) return false;
-  busy.value = true;
-  error.value = null;
-  try {
-    const result = await props.runtime.dispatch(action);
-    if (!result.ok) {
-      error.value = result.message ? props.t.t(result.message) : null;
-      return false;
-    }
-    return true;
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function sample(n: number): Promise<void> {
-  await dispatch({ type: 'probe/sample', payload: { n } });
-}
-
-/** 一次点击抽两批：界面一次输入，运行时照常记两条抽样证据。 */
-async function sampleTwice(): Promise<void> {
-  if (busy.value) return;
+/** 进入工具卡就自动抽两批：两批比例差多少才是这一关要看的东西，玩家只需要看数据、写结论。 */
+async function ensureBatches(): Promise<void> {
+  if (busy.value || batches.value > 0 || total.value > 0) return;
   const size = sizes.value[0] ?? 20;
   busy.value = true;
   error.value = null;
@@ -87,9 +67,30 @@ async function sampleTwice(): Promise<void> {
   }
 }
 
-async function clear(): Promise<void> {
-  await dispatch({ type: 'probe/clear', payload: {} });
+let autoTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 自动抽样放在宏任务里：autoplay 调试路径整段在微任务里跑完，
+ * 不能让它和自动抽样抢同一个运行时（否则自动播放的样本序列会被多抽两批打乱）。
+ * 正常游玩时这一拍只有一帧，玩家看不到空样本。
+ */
+function scheduleBatches(): void {
+  if (autoTimer !== null) return;
+  autoTimer = setTimeout(() => {
+    autoTimer = null;
+    void ensureBatches();
+  }, 0);
 }
+
+onMounted(scheduleBatches);
+// 「重来」会把样本清空（批次与总数回到 0）：再自动抽两批。
+watch([batches, total], () => {
+  if (batches.value === 0 && total.value === 0) scheduleBatches();
+});
+onBeforeUnmount(() => {
+  if (autoTimer !== null) clearTimeout(autoTimer);
+  autoTimer = null;
+});
 
 async function submitClaim(): Promise<void> {
   const current = stats.value;
@@ -128,38 +129,6 @@ async function submitClaim(): Promise<void> {
       </span>
     </div>
 
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        data-testid="sampling-two-batches"
-        :disabled="busy"
-        class="min-h-12 flex-1 rounded-2xl bg-blueprint px-4 text-sm font-black text-white active:scale-95 disabled:opacity-40"
-        @click="sampleTwice"
-      >
-        抽两批（每批 {{ sizes[0] ?? 20 }} 个）
-      </button>
-      <button
-        v-for="n in sizes"
-        :key="n"
-        type="button"
-        :data-testid="'sampling-sample-' + n"
-        :disabled="busy"
-        class="min-h-12 rounded-2xl bg-card px-4 text-xs font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="sample(n)"
-      >
-        再抽 {{ n }} 个
-      </button>
-      <button
-        type="button"
-        data-testid="sampling-clear"
-        :disabled="busy"
-        class="min-h-12 rounded-2xl bg-card px-4 text-xs font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="clear"
-      >
-        倒回袋里
-      </button>
-    </div>
-
     <!-- 每批比例同屏：两批的波动就是这一关要看见的东西，不能只给累计值。 -->
     <div v-if="batchRows.length > 0" class="rounded-2xl border border-grid bg-paper p-3" data-testid="sampling-batches">
       <p class="text-xs font-bold text-ink">每批样本比例</p>
@@ -183,7 +152,7 @@ async function submitClaim(): Promise<void> {
         95% 区间：{{ percent(stats.low) }} – {{ percent(stats.high) }}
       </p>
     </div>
-    <p v-else class="text-xs text-ink-soft">还没有样本。至少抽两批，每批 {{ sizes[0] ?? 20 }} 个。</p>
+    <p v-else class="text-xs text-ink-soft">正在自动抽两批样本（每批 {{ sizes[0] ?? 20 }} 个）……</p>
 
     <button
       type="button"

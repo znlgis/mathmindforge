@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { clickCanvasCell, clickRuleCell, interactions, startInteractionMeter } from './shared';
+import { clickCanvasCell, clickRuleCell, interactions, startInteractionMeter, waitAdvance } from './shared';
 
 /**
- * 交互次数预算（docs/12 §4 / §7-3）。
+ * 交互次数预算（docs/12 §4 / §7-3，docs/13 自动判题后重算）。
  *
  * 目的：把"每关最少几次点击"钉成门禁，防止以后又长回仪式步骤或死按钮。
  * 口径：Playwright 真实派发的 click + change 事件（fill/selectOption 都会触发 change）。
+ * 自动判题之后不再有「完成」这一击，所以预算整体比上一轮少 1。
  * 余量：目标值 +1，容纳音效/焦点等实现差异；超出即说明交互退化。
  */
 
@@ -18,7 +19,7 @@ interface Budget {
 const BUDGETS: Budget[] = [
   {
     id: 'k-structure-pattern-path',
-    target: 6,
+    target: 4,
     async run(page) {
       await page.getByTestId('pattern-candidate-ABB-none').click();
       await clickCanvasCell(page, 6);
@@ -28,7 +29,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g13-structure-symmetry',
-    target: 8,
+    target: 4,
     async run(page) {
       await page.getByTestId('pattern-candidate-ABC-reflect').click();
       await clickCanvasCell(page, 3);
@@ -38,7 +39,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'k-algorithm-train',
-    target: 7,
+    target: 5,
     async run(page) {
       for (const block of ['forward', 'forward', 'collect', 'forward', 'forward']) {
         await page.getByTestId('rule-add-' + block).click();
@@ -47,7 +48,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'k-modeling-share',
-    target: 6,
+    target: 4,
     async run(page) {
       await page.getByTestId('dist-plus-0-cookie').click();
       await page.getByTestId('dist-plus-0-cookie').click();
@@ -57,7 +58,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g79-structure-network',
-    target: 6,
+    target: 4,
     async run(page) {
       for (const edge of ['ab', 'bc', 'bd', 'ce']) {
         await page.getByTestId('network-edge-' + edge).click();
@@ -66,7 +67,7 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g79-algorithm-schedule',
-    target: 6,
+    target: 4,
     async run(page) {
       for (const [lesson, slot] of [['l1', 's1'], ['l2', 's2'], ['l3', 's2'], ['l4', 's3']] as const) {
         await page.getByTestId('schedule-cell-' + lesson + '-' + slot).click();
@@ -75,17 +76,16 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g1012-algorithm-frontier',
-    target: 3,
+    target: 1,
     async run(page) {
       await page.getByTestId('frontier-plus-at').click();
     },
   },
   {
     id: 'k-data-tally',
-    // 3 次点击（倒出 + 选答案 + 完成）+ 4 次数字框输入 = 7 次交互，上限 8
-    target: 7,
+    // 进入工具卡自动倒出；4 次数字框输入 + 1 次结论 chip = 5
+    target: 5,
     async run(page) {
-      await page.getByTestId('tally-dump').click();
       for (const [id, count] of [['circle', '6'], ['square', '5'], ['triangle', '6'], ['star', '3']] as const) {
         const input = page.getByTestId('tally-input-' + id);
         await input.fill(count);
@@ -96,29 +96,29 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g79-data-sampling',
-    target: 4,
+    target: 1,
     async run(page) {
-      await page.getByTestId('sampling-two-batches').click();
+      // 进入工具卡自动抽两批，只点一次结论
       await page.getByTestId('sampling-claim').click();
     },
   },
   {
     id: 'g1012-data-inference',
-    target: 3,
+    target: 1,
     async run(page) {
       await page.getByTestId('inference-a-higher').click();
     },
   },
   {
     id: 'g1012-structure-invariant',
-    target: 4,
+    target: 1,
     async run(page) {
       await page.getByTestId('argue-warrant-coloring').click();
     },
   },
   {
     id: 'g13-modeling-pack',
-    target: 6,
+    target: 4,
     async run(page) {
       // 每盒三类各一件的黄金解：先配第一个盒子，再一键照分
       await page.getByTestId('dist-plus-0-block').click();
@@ -129,7 +129,9 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g46-algorithm-payment',
-    target: 11,
+    // 2 枚硬币 + 展开反例卡 + 填目标金额 + 3 个面额复选 + 点前提 = 8 次真实操作；
+    // 面额是 checkbox，click 之后浏览器还会派发一次 change，计量器各记一次 → 记 11。
+    target: 10,
     async run(page) {
       await page.getByTestId('payment-add-3').click();
       await page.getByTestId('payment-add-3').click();
@@ -145,9 +147,8 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g13-data-weather',
-    target: 8,
+    target: 5,
     async run(page) {
-      await page.getByTestId('tally-dump').click();
       for (const [id, count] of [['sunny', '5'], ['cloudy', '4'], ['rainy', '3'], ['snowy', '2']] as const) {
         const input = page.getByTestId('tally-input-' + id);
         await input.fill(count);
@@ -158,44 +159,40 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g1012-modeling-winrate',
-    target: 7,
+    target: 6,
     async run(page) {
-      // 3 个数字框填 50/50/0，再跑满 1000 局并下结论
+      // 3 个数字框填 50/50/0（凑满就自动跑出采样结果），再点结论
       for (const [key, value] of [['attack', '50'], ['defense', '50'], ['economy', '0']] as const) {
         const input = page.getByTestId('knob-' + key);
         await input.fill(value);
         await input.blur();
       }
-      await page.getByTestId('knob-run').click();
-      // 结论按钮在第二张卡（数据采集器）里，先展开再点——这是 1 次真实交互
       await page.getByTestId('tool-card-toggle-probe-1').click();
       await page.getByTestId('sample-claim').click();
     },
   },
   {
     id: 'g46-modeling-queue',
-    target: 5,
+    target: 1,
     async run(page) {
       const serviceTime = page.getByTestId('knob-serviceTime');
       await serviceTime.fill('2');
       await serviceTime.blur();
-      await page.getByTestId('knob-run').click();
     },
   },
   {
     id: 'g79-modeling-dispatch',
-    target: 5,
+    target: 1,
     async run(page) {
       const vehicles = page.getByTestId('knob-vehicles');
       await vehicles.fill('3');
       await vehicles.blur();
-      await page.getByTestId('knob-run').click();
     },
   },
   {
     id: 'g13-algorithm-route',
-    // 画布点格画路线：5 次点格（引擎编译成展开版程序）+ 完成 = 6 击（docs/12 §4）
-    target: 6,
+    // 画布点格画路线：5 次点格就是全部答案输入（没有「完成」）
+    target: 5,
     async run(page) {
       for (const [x, y] of [[2, 0], [4, 0], [4, 2], [4, 4], [0, 4]] as const) {
         await clickRuleCell(page, x, y);
@@ -204,14 +201,14 @@ const BUDGETS: Budget[] = [
   },
   {
     id: 'g46-data-invariant',
-    target: 5,
+    target: 1,
     async run(page) {
       await page.getByTestId('argue-warrant-coloring').click();
     },
   },
   {
     id: 'g46-structure-tiling',
-    target: 5,
+    target: 1,
     async run(page) {
       await page.getByTestId('argue-warrant-coloring').click();
     },
@@ -221,13 +218,12 @@ const BUDGETS: Budget[] = [
 for (const budget of BUDGETS) {
   test('交互预算：' + budget.id + ' ≤ ' + (budget.target + 1), async ({ page }) => {
     await page.goto('/#/play/' + budget.id);
-    await expect(page.getByTestId('level-submit')).toBeVisible();
+    await expect(page.getByTestId('level-dock')).toBeVisible();
     await startInteractionMeter(page);
     await budget.run(page);
-    await page.getByTestId('level-submit').click();
-    await expect(page.getByTestId('completion-panel')).toBeVisible();
+    // 没有「完成」这一击：答案填完宿主自动判题、答对自动进下一关
+    expect(await waitAdvance(page, budget.id)).toBe(true);
     const used = await interactions(page);
-    // 打通这一关用掉的真实交互次数（含最后一次「完成」）
     expect(used, budget.id + ' 用了 ' + used + ' 次交互').toBeLessThanOrEqual(budget.target + 1);
   });
 }

@@ -74,6 +74,20 @@ function isParamKey(key: string): key is ParamKey {
   return (PARAM_KEYS as readonly string[]).includes(key);
 }
 
+/** 按当前参数跑满默认局数，产出面板能直接展示的采样结果（knob/run 与「编辑即运行」共用）。 */
+function sampleOf(script: DuelScript, params: DuelParams): DuelSample {
+  const seed = script.seeds[script.seedIndex] ?? script.seeds[0] ?? 1;
+  const run = simulateDuel(script, params, seed, script.matches);
+  return {
+    seed,
+    n: run.n,
+    wins: run.wins,
+    winRate: run.winRate,
+    ci: run.ci,
+    values: run.values,
+  };
+}
+
 function tallyDatasetSummary(script: TallyScript, collected: readonly string[]) {
   const counts = countsOf(collected, script);
   const values = collected.map((item) => {
@@ -181,16 +195,28 @@ function createAdapter(detail: LevelDetail): RuntimeAdapter<ExperimentState> {
         if (value % script.step !== 0) {
           return { state, error: '旋钮要按 ' + script.step + ' 的倍数调。' };
         }
-        const committed = state.params;
-        const changed = !committed || committed[key] !== value;
+        const draftParams = { ...state.draftParams, [key]: value };
+        const params: DuelParams = {
+          attack: draftParams.attack ?? 0,
+          defense: draftParams.defense ?? 0,
+          economy: draftParams.economy ?? 0,
+        };
+        // 编辑即运行（docs/13）：三个旋钮一凑满资源点就直接跑满默认局数，界面上不再有「运行」按钮。
+        // 没凑满不算错误，只是还没有可用的实验结果；旧的采样与结论一律作废。
+        if (params.attack + params.defense + params.economy === script.resources) {
+          const sample = sampleOf(script, params);
+          return {
+            state: { ...state, draftParams, params, sample, claim: null },
+            evidence: {
+              phase: 'run',
+              tool: 'knob',
+              action: action.type,
+              metrics: { n: sample.n, winRate: Math.round(sample.winRate * 1000) / 1000 },
+            },
+          };
+        }
         return {
-          state: {
-            ...state,
-            draftParams: { ...state.draftParams, [key]: value },
-            params: changed ? null : state.params,
-            sample: changed ? null : state.sample,
-            claim: changed ? null : state.claim,
-          },
+          state: { ...state, draftParams, params: null, sample: null, claim: null },
           evidence: { phase: 'hypothesize', tool: 'knob', action: action.type, metrics: { value } },
         };
       }
@@ -229,7 +255,7 @@ function createAdapter(detail: LevelDetail): RuntimeAdapter<ExperimentState> {
         };
       }
       case 'knob/run': {
-        // 宿主若显示“运行”按钮，就按“确认当前配置 + 跑满默认局数”处理，避免出现死按钮。
+        // 旧运行入口保留给 autoplay 与旧单测；界面已经改成编辑即运行，不再渲染「运行」按钮。
         const draft = state.draftParams;
         const params: DuelParams = {
           attack: draft.attack ?? 0,
@@ -240,27 +266,14 @@ function createAdapter(detail: LevelDetail): RuntimeAdapter<ExperimentState> {
         if (sum !== script.resources) {
           return { state, error: '三个旋钮加起来要正好是 ' + script.resources + ' 点，现在是 ' + sum + ' 点。' };
         }
-        const seed = script.seeds[script.seedIndex] ?? script.seeds[0] ?? 1;
-        const run = simulateDuel(script, params, seed, script.matches);
+        const sample = sampleOf(script, params);
         return {
-          state: {
-            ...state,
-            params,
-            sample: {
-              seed,
-              n: run.n,
-              wins: run.wins,
-              winRate: run.winRate,
-              ci: run.ci,
-              values: run.values,
-            },
-            claim: null,
-          },
+          state: { ...state, params, sample, claim: null },
           evidence: {
             phase: 'run',
             tool: 'knob',
             action: action.type,
-            metrics: { n: run.n, winRate: Math.round(run.winRate * 1000) / 1000 },
+            metrics: { n: sample.n, winRate: Math.round(sample.winRate * 1000) / 1000 },
           },
         };
       }
@@ -379,6 +392,16 @@ function createAdapter(detail: LevelDetail): RuntimeAdapter<ExperimentState> {
         run: state.sample !== null,
         claim: state.claim !== null,
       };
+    },
+    answerComplete(state): boolean {
+      // 只回答「答案填完了没有」，对错交给 validate：
+      // tally 要整筐采完 + 统计条记下 + 结论选好；duel 要参数、采样与结论三件齐（= artifact 非空）。
+      if (script.mode === 'tally') {
+        return state.collected.length >= script.items.length
+          && state.tallyCounts !== null
+          && state.claim !== null;
+      }
+      return state.params !== null && state.sample !== null && state.claim !== null;
     },
     toolState(state): Partial<ToolStateMap> {
       if (script.mode === 'tally') {

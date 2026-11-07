@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ClaimInput, LevelAction, LevelRuntime, RunSnapshot } from '@mmf/game-kit';
 import type { MessageParams, Translator } from '@mmf/i18n';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type LevelDetailLike = LevelRuntime['detail'];
 type ToolSpecLike = LevelDetailLike['tools'][number];
@@ -52,7 +52,7 @@ const labelOf = computed<Record<string, string>>(() => {
 
 const chips = computed(() => collected.value.map((id) => tokenOf.value[id] ?? id));
 
-/** 整筐总数：配置优先；没配就按「已采 + 未知」处理，按钮仍可点（运行时按剩余量切片）。 */
+/** 整筐总数：配置优先；没配就按「已采 + 未知」处理（运行时按剩余量切片）。 */
 const total = computed(() => config.value.total ?? 0);
 const remaining = computed(() => (total.value > 0 ? Math.max(0, total.value - collected.value.length) : 1));
 // 配置缺失时退到「至少有一把」，避免工具面板被永久禁用（配置由 content 测试钉住）。
@@ -84,14 +84,36 @@ async function dispatch(action: LevelAction): Promise<boolean> {
   }
 }
 
-/** 一次点击把整筐倒出来：复用 probe/sample 的 payload.n（运行时按剩余量切片）。 */
-async function dumpAll(): Promise<void> {
+/** 整筐由运行时按剩余量切片：进入工具卡就一次倒出来，玩家只需要照着图形填数字。 */
+async function ensureDumped(): Promise<void> {
+  if (busy.value || collectionComplete.value) return;
   await dispatch({ type: 'probe/sample', payload: { n: remaining.value } });
 }
 
-async function sampleBatch(): Promise<void> {
-  await dispatch({ type: 'probe/sample', payload: {} });
+let autoTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 自动倒筐放在宏任务里：autoplay 调试路径整段在微任务里跑完，
+ * 不能让它和自动倒筐抢同一个运行时（否则自动播放的第一次采集会被判「已采完」）。
+ * 正常游玩时这一拍只有一帧，玩家看不到空筐。
+ */
+function scheduleDump(): void {
+  if (autoTimer !== null) return;
+  autoTimer = setTimeout(() => {
+    autoTimer = null;
+    void ensureDumped();
+  }, 0);
 }
+
+onMounted(scheduleDump);
+// 「重来」会把采集清空（collected 回到 0）：再自动倒一次，玩家不用重新找按钮。
+watch(collected, (items) => {
+  if (items.length === 0) scheduleDump();
+});
+onBeforeUnmount(() => {
+  if (autoTimer !== null) clearTimeout(autoTimer);
+  autoTimer = null;
+});
 
 function draftValue(id: string): string {
   return drafts.value[id] ?? String(recorded.value[id] ?? 0);
@@ -157,27 +179,6 @@ function claimChipActive(direction: 'most' | 'least', categoryId: string): boole
       </span>
     </div>
 
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        data-testid="tally-dump"
-        :disabled="busy || collectionComplete"
-        class="min-h-14 flex-1 rounded-2xl bg-blueprint px-4 text-base font-black text-white active:scale-95 disabled:opacity-40"
-        @click="dumpAll"
-      >
-        {{ collectionComplete ? '整筐已经倒出来了' : '全部倒出来' }}
-      </button>
-      <button
-        type="button"
-        data-testid="tally-sample"
-        :disabled="busy || collectionComplete"
-        class="min-h-14 rounded-2xl bg-card px-4 text-sm font-bold text-ink active:scale-95 disabled:opacity-40"
-        @click="sampleBatch"
-      >
-        采集一把
-      </button>
-    </div>
-
     <div class="flex min-h-10 flex-wrap gap-1.5" data-testid="tally-chips">
       <span
         v-for="(token, index) in chips"
@@ -186,16 +187,13 @@ function claimChipActive(direction: 'most' | 'least', categoryId: string): boole
       >
         {{ token }}
       </span>
-      <span v-if="chips.length === 0" class="text-xs text-ink-soft">还没有采集，先点上面的按钮。</span>
+      <span v-if="chips.length === 0" class="text-xs text-ink-soft">正在把整筐倒出来……</span>
     </div>
 
     <div class="rounded-2xl border border-grid bg-paper p-3" data-testid="tally-board">
       <p class="text-sm font-bold text-ink">统计条</p>
       <p class="mt-1 text-xs text-ink-soft">
-        {{ collectionComplete ? '照着上面的图形，把每一类的数量填进去（按回车或点别处生效）。' : '先把整筐倒出来，再照着图形填数字。' }}
-      </p>
-      <p v-if="!collectionComplete" class="mt-1 text-xs font-bold text-red" data-testid="tally-wait">
-        整筐还没倒出来：先点「全部倒出来」，统计条和答案才会解锁。
+        {{ collectionComplete ? '照着上面的图形，把每一类的数量填进去（按回车或点别处生效）。' : '整筐正在自动倒出来，倒完就能填数字。' }}
       </p>
       <ul class="mt-2 flex flex-col gap-2">
         <li

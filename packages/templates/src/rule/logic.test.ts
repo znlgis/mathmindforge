@@ -428,3 +428,76 @@ describe('画布点格画路线（rule/place 追加展开版程序）', () => {
     expect(result.verdict?.passed).toBe(true);
   });
 });
+
+/**
+ * answerComplete（docs/13）：只回答「可以判了吗」，对错仍由 validateArtifact 决定。
+ * rule 的口径 = 程序非空，且执行结果撞墙/绕圈（已经能报错）或已停在终点（漏星交给 validate）。
+ */
+describe('answerComplete（自动判题口径）', () => {
+  async function placeProgram(
+    runtime: ReturnType<typeof runtimeAt>,
+    program: readonly ProgramBlock[],
+  ): Promise<void> {
+    for (const [index, block] of program.entries()) {
+      const placed = await runtime.dispatch({ type: 'rule/place', payload: { block, at: index } });
+      expect(placed.ok, 'place ' + block.id).toBe(true);
+    }
+  }
+
+  it('空程序和「还没跑到终点」的程序都不算填完', async () => {
+    const runtime = runtimeAt();
+    expect(runtime.snapshot().answerComplete).toBe(false);
+    await runtime.dispatch({ type: 'rule/place', payload: { block: { id: 'a', op: 'forward' }, at: 0 } });
+    // 有程序、但执行后既没撞墙也没到终点：宿主不该在这时候判。
+    expect(runtime.snapshot().answerComplete).toBe(false);
+  });
+
+  it('程序跑到终点：answerComplete 立即变 true，submit 也通过', async () => {
+    const runtime = runtimeAt();
+    await placeProgram(runtime, UNROLLED);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+  });
+
+  it('撞墙程序：answerComplete 为 true（已经能报错），submit 报 rule-wall', async () => {
+    const runtime = runtimeAt();
+    const wall = detail.negativeSamples.find((sample) => sample.expectFailure === 'rule-wall');
+    expect(wall).toBeDefined();
+    await placeProgram(runtime, (wall?.artifact as { program: ProgramBlock[] }).program);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(false);
+    expect(result.verdict?.failure?.class).toBe('rule-wall');
+  });
+
+  it('到了终点但漏收星星：answerComplete 为 true，对错由 validate 判 rule-missed-item', async () => {
+    const runtime = runtimeAt();
+    const missed = detail.negativeSamples.find((sample) => sample.expectFailure === 'rule-missed-item');
+    expect(missed).toBeDefined();
+    await placeProgram(runtime, (missed?.artifact as { program: ProgramBlock[] }).program);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(false);
+    expect(result.verdict?.failure?.class).toBe('rule-missed-item');
+  });
+
+  it('k-algorithm-train：顺序解收星到站后 answerComplete 为 true', async () => {
+    const train = trainJson as unknown as LevelDetail;
+    const runtime = createRuleRuntime(train, {
+      seed: 101, now: () => 1_700_000_000_000, locale: 'zh-CN', reducedMotion: true,
+    });
+    const solution = (train.solutions[0]?.artifact as { program: ProgramBlock[] }).program;
+    await placeProgram(runtime, solution);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+    const result = await runtime.dispatch({ type: 'submit', payload: {} });
+    expect(result.verdict?.passed).toBe(true);
+  });
+
+  it('autoplay 通关后 answerComplete 仍为 true', async () => {
+    const runtime = runtimeAt();
+    const result = await runtime.autoplay();
+    expect(result.verdict?.passed).toBe(true);
+    expect(runtime.snapshot().answerComplete).toBe(true);
+  });
+});

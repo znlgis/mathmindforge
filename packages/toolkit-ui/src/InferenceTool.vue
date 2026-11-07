@@ -84,7 +84,6 @@ async function choose(direction: 1 | -1 | 0): Promise<void> {
         <p class="text-[11px] text-ink-soft">{{ stats.bSuccess }} / {{ stats.bN }} · 区间 {{ percent(stats.bLow) }}–{{ percent(stats.bHigh) }}</p>
       </article>
     </div>
-    <p v-else class="text-xs text-ink-soft">还没有两组样本。</p>
 
     <div class="flex flex-wrap gap-2">
       <button type="button" data-testid="inference-a-higher" :disabled="busy" class="min-h-10 rounded-xl bg-card px-3 text-xs font-bold text-ink" @click="choose(1)">A 更高</button>

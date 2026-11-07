@@ -31,6 +31,12 @@ export interface RuntimeAdapter<S> {
   transferFailureClass?(detail: LevelDetail): string;
   /** argue 模板的结构化证书状态；其他模板不实现 */
   argumentState?(state: S): ArgumentSnapshot | undefined;
+  /**
+   * 答案是否已经填完整（docs/13）：宿主据此自动判题，玩家不用再点「完成」。
+   * 缺省 = 不支持自动判定；返回 false = 还缺东西（缺口没补、结论没选、程序还没跑通）。
+   * 注意这里只回答「填完了没有」，不回答问题对不对——对错一律交给 validate。
+   */
+  answerComplete?(state: S): boolean;
 }
 
 export const BASE_VARIANT: RuntimeVariant = { id: 'base', axis: 'structure', patch: {} };
@@ -112,6 +118,7 @@ export function createRuntimeWithAdapter<S>(
       lastRun: meta.lastRun,
       verdict: meta.verdict,
       argument: adapter.argumentState?.(meta.state),
+      answerComplete: adapter.answerComplete?.(meta.state) ?? false,
       stamps: [...meta.stamps],
       revision: meta.revision,
       updatedAt: opts.now(),
